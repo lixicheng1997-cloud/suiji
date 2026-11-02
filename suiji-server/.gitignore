@@ -24,9 +24,8 @@ ENV/
 .python-version
 
 # ---------- 环境变量 / 密钥 ----------
-# .env 不再忽略：单人自用项目，凭据随仓库一起管理（.env 与 .env.example 逐行保持一致）。
-# 将来若要开源/共享，把下面被注释的那行恢复即可，并把凭据改成占位值。
-# .env
+# .env 含真实凭据，不入库（开源约定）；模板为 .env.example，只含占位符。
+.env
 .env.local
 .env.*.local
 *.pem
