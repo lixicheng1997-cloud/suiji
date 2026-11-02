@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>岁记 · 卡通图标预览 · 小熊组 / 小鸭组</title>
+<style>
+  /* 设计令牌：与 suiji-prototype v0.3 同源 */
+  :root {
+    --primary: #FF6B8B;
+    --accent: #FF9E58;
+    --gold: #FFC24B;
+    --bg: #FFF6F0;
+    --surface: #FFFFFF;
+    --border: #FFE6D8;
+    --text: #4A3A3E;
+    --text-sub: #A08A8F;
+    --r-sm: 12px; --r-md: 18px; --r-lg: 24px; --r-pill: 999px;
+    --sh-sm: 0 2px 8px rgba(255,107,139,.10);
+    --sh-md: 0 8px 24px rgba(255,107,139,.14);
+    --ease-out: cubic-bezier(.22,.8,.3,1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Source Han Sans SC", "Microsoft YaHei", sans-serif;
+    color: var(--text);
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(255,107,139,.14), transparent 60%),
+      radial-gradient(1000px 500px at 95% 110%, rgba(255,158,88,.16), transparent 55%),
+      linear-gradient(165deg, #FFF6F0 0%, #FFEFE6 55%, #FFF3F6 100%);
+    min-height: 100vh;
+    padding: 40px 24px 64px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+
+  /* 头部 */
+  header { text-align: center; margin-bottom: 28px; }
+  header h1 { font-size: 26px; font-weight: 700; }
+  header h1 .en { font-size: 13px; color: var(--text-sub); font-weight: 400; margin-left: 8px; }
+  header p.desc { font-size: 14px; color: var(--text-sub); margin-top: 10px; line-height: 1.8; }
+  header p.desc b { color: var(--primary); font-weight: 600; }
+
+  /* 模式切换 */
+  .switch { display: flex; justify-content: center; gap: 10px; margin: 22px 0 30px; }
+  .switch button {
+    border: 1.5px solid var(--border); background: var(--surface); color: var(--text-sub);
+    font-size: 14px; font-weight: 600; padding: 9px 22px; border-radius: var(--r-pill);
+    cursor: pointer; transition: all .25s var(--ease-out); box-shadow: var(--sh-sm);
+  }
+  .switch button:hover { transform: translateY(-1px); border-color: var(--primary); color: var(--primary); }
+  .switch button.on { background: var(--primary); border-color: var(--primary); color: #fff; box-shadow: var(--sh-md); }
+
+  /* 分组标题 */
+  .group { margin-bottom: 34px; }
+  .group-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
+  .group-head h2 { font-size: 18px; font-weight: 700; }
+  .group-head span { font-size: 12.5px; color: var(--text-sub); }
+
+  /* 4×2 网格 */
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  @media (max-width: 860px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+    padding: 14px; box-shadow: var(--sh-sm); transition: transform .25s var(--ease-out), box-shadow .25s;
+  }
+  .card:hover { transform: translateY(-3px); box-shadow: var(--sh-md); }
+  .icons { display: flex; gap: 10px; }
+  .icons figure { flex: 1; min-width: 0; }
+  .ic {
+    width: 100%; aspect-ratio: 1/1; border-radius: var(--r-lg); overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .ic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .icons figcaption { text-align: center; font-size: 11px; color: var(--text-sub); margin-top: 6px; }
+  .meta { margin-top: 10px; }
+  .meta .row1 { display: flex; align-items: center; gap: 8px; }
+  .chip { width: 14px; height: 14px; border-radius: 5px; flex: none; border: 1px solid rgba(0,0,0,.06); }
+  .meta .label { font-size: 15px; font-weight: 700; }
+  .meta .file { font-size: 10.5px; color: var(--text-sub); margin-left: auto; font-family: Consolas, monospace; }
+  .meta .scene { font-size: 12px; color: var(--text-sub); margin-top: 5px; line-height: 1.6; }
+
+  /* 底部说明 */
+  footer {
+    margin-top: 40px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-lg); padding: 22px 26px; box-shadow: var(--sh-sm);
+  }
+  footer h3 { font-size: 15px; font-weight: 700; margin-bottom: 10px; }
+  footer h3 + ul { margin-bottom: 16px; }
+  footer ul { padding-left: 20px; font-size: 13px; color: var(--text-sub); line-height: 2; }
+  footer li b { color: var(--text); font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; margin-top: 6px; }
+  th, td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
+  th { background: #FFF0E8; font-weight: 600; }
+  td .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>岁记 · 卡通图标预览<span class="en">Baby Growth Log · Icon Set</span></h1>
+    <p class="desc">
+      基于 <b>PRD v1.2（云端轻量版）</b> 的快速记录场景与 <b>原型 v0.3</b> 暖粉橙设计系统，为 8 个记录类别各设计两组成图：<br>
+      <b>小熊组</b>（圆胖奶棕幼熊）与 <b>小鸭组</b>（圆黄小鸭），扁平 kawaii 风格 · 1920×1920 · 圆角徽章构图，类别底色与产品类别色一一对应。
+    </p>
+  </header>
+
+  <div class="switch" id="switch">
+    <button data-mode="bear" class="on">🐻 小熊组</button>
+    <button data-mode="duck">🐤 小鸭组</button>
+    <button data-mode="compare">⚖️ 双组对比</button>
+  </div>
+
+  <div id="stage"></div>
+
+  <footer>
+    <h3>使用说明</h3>
+    <ul>
+      <li><b>规格</b>：1920×1920 方形 JPG；主体居中于圆角徽章内，底色为类别浅色底（tint），无需抠图即可整卡使用。</li>
+      <li><b>适用场景</b>：快速记录面板磁贴（M1）、类别筛选标签、引导页 / 空状态插画、里程碑纪念卡片（M11）、家长端常用类别设置（M5）。</li>
+      <li><b>两组定位</b>：小熊组偏温暖亲和（默认推荐），小鸭组偏活泼明快；可按多宝宝（M9）为不同宝宝分配形象，也可用于主题皮肤切换。</li>
+      <li><b>目录</b>：<code>suiji-icons/bear/01~08</code>、<code>suiji-icons/duck/01~08</code>，文件名与类别英文键一致（feeding / sleep / milestone / photo / measure / poop / temp / med）。</li>
+      <li><b>落地建议</b>：小尺寸 UI（&lt;96px）建议按本组形象重新矢量化描边版，当前位图更适合磁贴、插画与卡片等大尺寸场景。</li>
+    </ul>
+    <h3>类别色映射（与原型 styles.css 同步）</h3>
+    <table id="colorTable"></table>
+  </footer>
+</div>
+
+<script>
+const CATS = [
+  { file: "01-feeding",  label: "喂养",   color: "#FF9E58", scene: "母乳 / 瓶喂 / 辅食快速记录，时光轴高频入口" },
+  { file: "02-sleep",    label: "睡眠",   color: "#8FA8D8", scene: "小睡与夜觉起止时间、时长自动计算" },
+  { file: "03-milestone",label: "里程碑", color: "#FFC24B", scene: "第一次翻身、独坐、走路等成长“第一次”" },
+  { file: "04-photo",    label: "照片",   color: "#FF6B8B", scene: "日常照片与视频片段记录" },
+  { file: "05-measure",  label: "测量",   color: "#E86FA0", scene: "身高 / 体重 / 头围，汇入生长曲线（M2）" },
+  { file: "06-poop",     label: "便便",   color: "#C9A28B", scene: "纸尿裤更换与消化情况观察" },
+  { file: "07-temp",     label: "体温",   color: "#FF7B6B", scene: "体温监测与护育健康日志（M4）" },
+  { file: "08-med",      label: "用药",   color: "#9B8AC6", scene: "用药记录与服药提醒（M6）" }
+];
+const GROUPS = { bear: "小熊组 🐻", duck: "小鸭组 🐤" };
+let mode = "bear";
+
+function iconCell(g, c) {
+  return `<figure><div class="ic"><img src="./${g}/${c.file}.jpg" alt="${c.label}" loading="lazy"></div>
+    <figcaption>${GROUPS[g].split(" ")[0]}</figcaption></figure>`;
+}
+function card(c) {
+  const cells = (mode === "compare" ? ["bear","duck"] : [mode]).map(g => iconCell(g, c)).join("");
+  return `<div class="card">
+    <div class="icons">${cells}</div>
+    <div class="meta">
+      <div class="row1"><span class="chip" style="background:${c.color}"></span>
+        <span class="label">${c.label}</span><span class="file">${c.file}.jpg</span></div>
+      <p class="scene">${c.scene}</p>
+    </div></div>`;
+}
+function render() {
+  const groups = mode === "compare" ? null : mode;
+  const grid = CATS.map(card).join("");
+  document.getElementById("stage").innerHTML = groups
+    ? `<section class="group"><div class="group-head"><h2>${GROUPS[groups]}</h2><span>8 枚 · 对应快速记录 8 类别</span></div><div class="grid">${grid}</div></section>`
+    : `<section class="group"><div class="group-head"><h2>小熊组 × 小鸭组</h2><span>同场景同配色，左右对比选组</span></div><div class="grid">${grid}</div></section>`;
+}
+document.getElementById("switch").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  mode = b.dataset.mode;
+  document.querySelectorAll("#switch button").forEach(x => x.classList.toggle("on", x === b));
+  render();
+});
+document.getElementById("colorTable").innerHTML =
+  "<tr><th>类别</th><th>色值</th><th>类别</th><th>色值</th></tr>" +
+  CATS.reduce((h, c, i) => i % 2 === 0 ? h + `<tr><td><span class="dot" style="background:${c.color}"></span>${c.label}</td><td>${c.color}</td>` : h + `<td><span class="dot" style="background:${c.color}"></span>${c.label}</td><td>${c.color}</td></tr>`, "") +
+  (CATS.length % 2 ? "<td></td><td></td></tr>" : "");
+render();
+</script>
+</body>
+</html>

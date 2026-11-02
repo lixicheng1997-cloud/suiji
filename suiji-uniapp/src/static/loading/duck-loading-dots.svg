@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 84 30" role="img" aria-label="小鸭叽叽 · 加载中">
+<style>
+  .h{animation:hop .96s cubic-bezier(.34,1.56,.64,1) infinite}
+  .h2{animation-delay:.16s}.h3{animation-delay:.32s}
+  @keyframes hop{0%,58%,100%{transform:translateY(0)}24%{transform:translateY(-10px)}}
+  .s{transform-box:fill-box;transform-origin:center;animation:sh .96s ease-in-out infinite}
+  .s2{animation-delay:.16s}.s3{animation-delay:.32s}
+  @keyframes sh{0%,58%,100%{transform:scaleX(1);opacity:.16}24%{transform:scaleX(.6);opacity:.07}}
+  @media (prefers-reduced-motion:reduce){.h,.s{animation:none}}
+</style>
+<g transform="translate(14,20)"><ellipse class="s" cy="6" rx="7" ry="2" fill="#D98E1F"/><g class="h"><circle r="6.8" fill="#CFEBFA" stroke="#6FBDE0" stroke-width="2.2"/><circle cx="-2.2" cy="-2.4" r="1.8" fill="#FFFFFF" opacity=".9"/></g></g>
+<g transform="translate(42,20)"><ellipse class="s s2" cy="6" rx="7" ry="2" fill="#D98E1F"/><g class="h h2"><circle r="6.8" fill="#CFEBFA" stroke="#6FBDE0" stroke-width="2.2"/><circle cx="-2.2" cy="-2.4" r="1.8" fill="#FFFFFF" opacity=".9"/></g></g>
+<g transform="translate(70,20)"><ellipse class="s s3" cy="6" rx="7" ry="2" fill="#D98E1F"/><g class="h h3"><circle r="6.8" fill="#CFEBFA" stroke="#6FBDE0" stroke-width="2.2"/><circle cx="-2.2" cy="-2.4" r="1.8" fill="#FFFFFF" opacity=".9"/></g></g>
+</svg>

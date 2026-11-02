@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="小熊岁岁 · 数据加载中">
+<style>
+  .ring{transform-box:view-box;transform-origin:64px 64px;animation:orbit 1.6s linear infinite}
+  @keyframes orbit{to{transform:rotate(360deg)}}
+  .head{animation:bob 1.6s ease-in-out infinite}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+  .earL{transform-box:view-box;transform-origin:43.3px 55.5px;animation:flapL 1.6s ease-in-out infinite}
+  .earR{transform-box:view-box;transform-origin:84.7px 55.5px;animation:flapR 1.6s ease-in-out infinite}
+  @keyframes flapL{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(5deg)}}
+  @keyframes flapR{0%,100%{transform:rotate(6deg)}50%{transform:rotate(-5deg)}}
+  .eyes{transform-box:view-box;transform-origin:64px 63.4px;animation:blink 4.2s infinite}
+  @keyframes blink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+  @media (prefers-reduced-motion:reduce){.ring,.head,.earL,.earR,.eyes{animation:none}}
+</style>
+
+<g class="ring">
+  <circle cx="64" cy="64" r="48" fill="none" stroke="#D99E63" stroke-width="3" stroke-dasharray=".1 9" stroke-linecap="round" opacity=".35"/>
+  <g transform="translate(105.6,88) rotate(120)" opacity="1">
+    <path d="M0 -10.5C3.6 -4.6 6.4 -1.6 6.4 1.6A6.4 6.4 0 1 1 -6.4 1.6C-6.4 -1.6 -3.6 -4.6 0 -10.5Z" fill="#F7A15C" stroke="#E07E33" stroke-width="2" stroke-linejoin="round"/>
+  </g>
+  <g transform="translate(64,16) scale(.82)" opacity=".65">
+    <path d="M0 -10.5C3.6 -4.6 6.4 -1.6 6.4 1.6A6.4 6.4 0 1 1 -6.4 1.6C-6.4 -1.6 -3.6 -4.6 0 -10.5Z" fill="#F7A15C" stroke="#E07E33" stroke-width="2.4" stroke-linejoin="round"/>
+  </g>
+  <g transform="translate(22.4,88) rotate(240) scale(.66)" opacity=".34">
+    <path d="M0 -10.5C3.6 -4.6 6.4 -1.6 6.4 1.6A6.4 6.4 0 1 1 -6.4 1.6C-6.4 -1.6 -3.6 -4.6 0 -10.5Z" fill="#F7A15C" stroke="#E07E33" stroke-width="3" stroke-linejoin="round"/>
+  </g>
+</g>
+
+<g class="head">
+  <g class="earL"><circle cx="43.3" cy="44" r="11.5" fill="#D99E63" stroke="#6B4A3A" stroke-width="4.5"/><circle cx="43.3" cy="44" r="5.2" fill="#F7B8C4"/></g>
+  <g class="earR"><circle cx="84.7" cy="44" r="11.5" fill="#D99E63" stroke="#6B4A3A" stroke-width="4.5"/><circle cx="84.7" cy="44" r="5.2" fill="#F7B8C4"/></g>
+  <circle cx="64" cy="68" r="27" fill="#D99E63" stroke="#6B4A3A" stroke-width="4.5"/>
+  <ellipse cx="64" cy="76.1" rx="12.6" ry="9.2" fill="#F7E3C8"/>
+  <g class="eyes"><circle cx="53.7" cy="63.4" r="3.2" fill="#4A3226"/><circle cx="74.3" cy="63.4" r="3.2" fill="#4A3226"/></g>
+  <ellipse cx="64" cy="72.6" rx="4" ry="2.9" fill="#6B4A3A"/>
+  <path d="M64 75.5q0 3.4 -3.8 4M64 75.5q0 3.4 3.8 4" stroke="#6B4A3A" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <ellipse cx="45.6" cy="71.4" rx="4.6" ry="2.9" fill="#F9A8B8" opacity=".85"/>
+  <ellipse cx="82.4" cy="71.4" rx="4.6" ry="2.9" fill="#F9A8B8" opacity=".85"/>
+</g>
+</svg>

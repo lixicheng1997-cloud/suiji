@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>岁记 · 卡通图标预览 v2 · 新小熊 / 新小鸭</title>
+<style>
+  :root {
+    --primary: #FF6B8B;
+    --accent: #FF9E58;
+    --gold: #FFC24B;
+    --bg: #FFF6F0;
+    --surface: #FFFFFF;
+    --border: #FFE6D8;
+    --text: #4A3A3E;
+    --text-sub: #A08A8F;
+    --r-sm: 12px; --r-md: 18px; --r-lg: 24px; --r-pill: 999px;
+    --sh-sm: 0 2px 8px rgba(255,107,139,.10);
+    --sh-md: 0 8px 24px rgba(255,107,139,.14);
+    --ease-out: cubic-bezier(.22,.8,.3,1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Source Han Sans SC", "Microsoft YaHei", sans-serif;
+    color: var(--text);
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(255,107,139,.14), transparent 60%),
+      radial-gradient(1000px 500px at 95% 110%, rgba(255,158,88,.16), transparent 55%),
+      linear-gradient(165deg, #FFF6F0 0%, #FFEFE6 55%, #FFF3F6 100%);
+    min-height: 100vh;
+    padding: 40px 24px 64px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+
+  header { text-align: center; margin-bottom: 28px; }
+  header h1 { font-size: 26px; font-weight: 700; }
+  header h1 .en { font-size: 13px; color: var(--text-sub); font-weight: 400; margin-left: 8px; }
+  header p.desc { font-size: 14px; color: var(--text-sub); margin-top: 10px; line-height: 1.8; }
+  header p.desc b { color: var(--primary); font-weight: 600; }
+
+  .switch { display: flex; justify-content: center; gap: 10px; margin: 22px 0 30px; }
+  .switch button {
+    border: 1.5px solid var(--border); background: var(--surface); color: var(--text-sub);
+    font-size: 14px; font-weight: 600; padding: 9px 22px; border-radius: var(--r-pill);
+    cursor: pointer; transition: all .25s var(--ease-out); box-shadow: var(--sh-sm);
+  }
+  .switch button:hover { transform: translateY(-1px); border-color: var(--primary); color: var(--primary); }
+  .switch button.on { background: var(--primary); border-color: var(--primary); color: #fff; box-shadow: var(--sh-md); }
+
+  .group { margin-bottom: 34px; }
+  .group-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
+  .group-head h2 { font-size: 18px; font-weight: 700; }
+  .group-head span { font-size: 12.5px; color: var(--text-sub); }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 860px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+    padding: 14px; box-shadow: var(--sh-sm); transition: transform .25s var(--ease-out), box-shadow .25s;
+  }
+  .card:hover { transform: translateY(-3px); box-shadow: var(--sh-md); }
+  .icons { display: flex; gap: 10px; }
+  .icons figure { flex: 1; min-width: 0; }
+  .ic {
+    width: 100%; aspect-ratio: 1/1; border-radius: var(--r-lg); overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .ic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .icons figcaption { text-align: center; font-size: 11px; color: var(--text-sub); margin-top: 6px; }
+  .meta { margin-top: 10px; }
+  .meta .row1 { display: flex; align-items: center; gap: 8px; }
+  .meta .label { font-size: 15px; font-weight: 700; }
+  .meta .file { font-size: 10.5px; color: var(--text-sub); margin-left: auto; font-family: Consolas, monospace; }
+  .meta .scene { font-size: 12px; color: var(--text-sub); margin-top: 5px; line-height: 1.6; }
+
+  footer {
+    margin-top: 40px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-lg); padding: 22px 26px; box-shadow: var(--sh-sm);
+  }
+  footer h3 { font-size: 15px; font-weight: 700; margin-bottom: 10px; }
+  footer h3 + ul { margin-bottom: 16px; }
+  footer ul { padding-left: 20px; font-size: 13px; color: var(--text-sub); line-height: 2; }
+  footer li b { color: var(--text); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>岁记 · 卡通图标预览 v2<span class="en">Icon Set v2 · Bear &amp; Duck</span></h1>
+    <p class="desc">
+      重新设计的两套卡通形象：<b>新小熊组</b>（奶白幼熊 + 薄荷绿围巾）与 <b>新小鸭组</b>（雪白玉鸭 + 天蓝围巾）。<br>
+      每套 30 枚、场景一一对应，形象全组统一；扁平 kawaii 风格 · 1920×1920 · 圆角淡彩底板构图。
+    </p>
+  </header>
+
+  <div class="switch" id="switch">
+    <button data-mode="bear-v2" class="on">🐻 新小熊组</button>
+    <button data-mode="duck-v2">🐤 新小鸭组</button>
+    <button data-mode="compare">⚖️ 双组对比</button>
+  </div>
+
+  <div id="stage"></div>
+
+  <footer>
+    <h3>使用说明</h3>
+    <ul>
+      <li><b>规格</b>：30 枚 × 2 套，全部 1920×1920 方形 JPG，尺寸完全一致；主体居中于圆角淡彩底板，无需抠图即可整卡使用。</li>
+      <li><b>形象一致性</b>：新小熊 = 奶白色圆胖幼熊 + 薄荷绿围巾；新小鸭 = 雪白圆胖小鸭 + 天蓝围巾；同一套内所有图标为同一角色。</li>
+      <li><b>分组</b>：记录类型（01~09，10 枚）、底部导航（10~13，4 枚）、功能模块（20~35，16 枚），共 30 个场景。</li>
+      <li><b>目录</b>：<code>suiji-icons/bear-v2/</code> 与 <code>suiji-icons/duck-v2/</code>，文件名与原图标库一致，可直接替换引用。</li>
+      <li><b>不影响原文件</b>：本页仅引用 v2 目录；原 <code>bear/</code>、<code>duck/</code>、<code>preview.html</code>、<code>岁记图标库.html</code> 均未改动。</li>
+    </ul>
+  </footer>
+</div>
+
+<script>
+const GROUPS = { "bear-v2": "新小熊组 🐻", "duck-v2": "新小鸭组 🐤" };
+
+const SECTIONS = [
+  { title: "一、记录类型", note: "宝宝日常与偶发事件的记录维度", items: [
+    { file: "01-feeding",   label: "喂奶",   scene: "记录哺乳/奶瓶喂养的时间、奶量、左右乳，是最高频的日常记录项。" },
+    { file: "02-sleep",     label: "睡眠",   scene: "记录宝宝睡眠时长、起夜与质量，以月亮+睡帽表达安睡场景。" },
+    { file: "03-milestone", label: "里程碑", scene: "记录翻身、坐、爬、走等成长大事件，用奖杯象征阶段成就。" },
+    { file: "04-photo",     label: "照片",   scene: "记录每个阶段的影像瞬间，用相机表达。" },
+    { file: "05-measure",   label: "测量",   scene: "记录身高、体重、头围等发育数据，配软尺与体重秤。" },
+    { file: "06-poop",      label: "便便",   scene: "记录大便性状、次数、颜色，卡通便便造型轻松表达。" },
+    { file: "07-temp",      label: "体温",   scene: "记录体温与物理降温，配体温计与退热贴。" },
+    { file: "08-med",       label: "用药",   scene: "记录用药名称、剂量、时间，配药瓶与胶囊。" },
+    { file: "09-text-mood", label: "文字心情", scene: "用文字便签记录宝宝当日心情或妈妈随笔。" },
+    { file: "09-voice",     label: "语音",   scene: "用语音速记宝宝趣事或哼唱，配对话气泡。" }
+  ]},
+  { title: "二、底部导航", note: "App 主框架的四个一级页面入口", items: [
+    { file: "10-tab-home",   label: "首页", scene: "App 主入口，时间轴概览当天的各类记录。" },
+    { file: "11-tab-growth", label: "成长", scene: "查看生长曲线、里程碑与成长趋势。" },
+    { file: "12-tab-family", label: "家庭", scene: "家庭成员与共同记录管理。" },
+    { file: "13-tab-me",     label: "我的", scene: "个人中心、设置与账户入口。" }
+  ]},
+  { title: "三、功能模块", note: "记录、协作、安全、导出等扩展能力入口", items: [
+    { file: "20-fn-diary",   label: "日记",     scene: "长文成长日记，配日记本与铅笔。" },
+    { file: "21-fn-remind",  label: "提醒",     scene: "喂奶/用药/疫苗提醒，配手摇铃铛。" },
+    { file: "22-fn-backup",  label: "云端备份", scene: "数据云同步与备份，配云朵与上箭头。" },
+    { file: "23-fn-privacy", label: "隐私安全", scene: "隐私保护、加密与权限管理，配盾牌爱心锁。" },
+    { file: "24-fn-search",  label: "搜索",     scene: "按关键词/日期检索历史记录，配放大镜。" },
+    { file: "25-fn-notify",  label: "消息通知", scene: "家人动态与系统消息，配信封。" },
+    { file: "26-fn-export",  label: "导出PDF",  scene: "导出成长报告/纪念册，配文档页。" },
+    { file: "27-fn-trash",   label: "回收站",   scene: "误删记录恢复，配垃圾桶。" },
+    { file: "28-fn-invite",  label: "邀请家人", scene: "邀请家人共同记录，配分享卡与爱心链。" },
+    { file: "29-fn-babies",  label: "多宝宝",   scene: "支持多个宝宝档案切换，配多只宝宝玩具。" },
+    { file: "30-fn-elder",   label: "家长模式", scene: "大字版长辈友好模式，配眼镜与书本。" },
+    { file: "31-fn-compare", label: "同月龄对比", scene: "与同月龄宝宝数据对比，配两张对比照片。" },
+    { file: "32-fn-card",    label: "纪念卡",   scene: "生成可分享的纪念日卡片，配贺卡与丝带。" },
+    { file: "33-fn-video",   label: "成长视频", scene: "照片自动生成成长短片，配复古摄像机。" },
+    { file: "34-fn-vaccine", label: "疫苗接种", scene: "疫苗时间表与接种记录，配创可贴与药瓶针管。" },
+    { file: "35-fn-audit",   label: "操作留痕", scene: "记录操作日志与修改历史，配清单勾选。" }
+  ]}
+];
+
+let mode = "bear-v2";
+
+function iconCell(g, c) {
+  return `<figure><div class="ic"><img src="./${g}/${c.file}.jpg" alt="${c.label}" loading="lazy"></div>
+    <figcaption>${GROUPS[g].split(" ")[0]}</figcaption></figure>`;
+}
+function card(c) {
+  const cells = (mode === "compare" ? ["bear-v2","duck-v2"] : [mode]).map(g => iconCell(g, c)).join("");
+  return `<div class="card">
+    <div class="icons">${cells}</div>
+    <div class="meta">
+      <div class="row1"><span class="label">${c.label}</span><span class="file">${c.file}.jpg</span></div>
+      <p class="scene">${c.scene}</p>
+    </div></div>`;
+}
+function render() {
+  const html = SECTIONS.map(s => {
+    const grid = s.items.map(card).join("");
+    const head = mode === "compare"
+      ? "新小熊组 × 新小鸭组 · 同场景左右对比"
+      : GROUPS[mode];
+    return `<section class="group"><div class="group-head"><h2>${s.title}</h2><span>${head} · ${s.note}（${s.items.length} 枚）</span></div><div class="grid">${grid}</div></section>`;
+  }).join("");
+  document.getElementById("stage").innerHTML = html;
+}
+document.getElementById("switch").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  mode = b.dataset.mode;
+  document.querySelectorAll("#switch button").forEach(x => x.classList.toggle("on", x === b));
+  render();
+});
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="岁记 App 图标">
+  <!--
+    岁记 · App Icon · master vector (1024x1024, full-bleed square)
+    概念 Wordmark：直接呈现「岁记」两字，圆胖字重 + 轻微歪头，两点星光点缀，其余从简。
+    - 上传 App Store 用整张方形（系统自动加圆角遮罩）
+    - Android 自适应图标：bg = 下方 rect，fg = glyph 组
+    配色沿用 Design Tokens: #FF6B8B / #FF9E58
+    字体栈：PingFang SC / HarmonyOS Sans / 思源黑体 / 微软雅黑（导出 PNG 时需安装其一）
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FF7A93"/>
+      <stop offset="0.55" stop-color="#FF6B8B"/>
+      <stop offset="1" stop-color="#FF9E58"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.28" cy="0.22" r="0.9">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.28"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.05"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="14" stdDeviation="22" flood-color="#C8324F" flood-opacity="0.32"/>
+    </filter>
+  </defs>
+
+  <!-- 背景（自适应图标 background 层） -->
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <rect width="1024" height="1024" fill="url(#glow)"/>
+
+  <!-- 前景（自适应图标 foreground 层） -->
+  <g filter="url(#softShadow)"
+     font-family="'PingFang SC','HarmonyOS Sans SC','Source Han Sans SC','Noto Sans SC','Microsoft YaHei',sans-serif"
+     font-weight="900" fill="#FFFFFF" text-anchor="middle"
+     stroke="#FFFFFF" stroke-width="14" stroke-linejoin="round" paint-order="stroke">
+    <!-- 岁记：微微歪头，俏皮可爱 -->
+    <text x="332" y="606" font-size="340" transform="rotate(-7 332 470)">岁</text>
+    <text x="692" y="646" font-size="340" transform="rotate(6 692 510)">记</text>
+    <!-- 星光点缀（仅此两点，其余从简） -->
+    <path opacity="0.95" stroke="none" d="M856 168 L868 200 L900 212 L868 224 L856 256 L844 224 L812 212 L844 200 Z"/>
+    <path opacity="0.8" stroke="none" d="M168 776 L177 797 L198 806 L177 815 L168 836 L159 815 L138 806 L159 797 Z"/>
+  </g>
+</svg>

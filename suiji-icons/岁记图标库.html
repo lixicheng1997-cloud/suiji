@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>岁记 · 宝宝成长记录 App 图标库</title>
+<style>
+  :root{
+    --bg:#FFF7F2; --card:#FFFFFF; --ink:#3A2E2A; --sub:#8A7A72;
+    --line:#F0E2D8; --bear:#F2C288; --duck:#FFD85C; --accent:#FF9E7A;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.6; padding:0 0 60px;
+  }
+  header{
+    text-align:center; padding:48px 20px 32px;
+    background:linear-gradient(135deg,#FFE8DB,#FFF2DE);
+    border-bottom:1px solid var(--line);
+  }
+  header h1{font-size:30px; font-weight:800; letter-spacing:1px}
+  header p{color:var(--sub); margin-top:10px; font-size:15px; max-width:760px; margin-left:auto;margin-right:auto}
+  .badges{margin-top:18px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap}
+  .badge{background:#fff; border:1px solid var(--line); border-radius:999px; padding:6px 14px; font-size:13px; color:var(--sub)}
+  .legend{display:flex; gap:24px; justify-content:center; margin-top:20px; font-size:14px; color:var(--sub)}
+  .legend i{display:inline-block; width:14px; height:14px; border-radius:4px; margin-right:6px; vertical-align:-2px}
+  .legend .b{background:var(--bear)} .legend .d{background:var(--duck)}
+
+  main{max-width:1100px; margin:0 auto; padding:0 20px}
+  .cat{margin-top:46px}
+  .cat h2{
+    font-size:21px; font-weight:800; margin-bottom:6px; display:flex; align-items:center; gap:10px;
+  }
+  .cat h2 .num{
+    background:var(--accent); color:#fff; border-radius:8px; font-size:14px;
+    width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center;
+  }
+  .cat .desc{color:var(--sub); font-size:14px; margin-bottom:20px}
+
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(248px,1fr)); gap:18px}
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:18px;
+    padding:18px 16px 16px; box-shadow:0 4px 14px rgba(180,120,90,.06);
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .card:hover{transform:translateY(-3px); box-shadow:0 10px 24px rgba(180,120,90,.12)}
+  .face{display:flex; justify-content:center; gap:14px; margin-bottom:14px}
+  .face figure{text-align:center}
+  .face img{width:96px; height:96px; object-fit:contain; image-rendering:auto}
+  .face figcaption{font-size:11px; color:var(--sub); margin-top:4px}
+  .face .ring{border-radius:14px; padding:8px; background:#FFF7F0}
+  .card h3{font-size:16px; font-weight:700; text-align:center}
+  .card .file{text-align:center; font-size:12px; color:#B39E93; font-family:ui-monospace,Menlo,monospace; margin:4px 0 10px}
+  .card .explain{font-size:13.5px; color:#5B4F49; min-height:54px}
+  .card .tag{display:inline-block; font-size:11px; color:var(--accent); background:#FFF0E9; border-radius:6px; padding:2px 8px; margin-top:10px}
+
+  footer{max-width:1100px; margin:50px auto 0; padding:24px 20px; color:var(--sub); font-size:13px; text-align:center; border-top:1px solid var(--line)}
+  .note{background:#FFF; border:1px dashed var(--line); border-radius:14px; padding:16px 18px; font-size:13px; color:#6b5d56; margin-top:18px}
+  .note b{color:var(--ink)}
+</style>
+</head>
+<body>
+<header>
+  <h1>🐻 岁记 · 宝宝成长记录 App 图标库 🐥</h1>
+  <p>基于《岁记-宝宝成长记录App-PRD-v1.2-云端轻量版》设计的两套卡通图标：<b>小熊</b>与<b>小鸭</b>。
+     统一采用「圆角方形淡彩底板 + 居中卡通角色 + 道具化表达」的扁平 Kawaii 风格，PNG 透明底，适配移动端。</p>
+  <div class="badges">
+    <span class="badge">60 枚图标（2 套 × 30 枚）</span>
+    <span class="badge">1024×1024 PNG 透明底</span>
+    <span class="badge">扁平矢量 · 无文字水印</span>
+  </div>
+  <div class="legend">
+    <span><i class="b"></i>小熊 Bear（暖棕系 #F2C288）</span>
+    <span><i class="d"></i>小鸭 Duck（明黄系 #FFD85C）</span>
+  </div>
+</header>
+
+<main id="app"></main>
+
+<footer>
+  图标目录：<code>suiji-icons/bear/</code> 与 <code>suiji-icons/duck/</code> ·
+  本页与图标同目录，使用相对路径引用，可直接双击打开。<br>
+  生成规范：圆角方形底板（圆角半径≈22%）+ 居中角色 + 粗描边 + 无渐变无阴影无文字。
+</footer>
+
+<script>
+// 图标定义：name=文件名(不含扩展名)，title=中文名，explain=解释，tag=归类标签
+const ICONS = [
+  // —— 一、记录类型 ——
+  {cat:1, name:"01-feeding",   title:"喂奶",   tag:"记录类型", explain:"记录哺乳/奶瓶喂养的时间、奶量、左右乳，是最高频的日常记录项。"},
+  {cat:1, name:"02-sleep",     title:"睡眠",   tag:"记录类型", explain:"记录宝宝睡眠时长、起夜与质量，以月亮+睡帽表达安睡场景。"},
+  {cat:1, name:"03-milestone", title:"里程碑", tag:"记录类型", explain:"记录翻身、坐、爬、走等成长大事件，用奖杯象征阶段成就。"},
+  {cat:1, name:"04-photo",     title:"照片",   tag:"记录类型", explain:"记录每个阶段的影像瞬间，用相机表达。"},
+  {cat:1, name:"05-measure",   title:"测量",   tag:"记录类型", explain:"记录身高、体重、头围等发育数据，配软尺与体重秤。"},
+  {cat:1, name:"06-poop",      title:"便便",   tag:"记录类型", explain:"记录大便性状、次数、颜色，卡通便便造型轻松表达。"},
+  {cat:1, name:"07-temp",      title:"体温",   tag:"记录类型", explain:"记录体温与物理降温，配体温计与退热贴。"},
+  {cat:1, name:"08-med",       title:"用药",   tag:"记录类型", explain:"记录用药名称、剂量、时间，配药瓶与胶囊。"},
+  {cat:1, name:"09-text-mood", title:"文字心情",tag:"记录类型", explain:"用文字便签记录宝宝当日心情或妈妈随笔。"},
+  {cat:1, name:"09-voice",     title:"语音",   tag:"记录类型", explain:"用语音速记宝宝趣事或哼唱，配对话气泡。"},
+
+  // —— 二、底部导航 ——
+  {cat:2, name:"10-tab-home",    title:"首页",   tag:"底部导航", explain:"App 主入口，时间轴概览当天的各类记录。"},
+  {cat:2, name:"11-tab-growth",  title:"成长",   tag:"底部导航", explain:"查看生长曲线、里程碑与成长趋势。"},
+  {cat:2, name:"12-tab-family",  title:"家庭",   tag:"底部导航", explain:"家庭成员与共同记录管理。"},
+  {cat:2, name:"13-tab-me",      title:"我的",   tag:"底部导航", explain:"个人中心、设置与账户入口。"},
+
+  // —— 三、功能模块 ——
+  {cat:3, name:"20-fn-diary",    title:"日记",     tag:"功能模块", explain:"长文成长日记，配日记本与铅笔。"},
+  {cat:3, name:"21-fn-remind",   title:"提醒",     tag:"功能模块", explain:"喂奶/用药/疫苗提醒，配手摇铃铛。"},
+  {cat:3, name:"22-fn-backup",   title:"云端备份", tag:"功能模块", explain:"数据云同步与备份，配云朵与上箭头。"},
+  {cat:3, name:"23-fn-privacy",  title:"隐私安全", tag:"功能模块", explain:"隐私保护、加密与权限管理，配盾牌爱心锁。"},
+  {cat:3, name:"24-fn-search",   title:"搜索",     tag:"功能模块", explain:"按关键词/日期检索历史记录，配放大镜。"},
+  {cat:3, name:"25-fn-notify",   title:"消息通知", tag:"功能模块", explain:"家人动态与系统消息，配信封。"},
+  {cat:3, name:"26-fn-export",   title:"导出PDF",  tag:"功能模块", explain:"导出成长报告/纪念册，配文档页。"},
+  {cat:3, name:"27-fn-trash",    title:"回收站",   tag:"功能模块", explain:"误删记录恢复，配垃圾桶。"},
+  {cat:3, name:"28-fn-invite",   title:"邀请家人", tag:"功能模块", explain:"邀请家人共同记录，配分享卡与爱心链。"},
+  {cat:3, name:"29-fn-babies",   title:"多宝宝",   tag:"功能模块", explain:"支持多个宝宝档案切换，配多只宝宝。"},
+  {cat:3, name:"30-fn-elder",    title:"家长模式", tag:"功能模块", explain:"大字版长辈友好模式，配眼镜与书本。"},
+  {cat:3, name:"31-fn-compare",  title:"同月龄对比",tag:"功能模块", explain:"与同月龄宝宝数据对比，配两张对比照片。"},
+  {cat:3, name:"32-fn-card",     title:"纪念卡",   tag:"功能模块", explain:"生成可分享的纪念日卡片，配贺卡与丝带。"},
+  {cat:3, name:"33-fn-video",    title:"成长视频", tag:"功能模块", explain:"照片自动生成成长短片，配复古摄像机。"},
+  {cat:3, name:"34-fn-vaccine",  title:"疫苗接种", tag:"功能模块", explain:"疫苗时间表与接种记录，配针管与药瓶。"},
+  {cat:3, name:"35-fn-audit",    title:"操作留痕", tag:"功能模块", explain:"记录操作日志与修改历史，配清单勾选。"},
+];
+
+const CATS = {
+  1:{title:"一、记录类型", desc:"宝宝在成长过程中的各种记录维度，覆盖日常高频与偶发事件。"},
+  2:{title:"二、底部导航", desc:"App 主框架的四个一级页面入口（首页 / 成长 / 家庭 / 我的）。"},
+  3:{title:"三、功能模块", desc:"围绕记录、协作、安全、导出等扩展能力的功能入口。"},
+};
+
+function cardHTML(it){
+  return `
+  <div class="card">
+    <div class="face">
+      <figure class="ring"><img loading="lazy" src="bear/${it.name}.png" alt="小熊-${it.title}"><figcaption>小熊</figcaption></figure>
+      <figure class="ring"><img loading="lazy" src="duck/${it.name}.png" alt="小鸭-${it.title}"><figcaption>小鸭</figcaption></figure>
+    </div>
+    <h3>${it.title}</h3>
+    <div class="file">${it.name}.png</div>
+    <div class="explain">${it.explain}</div>
+    <span class="tag">${it.tag}</span>
+  </div>`;
+}
+
+const app = document.getElementById('app');
+for (const [cid, c] of Object.entries(CATS)) {
+  const items = ICONS.filter(i => i.cat == cid);
+  const cards = items.map(cardHTML).join('');
+  app.insertAdjacentHTML('beforeend', `
+    <section class="cat">
+      <h2><span class="num">${cid}</span>${c.title}</h2>
+      <div class="desc">${c.desc}（共 ${items.length} 枚）</div>
+      <div class="grid">${cards}</div>
+    </section>`);
+}
+</script>
+</body>
+</html>

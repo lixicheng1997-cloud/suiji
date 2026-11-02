@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>岁记 · App 图标设计预览 v0.4（岁记文字标）</title>
+<style>
+:root{
+  --primary:#FF6B8B; --primary-deep:#E84A6F; --accent:#FF9E58; --gold:#FFC24B;
+  --bg:#FFF6F0; --surface:#fff; --border:#FFE6D8;
+  --text:#4A3A3E; --text-sub:#A08A8F; --text-faint:#C4B2B6;
+  --r-sm:12px; --r-md:18px; --r-lg:24px; --r-pill:999px;
+  --sh-md:0 8px 24px rgba(255,107,139,.14);
+  --sh-lg:0 16px 40px rgba(232,74,111,.22);
+  --font:"PingFang SC","HarmonyOS Sans SC","MiSans","Microsoft YaHei",sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);color:var(--text);min-height:100%;
+  background:
+    radial-gradient(900px 600px at 12% 8%, rgba(255,158,88,.18), transparent 60%),
+    radial-gradient(800px 700px at 92% 88%, rgba(255,107,139,.16), transparent 60%),
+    linear-gradient(160deg,#FFF3EA 0%,#FFEAE4 55%,#FDE9EF 100%);
+  padding:40px 24px 64px;}
+.wrap{max-width:1080px;margin:0 auto}
+.head{text-align:center;margin-bottom:36px}
+.head h1{font-size:30px;font-weight:700;letter-spacing:1px;color:var(--primary-deep)}
+.head h1 em{font-style:normal;font-size:14px;font-weight:500;color:var(--text-sub);margin-left:8px}
+.head p{margin-top:8px;font-size:13px;color:var(--text-sub);letter-spacing:.5px}
+.card{background:rgba(255,255,255,.78);backdrop-filter:blur(12px);border:1px solid var(--border);
+  border-radius:var(--r-lg);padding:28px;box-shadow:var(--sh-md);margin-bottom:24px}
+.card h2{font-size:15px;font-weight:700;color:var(--primary-deep);letter-spacing:.5px;margin-bottom:6px}
+.card .sub{font-size:12px;color:var(--text-sub);margin-bottom:20px}
+
+.hero{display:flex;gap:36px;align-items:center;flex-wrap:wrap;justify-content:center}
+.icon{border-radius:22.37%;overflow:hidden;box-shadow:var(--sh-lg);line-height:0;background:#FF6B8B}
+.icon svg{display:block;width:100%;height:100%}
+.hero .icon{width:240px;height:240px}
+.hero-txt{max-width:360px}
+.hero-txt h3{font-size:20px;color:var(--text);margin-bottom:10px}
+.hero-txt ul{list-style:none;font-size:13.5px;line-height:2;color:var(--text-sub)}
+.hero-txt li b{color:var(--primary-deep);font-weight:600}
+.hero-txt li::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:linear-gradient(135deg,var(--primary),var(--accent));margin-right:8px;vertical-align:2px}
+
+.sizes{display:flex;align-items:flex-end;gap:22px;flex-wrap:wrap}
+.size{display:flex;flex-direction:column;align-items:center;gap:8px}
+.size .cap{font-size:11px;color:var(--text-faint)}
+
+.mock{display:flex;gap:28px;flex-wrap:wrap;justify-content:center}
+.phone{width:300px;border-radius:40px;padding:18px;background:linear-gradient(160deg,#3A2C31,#241A1E);
+  box-shadow:0 24px 60px rgba(120,60,70,.35)}
+.phone.light{background:linear-gradient(160deg,#FFEDE4,#FFE1EA)}
+.wall{border-radius:28px;padding:22px 16px;min-height:300px;
+  background:radial-gradient(120% 80% at 50% 0%,rgba(255,255,255,.5),transparent 60%),linear-gradient(160deg,#FFD9C9,#FFC2D2)}
+.phone.light .wall{background:radial-gradient(120% 80% at 50% 0%,#fff,transparent 60%),linear-gradient(160deg,#FFF1E8,#FFE6EE)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px 14px}
+.app{display:flex;flex-direction:column;align-items:center;gap:6px}
+.app .icon{width:58px;height:58px;box-shadow:0 6px 16px rgba(232,74,111,.25)}
+.app span{font-size:10px;color:#5a464b}
+.phone.light .app span{color:var(--text)}
+
+.layers{display:flex;gap:24px;align-items:center;flex-wrap:wrap;justify-content:center}
+.layer{display:flex;flex-direction:column;align-items:center;gap:10px}
+.layer .box{width:150px;height:150px;border-radius:22.37%;overflow:hidden;box-shadow:var(--sh-md);line-height:0;border:1px dashed var(--border)}
+.layer .box svg{width:100%;height:100%;display:block}
+.layer .cap{font-size:12px;color:var(--text-sub);font-weight:600}
+.plus,.eq{font-size:26px;color:var(--text-faint);font-weight:300}
+
+.tokens{display:flex;gap:10px;flex-wrap:wrap}
+.tok{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-sub);background:#fff;
+  border:1px solid var(--border);border-radius:var(--r-pill);padding:6px 12px 6px 6px}
+.tok i{width:22px;height:22px;border-radius:50%;display:inline-block}
+.tok b{color:var(--text);font-weight:600}
+.tok code{font-size:11px;color:var(--text-faint)}
+.foot{text-align:center;font-size:12px;color:var(--text-faint);margin-top:8px;line-height:1.8}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="g_bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FF7A93"/><stop offset=".55" stop-color="#FF6B8B"/><stop offset="1" stop-color="#FF9E58"/>
+    </linearGradient>
+    <radialGradient id="g_glow" cx=".28" cy=".22" r=".9">
+      <stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset=".5" stop-color="#fff" stop-opacity=".05"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <symbol id="suiji" viewBox="0 0 1024 1024">
+      <rect width="1024" height="1024" fill="url(#g_bg)"/>
+      <rect width="1024" height="1024" fill="url(#g_glow)"/>
+      <g font-family="'PingFang SC','HarmonyOS Sans SC','Source Han Sans SC','Noto Sans SC','Microsoft YaHei',sans-serif"
+         font-weight="900" fill="#fff" text-anchor="middle"
+         stroke="#fff" stroke-width="14" stroke-linejoin="round" paint-order="stroke">
+        <text x="332" y="606" font-size="340" transform="rotate(-7 332 470)">岁</text>
+        <text x="692" y="646" font-size="340" transform="rotate(6 692 510)">记</text>
+        <path opacity=".95" stroke="none" d="M856 168 L868 200 L900 212 L868 224 L856 256 L844 224 L812 212 L844 200 Z"/>
+        <path opacity=".8" stroke="none" d="M168 776 L177 797 L198 806 L177 815 L168 836 L159 815 L138 806 L159 797 Z"/>
+      </g>
+    </symbol>
+    <symbol id="suiji-fg" viewBox="0 0 1024 1024">
+      <g font-family="'PingFang SC','HarmonyOS Sans SC','Source Han Sans SC','Noto Sans SC','Microsoft YaHei',sans-serif"
+         font-weight="900" fill="#fff" text-anchor="middle"
+         stroke="#fff" stroke-width="14" stroke-linejoin="round" paint-order="stroke">
+        <text x="332" y="606" font-size="340" transform="rotate(-7 332 470)">岁</text>
+        <text x="692" y="646" font-size="340" transform="rotate(6 692 510)">记</text>
+        <path opacity=".95" stroke="none" d="M856 168 L868 200 L900 212 L868 224 L856 256 L844 224 L812 212 L844 200 Z"/>
+        <path opacity=".8" stroke="none" d="M168 776 L177 797 L198 806 L177 815 L168 836 L159 815 L138 806 L159 797 Z"/>
+      </g>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <div class="head">
+    <h1>岁记 <em>Baby Growth Log · App Icon</em></h1>
+    <p>时光轴首页 · 温暖可爱 · 粉橙系 · 图标设计预览 v0.4 · 岁记文字标</p>
+  </div>
+
+  <section class="card">
+    <h2>设计概念 · 岁记文字标 · Wordmark</h2>
+    <p class="sub">直接呈现「岁记」两个字：圆胖字重 + 微微歪头显可爱，只加两点星光点缀，其余从简</p>
+    <div class="hero">
+      <div class="icon" style="width:240px;height:240px"><svg><use href="#suiji"/></svg></div>
+      <div class="hero-txt">
+        <h3>为什么这样设计</h3>
+        <ul>
+          <li><b>品牌直给</b>：图标即名字，"岁记"一眼认出</li>
+          <li><b>可爱字感</b>：圆胖粗体 + 微微歪头，俏皮不幼稚</li>
+          <li><b>极简点缀</b>：只留两点星光，画面干净</li>
+          <li><b>延续品牌</b>：135° 粉橙渐变 + 暖粉投影不变</li>
+          <li><b>高识别度</b>：大字标，40px 仍清晰可读</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>尺寸适配测试</h2>
+    <p class="sub">从大尺寸到桌面 20px，验证小尺寸可读性</p>
+    <div class="sizes">
+      <div class="size"><div class="icon" style="width:128px;height:128px"><svg><use href="#suiji"/></svg></div><span class="cap">128</span></div>
+      <div class="size"><div class="icon" style="width:80px;height:80px"><svg><use href="#suiji"/></svg></div><span class="cap">80</span></div>
+      <div class="size"><div class="icon" style="width:60px;height:60px"><svg><use href="#suiji"/></svg></div><span class="cap">60</span></div>
+      <div class="size"><div class="icon" style="width:40px;height:40px"><svg><use href="#suiji"/></svg></div><span class="cap">40 · iPhone</span></div>
+      <div class="size"><div class="icon" style="width:29px;height:29px"><svg><use href="#suiji"/></svg></div><span class="cap">29 · 设置</span></div>
+      <div class="size"><div class="icon" style="width:20px;height:20px"><svg><use href="#suiji"/></svg></div><span class="cap">20</span></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>主屏效果</h2>
+    <p class="sub">深色 / 浅色壁纸下的实际观感</p>
+    <div class="mock">
+      <div class="phone"><div class="wall"><div class="grid">
+        <div class="app"><div class="icon"><svg><use href="#suiji"/></svg></div><span>岁记</span></div>
+        <div class="app"><div class="icon" style="background:#8FA8D8"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M3 10h18M8 2v4M16 2v4"/></svg></div><span>日历</span></div>
+        <div class="app"><div class="icon" style="background:#5FB87A"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 2v20M2 12h20"/></svg></div><span>健康</span></div>
+        <div class="app"><div class="icon" style="background:#FFC24B"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 4-6"/></svg></div><span>成长</span></div>
+      </div></div></div>
+      <div class="phone light"><div class="wall"><div class="grid">
+        <div class="app"><div class="icon"><svg><use href="#suiji"/></svg></div><span>岁记</span></div>
+        <div class="app"><div class="icon" style="background:#8FA8D8"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M3 10h18M8 2v4M16 2v4"/></svg></div><span>日历</span></div>
+        <div class="app"><div class="icon" style="background:#5FB87A"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 2v20M2 12h20"/></svg></div><span>健康</span></div>
+        <div class="app"><div class="icon" style="background:#FF9E58"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="8" r="5"/><path d="M8 21a4 4 0 0 1 8 0"/></svg></div><span>家庭</span></div>
+      </div></div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Android 自适应图标分层</h2>
+    <p class="sub">background 层 + foreground 层，系统按机型裁切</p>
+    <div class="layers">
+      <div class="layer"><div class="box"><svg viewBox="0 0 1024 1024"><rect width="1024" height="1024" fill="url(#g_bg)"/><rect width="1024" height="1024" fill="url(#g_glow)"/></svg></div><span class="cap">background</span></div>
+      <span class="plus">+</span>
+      <div class="layer"><div class="box" style="background:#FFD9C9"><svg viewBox="0 0 1024 1024"><use href="#suiji-fg"/></svg></div><span class="cap">foreground</span></div>
+      <span class="eq">=</span>
+      <div class="layer"><div class="box"><svg viewBox="0 0 1024 1024"><use href="#suiji"/></svg></div><span class="cap">合成</span></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>配色 Tokens</h2>
+    <p class="sub">与 uni.scss Design Tokens 完全一致</p>
+    <div class="tokens">
+      <div class="tok"><i style="background:#FF6B8B"></i><b>主色</b><code>#FF6B8B</code></div>
+      <div class="tok"><i style="background:#FF9E58"></i><b>强调</b><code>#FF9E58</code></div>
+      <div class="tok"><i style="background:#FFC24B"></i><b>里程碑金</b><code>#FFC24B</code></div>
+      <div class="tok"><i style="background:linear-gradient(135deg,#FF7A93,#FF9E58)"></i><b>图标渐变</b><code>135°</code></div>
+      <div class="tok"><i style="background:#FFF6F0;border:1px solid #FFE6D8"></i><b>底色</b><code>#FFF6F0</code></div>
+    </div>
+    <p class="foot" style="margin-top:18px">
+      交付文件：<code>app-icon.svg</code>（整张方形，上传 App Store）· <code>app-icon-rounded.svg</code>（圆角，直接预览/分享）<br>
+      需要 PNG 位图集、Android mipmap 资源，或调整字标（如换字体 / 调歪头角度 / 描边粗细），告诉我即可。
+    </p>
+  </section>
+</div>
+</body>
+</html>

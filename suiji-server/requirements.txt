@@ -1,0 +1,25 @@
+# 岁记服务端依赖（固定可安装版本，兼容 Python 3.12/3.13）
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+sqlalchemy==2.0.36
+psycopg[binary]==3.2.3
+pydantic==2.10.4
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+PyJWT==2.10.1
+redis==5.2.1
+httpx==0.28.1
+python-multipart==0.0.12
+python-dotenv==1.0.1
+fastapi-offline==1.7.7
+alembic==1.14.0
+pytest==8.3.4
+# 非结构化文件对象存储（MEDIA_BACKEND=minio 时使用；切 local 可不装）
+minio==7.2.15
+# 图片上传前无损重压（PNG/GIF，media/compress.py）；缺失时上传自动跳过压缩
+Pillow==11.1.0
+# HEIC/HEIF 转 JPEG（iPhone 照片兼容性）；缺失时 HEIC 原样存储
+pillow-heif==0.16.0
+# 应用层传输加密：RSA-OAEP-256 + AES-256-CBC/HMAC-SHA256（core/crypto.py）
+# 缺失时服务照常启动，只是敏感接口退回明文（启动日志会告警）
+cryptography==44.0.2

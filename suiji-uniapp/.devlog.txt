@@ -1,0 +1,31 @@
+
+> suiji-uniapp@1.0.0 dev:h5
+> uni
+
+请注意运行模式下，因日志输出、sourcemap 以及未压缩源码等原因，性能和包体积，均不及发行模式。
+vite是按需编译，运行时点击某个未编译页面会先编译后加载，导致显示较慢，发行后无此问题。
+编译器版本：5.26（vue3）
+正在编译中...
+
+​本地运行未开启 manifest.json 的 uniStatistics.debug，uni统计不采集、不上报；发行模式不受影响​
+
+Port 5173 is in use, trying another one...
+[36m
+  vite v5.2.8[39m[32m dev server running at:
+[39m
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5174[22m/[39m
+[2m  [32m➜[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
+
+  [36mready in 1992ms.[39m
+
+[2m17:29:18[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/video/video.vue[22m
+[2m17:29:29[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/video/video.vue[22m
+[2m17:29:34[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/video/video.vue[22m
+[2m17:30:05[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/video/video.vue[22m
+[2m17:30:50[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/video/video.vue[22m
+[2m17:31:02[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/video/video.vue[22m
+[2m19:23:56[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/video/video.vue[22m
+[2m19:24:02[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/video/video.vue[22m
+[2m19:24:06[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/sj-ui-host/sj-ui-host.vue[22m
+[2m19:24:09[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/sj-ui-host/sj-ui-host.vue[22m
+[2m19:25:09[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/video/video.vue[22m

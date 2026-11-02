@@ -1,0 +1,78 @@
+# ========== 岁记（suiji）根目录 .gitignore ==========
+# 子项目 suiji-server/ 与 suiji-uniapp/ 各自有更细的 .gitignore，
+# 本文件只兜底全仓库通用垃圾文件。
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+
+# ---------- Node ----------
+node_modules/
+.pnpm-store/
+.yarn/
+.npm/
+
+# ---------- 构建产物 ----------
+dist/
+build/
+.output/
+.temp/
+.cache/
+unpackage/
+
+# ---------- 数据库 / 运行时数据 ----------
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+data/
+
+# ---------- 日志 ----------
+logs/
+*.log
+
+# ---------- 测试 / 覆盖率 ----------
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage/
+.nyc_output/
+
+# ---------- 环境变量 / 密钥 ----------
+# 注意：suiji-server/.env 按项目约定随仓库管理（不忽略），此处不要写 .env。
+.env.local
+.env.*.local
+
+# ---------- 编辑器 / IDE ----------
+.idea/
+.vscode/
+*.swp
+*.swo
+.hbuilderx/
+
+# ---------- 系统 ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------- 临时文件 ----------
+suiji-server/tmp/
+*.tmp
+
+# ---------- 签名密钥（只留本机，不入库） ----------
+*.keystore
+*.jks
+
+# ---------- AI 工具会话数据（本地产物，不入库） ----------
+.trae/
+.workbuddy/
+.playwright-cli/
+.trae-html-share-packages/
+.codebuddy/

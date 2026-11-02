@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>岁记 UI v3 · 设计语言提案 · 黏土玩具 × 贴纸拼贴</title>
+<style>
+/* ============================================================
+   岁记 suiji-ui-v3 设计语言提案（单文件，零外部依赖，可离线打开）
+   图标引用：../suiji-icons/{bear|duck}/*.png（只读引用，不修改）
+   ============================================================ */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --doc-bg:#241D1A; --doc-panel:#2E2622; --doc-line:#3D332D;
+  --doc-tx:#EFE6DC; --doc-sub:#A8968A; --doc-faint:#6E5F55;
+  --doc-acc:#E8B4A0; --doc-teal:#8FCDC2;
+  --doc-r:16px;
+  --serif:Georgia,"Songti SC","Noto Serif SC",serif;
+  --sans:-apple-system,"PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif;
+  --mono:"SFMono-Regular",Consolas,"Cascadia Mono",monospace;
+}
+html{scroll-behavior:smooth}
+body{background:var(--doc-bg);color:var(--doc-tx);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased}
+::selection{background:var(--doc-acc);color:#241D1A}
+
+/* ---------- 文档版式 ---------- */
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+section{padding:72px 0;border-top:1px solid var(--doc-line)}
+.sec-head{display:flex;align-items:baseline;gap:16px;margin-bottom:8px}
+.sec-num{font-family:var(--serif);font-size:14px;letter-spacing:.2em;color:var(--doc-acc)}
+.sec-title{font-family:var(--serif);font-size:30px;font-weight:700;letter-spacing:.02em}
+.sec-sub{color:var(--doc-sub);font-size:15px;max-width:760px;margin-bottom:36px}
+.tag{display:inline-block;font-size:12px;padding:2px 10px;border-radius:999px;border:1px solid var(--doc-line);color:var(--doc-sub);vertical-align:middle}
+.tag.hot{border-color:var(--doc-acc);color:var(--doc-acc)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--doc-line);vertical-align:top}
+th{color:var(--doc-sub);font-weight:600;font-size:12px;letter-spacing:.05em;white-space:nowrap}
+td{color:var(--doc-tx)}
+.mono{font-family:var(--mono);font-size:12px}
+.pass{color:#8FD3A7;font-weight:600}.fail{color:#E89A8C;font-weight:600}
+
+/* ---------- HERO ---------- */
+.hero{position:relative;padding:88px 0 56px;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:-40%;background:
+  radial-gradient(38% 30% at 18% 30%,rgba(232,180,160,.14),transparent 70%),
+  radial-gradient(32% 28% at 82% 62%,rgba(143,205,194,.12),transparent 70%);pointer-events:none}
+.hero-kicker{font-family:var(--serif);letter-spacing:.35em;font-size:13px;color:var(--doc-acc);margin-bottom:14px}
+.hero h1{font-family:var(--serif);font-size:clamp(34px,5vw,54px);line-height:1.15;font-weight:700}
+.hero h1 em{font-style:normal;color:var(--doc-acc)}
+.hero p.lead{margin-top:18px;max-width:720px;color:var(--doc-sub);font-size:16px}
+.hero-meta{margin-top:26px;display:flex;gap:10px;flex-wrap:wrap}
+.hero-jump{margin-top:34px;display:flex;gap:10px;flex-wrap:wrap}
+.hero-jump a{font-size:13px;color:var(--doc-tx);text-decoration:none;padding:8px 16px;border:1px solid var(--doc-line);border-radius:999px;transition:.2s}
+.hero-jump a:hover{border-color:var(--doc-acc);color:var(--doc-acc);transform:translateY(-2px)}
+
+/* ---------- 全局控制台（驱动所有手机与色卡） ---------- */
+.console{position:sticky;top:0;z-index:60;background:rgba(36,29,26,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--doc-line);padding:12px 0}
+.console .wrap{display:flex;gap:26px;align-items:center;flex-wrap:wrap}
+.cgroup{display:flex;align-items:center;gap:8px}
+.cgroup>span{font-size:12px;color:var(--doc-faint);letter-spacing:.08em}
+.seg{display:flex;background:var(--doc-panel);border:1px solid var(--doc-line);border-radius:999px;padding:3px}
+.seg button{appearance:none;border:0;background:transparent;color:var(--doc-sub);font-size:13px;padding:5px 14px;border-radius:999px;cursor:pointer;transition:.22s;font-family:var(--sans)}
+.seg button.on{background:var(--doc-acc);color:#241D1A;font-weight:600}
+.seg button:not(.on):hover{color:var(--doc-tx)}
+.seg .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px;border:1px solid rgba(0,0,0,.15)}
+
+/* ---------- 差异表 ---------- */
+.diff td:first-child{color:var(--doc-acc);font-weight:600;white-space:nowrap}
+.diff .v2{color:var(--doc-sub)}
+.diff .v3{color:var(--doc-tx)}
+
+/* ---------- 形象气质卡片 ---------- */
+.vibes{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+@media(max-width:900px){.vibes{grid-template-columns:1fr}}
+.vibe-card{background:var(--doc-panel);border:1px solid var(--doc-line);border-radius:var(--doc-r);padding:28px;position:relative;transition:.3s}
+.vibe-card.sel{border-color:var(--doc-acc);box-shadow:0 0 0 1px var(--doc-acc),0 18px 40px rgba(0,0,0,.35)}
+.vibe-card .pick{position:absolute;top:20px;right:20px;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--doc-line);background:transparent;color:var(--doc-sub);cursor:pointer;transition:.2s}
+.vibe-card .pick.on{background:var(--doc-acc);border-color:var(--doc-acc);color:#241D1A;font-weight:600}
+.vibe-card h3{font-family:var(--serif);font-size:22px;margin-bottom:4px}
+.vibe-card .en{font-size:12px;color:var(--doc-faint);letter-spacing:.15em;margin-bottom:14px}
+.vibe-card ul{list-style:none;font-size:13.5px;color:var(--doc-sub)}
+.vibe-card ul li{padding:5px 0 5px 18px;position:relative}
+.vibe-card ul li::before{content:"";position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%}
+.vibe-card.v-clay ul li::before{background:#E8B4A0}
+.vibe-card.v-stk ul li::before{border-radius:2px;background:#8FCDC2}
+.vibe-mini-row{display:flex;gap:14px;margin:18px 0 6px}
+.vibe-note{font-size:12px;color:var(--doc-faint);margin-top:12px}
+.rec-badge{display:inline-block;font-size:11px;background:var(--doc-teal);color:#123; padding:2px 8px;border-radius:6px;font-weight:700;margin-left:8px;vertical-align:2px}
+
+/* 迷你应用屏（启动/空态/成功） */
+.mini{flex:1;border-radius:14px;overflow:hidden;border:1px solid var(--doc-line);aspect-ratio:9/16;position:relative}
+.mini .cap{position:absolute;left:0;right:0;bottom:0;font-size:10px;text-align:center;padding:3px 0;background:rgba(0,0,0,.45);color:#fff;z-index:5}
+
+/* ---------- 色系卡 ---------- */
+.schemes{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+@media(max-width:980px){.schemes{grid-template-columns:1fr}}
+.scheme-card{background:var(--doc-panel);border:1px solid var(--doc-line);border-radius:var(--doc-r);padding:22px;cursor:pointer;transition:.3s;position:relative}
+.scheme-card.sel{border-color:var(--doc-acc);box-shadow:0 0 0 1px var(--doc-acc)}
+.scheme-card .pick{position:absolute;top:16px;right:16px;font-size:11px;padding:3px 10px;border-radius:999px;border:1px solid var(--doc-line);color:var(--doc-sub);background:transparent;cursor:pointer}
+.scheme-card .pick.on{background:var(--doc-acc);border-color:var(--doc-acc);color:#241D1A;font-weight:600}
+.scheme-card h3{font-family:var(--serif);font-size:18px}
+.scheme-card .desc{font-size:12.5px;color:var(--doc-sub);margin:4px 0 14px;min-height:38px}
+.swatch-strip{display:flex;border-radius:10px;overflow:hidden;height:44px;margin-bottom:14px;border:1px solid rgba(255,255,255,.08)}
+.swatch-strip i{flex:1;position:relative}
+.swatch-strip i::after{content:attr(data-n);position:absolute;left:50%;transform:translateX(-50%);bottom:-16px;font-style:normal;font-size:9px;color:var(--doc-faint);white-space:nowrap}
+.scheme-card table{font-size:11.5px;margin-top:22px}
+.scheme-card th,.scheme-card td{padding:5px 6px}
+.scheme-card .role{font-size:12px;color:var(--doc-sub);background:rgba(255,255,255,.03);border-radius:8px;padding:8px 10px;margin-top:14px}
+.scheme-card .role b{color:var(--doc-tx)}
+
+/* ---------- 效果图舞台 ---------- */
+.stage-bar{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:26px}
+.demo-tabs{display:flex;gap:8px;flex-wrap:wrap}
+.demo-tabs button{font-size:13px;padding:8px 16px;border-radius:999px;border:1px solid var(--doc-line);background:var(--doc-panel);color:var(--doc-sub);cursor:pointer;transition:.2s}
+.demo-tabs button.on{background:var(--doc-acc);border-color:var(--doc-acc);color:#241D1A;font-weight:600}
+.state-tabs{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.state-tabs span{font-size:12px;color:var(--doc-faint);margin-right:4px}
+.state-tabs button{font-size:12px;padding:5px 11px;border-radius:8px;border:1px dashed var(--doc-line);background:transparent;color:var(--doc-sub);cursor:pointer;transition:.2s}
+.state-tabs button.on{border-style:solid;border-color:var(--doc-teal);color:var(--doc-teal);background:rgba(143,205,194,.08)}
+.stage{display:flex;gap:34px;align-items:flex-start;flex-wrap:wrap}
+.phone-col{display:flex;flex-direction:column;align-items:center;gap:18px}
+.notes{flex:1;min-width:280px;max-width:420px;background:var(--doc-panel);border:1px solid var(--doc-line);border-radius:var(--doc-r);padding:22px;font-size:13.5px;color:var(--doc-sub)}
+.notes h4{color:var(--doc-tx);font-size:15px;margin-bottom:10px;font-family:var(--serif)}
+.notes ul{padding-left:18px}
+.notes li{margin:6px 0}
+.notes b{color:var(--doc-acc)}
+
+/* ---------- 手机壳 ---------- */
+.phone{width:375px;height:812px;flex:none;border-radius:44px;background:#171310;padding:10px;box-shadow:0 30px 80px rgba(0,0,0,.5),inset 0 0 0 2px #322a25;position:relative}
+@media(max-width:520px){.phone{transform:scale(.86);transform-origin:top center;height:700px}}
+.phone .island{position:absolute;top:20px;left:50%;transform:translateX(-50%);width:110px;height:26px;border-radius:14px;background:#171310;z-index:40}
+.viewport{width:100%;height:100%;border-radius:36px;overflow:hidden;position:relative;background:#fff}
+.statusbar{position:absolute;top:0;left:0;right:0;height:44px;z-index:39;display:flex;align-items:center;justify-content:space-between;padding:14px 26px 0;font-size:12px;font-weight:600;color:var(--tx);pointer-events:none}
+.statusbar .sb-r{display:flex;gap:5px;align-items:center}
+.statusbar svg{width:16px;height:12px;fill:var(--tx)}
+
+/* ---------- v3 设计令牌：三套色系 ---------- */
+[data-scheme="a"]{
+  --p:#C98D7B;--pd:#A65A47;--psoft:#F4E2D9;
+  --s:#F0E3CD;--sd:#D9BE94;
+  --ac:#7C93A8;--acd:#52708C;--acsoft:#E2E9EF;
+  --bg:#FAF4EE;--sf:#FFFFFF;--ln:#EFE2D6;
+  --tx:#4A3F38;--sb:#7A6858;
+  --ok:#4E7A42;--dg:#B5544A;--wn:#C99A3F;
+  --grad:linear-gradient(135deg,#C98D7B,#D9B08C);
+  --c1:#C98D7B;--c2:#7C93A8;--c3:#C99A3F;--c4:#B5726B;--c5:#4E7A42;--c6:#A9805B;--c7:#C25E52;--c8:#8A7BA8;--c9:#B5648A;--c10:#5E8FA0;
+}
+[data-scheme="b"]{
+  --p:#FF9B85;--pd:#C24E33;--psoft:#FFE8E1;
+  --s:#EDE4FA;--sd:#C4B0E8;
+  --ac:#3FA8A0;--acd:#277A71;--acsoft:#DDF1EE;
+  --bg:#F7FBF9;--sf:#FFFFFF;--ln:#E3EFEA;
+  --tx:#33504C;--sb:#57716C;
+  --ok:#27794F;--dg:#C24038;--wn:#D99A2B;
+  --grad:linear-gradient(135deg,#FF9B85,#FFC3A1);
+  --c1:#E2674E;--c2:#3FA8A0;--c3:#D99A2B;--c4:#C25E8A;--c5:#5B9E4F;--c6:#A97B4F;--c7:#E05555;--c8:#7E6BC4;--c9:#D14D78;--c10:#4A9BC4;
+}
+[data-scheme="c"]{
+  --p:#F2668B;--pd:#C13A5E;--psoft:#FFE0EA;
+  --s:#FFE9D2;--sd:#F5C089;
+  --ac:#3E9BD6;--acd:#2472A4;--acsoft:#DCEEFB;
+  --bg:#FFF6F8;--sf:#FFFFFF;--ln:#F5E3EA;
+  --tx:#4A2F3C;--sb:#826576;
+  --ok:#27794F;--dg:#B8304E;--wn:#E09A2B;
+  --grad:linear-gradient(135deg,#F2668B,#FF8A3D);
+  --c1:#F2668B;--c2:#3E9BD6;--c3:#E09A2B;--c4:#C13A5E;--c5:#27794F;--c6:#A96B3F;--c7:#E05540;--c8:#7E5BC4;--c9:#D14D9A;--c10:#2A8FA8;
+}
+/* ---------- v3 气质令牌：黏土 / 贴纸 ---------- */
+[data-vibe="clay"]{
+  --r-card:26px;--r-tile:22px;--r-btn:999px;
+  --sh-card:inset 0 2px 0 rgba(255,255,255,.85),0 5px 0 rgba(0,0,0,.05),0 12px 22px rgba(0,0,0,.07);
+  --sh-btn:inset 0 2px 0 rgba(255,255,255,.4),0 5px 0 var(--pd),0 10px 18px rgba(0,0,0,.14);
+  --sh-btn-a:inset 0 2px 0 rgba(255,255,255,.4),0 2px 0 var(--pd),0 5px 10px rgba(0,0,0,.12);
+  --sh-fab:inset 0 3px 0 rgba(255,255,255,.45),0 7px 0 var(--pd),0 14px 26px rgba(0,0,0,.22);
+  --sh-fab-a:inset 0 3px 0 rgba(255,255,255,.45),0 3px 0 var(--pd),0 7px 14px rgba(0,0,0,.18);
+  --press:translateY(4px) scale(.985);
+  --press-btn:translateY(3px);
+  --tile-rot:0deg;
+  --mascot-stroke:0;
+  --diecut:0;
+  --paper:none;
+  --tape:0;
+}
+[data-vibe="sticker"]{
+  --r-card:16px;--r-tile:14px;--r-btn:12px;
+  --sh-card:3px 3px 0 var(--ln);
+  --sh-btn:3px 3px 0 var(--pd);
+  --sh-btn-a:1px 1px 0 var(--pd);
+  --sh-fab:4px 4px 0 var(--pd);
+  --sh-fab-a:1px 1px 0 var(--pd);
+  --press:translate(-2px,-2px) rotate(.4deg);
+  --press-btn:translate(3px,3px);
+  --tile-rot:-1.6deg;
+  --mascot-stroke:5;
+  --diecut:8;
+  --paper:radial-gradient(rgba(0,0,0,.045) 1px,transparent 1px);
+  --tape:1;
+}
+
+/* ---------- 屏幕通用 ---------- */
+.scr{position:absolute;inset:0;background:var(--bg);color:var(--tx);font-size:14px;display:flex;flex-direction:column;transform:translateX(104%);transition:transform .34s cubic-bezier(.3,.9,.3,1),opacity .34s;opacity:0;z-index:1;pointer-events:none}
+.scr.active{transform:none;opacity:1;z-index:10;pointer-events:auto}
+.scr.behind{transform:translateX(-18%) scale(.96);opacity:.5;z-index:5;pointer-events:none}
+.scr .body{flex:1;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;padding:52px 16px 96px;position:relative;background-image:var(--paper);background-size:14px 14px}
+.scr .body::-webkit-scrollbar{display:none}
+.appbar{padding:50px 16px 6px;display:flex;align-items:center;gap:10px}
+.appbar h1{font-size:19px;font-weight:700;flex:1;display:flex;align-items:center;gap:6px}
+.baby-chip{display:inline-flex;align-items:center;gap:6px;background:var(--sf);border-radius:999px;padding:4px 12px 4px 5px;box-shadow:var(--sh-card);font-size:14px;cursor:pointer;transition:transform .15s}
+.baby-chip:active{transform:var(--press)}
+.baby-chip .av{width:26px;height:26px;border-radius:50%;background:var(--grad);display:grid;place-items:center;overflow:hidden}
+.baby-chip .av svg{width:22px;height:22px}
+.iconbtn{width:34px;height:34px;border-radius:12px;background:var(--sf);box-shadow:var(--sh-card);display:grid;place-items:center;border:0;cursor:pointer;color:var(--sb);transition:transform .15s}
+.iconbtn:active{transform:var(--press)}
+.iconbtn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.iconbtn .badge{position:absolute;top:-4px;right:-4px;min-width:15px;height:15px;border-radius:8px;background:var(--dg);color:#fff;font-size:9px;display:grid;place-items:center;padding:0 3px}
+.iconbtn{position:relative}
+
+/* 贴纸胶带装饰 */
+.tape{display:none}
+[data-vibe="sticker"] .tape{display:block;position:absolute;width:64px;height:18px;background:var(--s);opacity:.85;border-radius:2px;box-shadow:0 1px 3px rgba(0,0,0,.12);z-index:2}
+
+/* ---------- 卡片（两气质核心差异） ---------- */
+.card{background:var(--sf);border-radius:var(--r-card);box-shadow:var(--sh-card);padding:14px;margin-bottom:12px;position:relative;transition:transform .16s cubic-bezier(.3,.9,.3,1)}
+[data-vibe="sticker"] .card{border:2px solid var(--tx)}
+[data-vibe="sticker"] .card:nth-child(odd){transform:rotate(.5deg)}
+.card.pressable{cursor:pointer}
+.card.pressable:active{transform:var(--press)}
+.day-head{display:flex;align-items:center;gap:10px;margin:18px 2px 10px;font-size:13px;color:var(--sb)}
+.day-head b{font-size:15px;color:var(--tx)}
+.day-head .line{flex:1;height:0;border-top:2px dashed var(--ln)}
+[data-vibe="clay"] .day-head .line{border-top-style:solid;height:3px;border-radius:3px;background:var(--ln)}
+.rec{display:flex;gap:12px;align-items:flex-start;padding:12px}
+.rec .ic{width:44px;height:44px;flex:none;border-radius:var(--r-tile);overflow:hidden;background:var(--sf);box-shadow:var(--sh-card);transform:rotate(var(--tile-rot))}
+.rec .ic img{width:100%;height:100%;display:block}
+.rec .tx{flex:1;min-width:0}
+.rec .tx .t{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.rec .tx .t b{font-size:14.5px}
+.rec .tx .t time{font-size:11.5px;color:var(--sb);flex:none}
+.rec .tx p{font-size:12.5px;color:var(--sb);margin-top:2px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.rec .tx .meta{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.pill{font-size:10.5px;padding:2px 8px;border-radius:999px;background:var(--psoft);color:var(--pd);font-weight:600}
+.pill.cool{background:var(--acsoft);color:var(--acd)}
+.pill.warnp{background:rgba(201,154,63,.15);color:var(--wn)}
+.pill.late{background:var(--s);color:var(--sd);border:1px dashed var(--sd)}
+.photos{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:8px}
+.photos i{aspect-ratio:1;border-radius:10px;background:linear-gradient(135deg,var(--s),var(--psoft));box-shadow:var(--sh-card)}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);display:inline-block;margin-left:5px;vertical-align:1px}
+
+/* ---------- Tab 栏 ---------- */
+.tabbar{position:absolute;left:10px;right:10px;bottom:10px;height:62px;background:var(--sf);border-radius:22px 22px 26px 26px;box-shadow:0 -4px 20px rgba(0,0,0,.06),var(--sh-card);display:flex;z-index:20;padding:6px 8px}
+[data-vibe="sticker"] .tabbar{border:2px solid var(--tx)}
+.tabbar button{flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;color:var(--sb);font-size:10px;font-family:var(--sans);transition:color .2s}
+.tabbar button img{width:30px;height:30px;transition:transform .3s cubic-bezier(.34,1.56,.4,1)}
+.tabbar button.on{color:var(--pd);font-weight:700}
+.tabbar button.on img{transform:translateY(-4px) scale(1.08)}
+.tabbar button.on::after{content:"";width:16px;height:4px;border-radius:4px;background:var(--grad);position:absolute;bottom:6px}
+.tabbar button{position:relative}
+@keyframes tabHop{0%{transform:translateY(0)}35%{transform:translateY(-9px) rotate(8deg) scale(1.12)}70%{transform:translateY(2px) scale(.96)}100%{transform:translateY(-4px) scale(1.08)}}
+.tabbar button.hop img{animation:tabHop .45s cubic-bezier(.34,1.3,.4,1)}
+
+/* ---------- FAB ---------- */
+.fab{position:absolute;right:18px;bottom:86px;width:60px;height:60px;border-radius:50%;background:var(--grad);box-shadow:var(--sh-fab);border:0;display:grid;place-items:center;z-index:25;cursor:pointer;transition:transform .18s cubic-bezier(.34,1.4,.4,1)}
+.fab:active{transform:var(--press-btn);box-shadow:var(--sh-fab-a)}
+.fab svg{width:26px;height:26px;stroke:#fff;stroke-width:2.6;fill:none;stroke-linecap:round;transition:transform .3s}
+.fab.open svg{transform:rotate(45deg)}
+[data-vibe="sticker"] .fab{border-radius:18px;border:2.5px solid var(--tx)}
+@keyframes fabIn{0%{transform:scale(0) rotate(-40deg)}70%{transform:scale(1.15) rotate(4deg)}100%{transform:scale(1)}}
+.fab.in{animation:fabIn .5s cubic-bezier(.34,1.4,.4,1) .3s backwards}
+.ro .fab,.ro .tabbar-fab-gap{display:none!important}
+.ro-banner{display:none;background:var(--acsoft);color:var(--acd);font-size:12px;text-align:center;padding:7px;border-radius:12px;margin:0 0 10px;border:1.5px dashed var(--ac)}
+.ro .ro-banner{display:block}
+
+/* ---------- P08 记录面板 ---------- */
+.scrim{position:absolute;inset:0;background:rgba(20,14,10,.45);backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:opacity .28s;z-index:30}
+.scrim.on{opacity:1;pointer-events:auto}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--bg);border-radius:28px 28px 0 0;padding:18px 16px 26px;z-index:31;transform:translateY(105%);transition:transform .38s cubic-bezier(.3,1.25,.4,1);box-shadow:0 -12px 40px rgba(0,0,0,.2)}
+[data-vibe="sticker"] .sheet{border-top:2.5px solid var(--tx)}
+.sheet.on{transform:none}
+.sheet .grab{width:40px;height:4px;border-radius:4px;background:var(--ln);margin:0 auto 12px}
+.sheet h3{font-size:16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.sheet h3 small{font-size:11px;color:var(--sb);font-weight:400}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+.tile{background:var(--sf);border-radius:var(--r-tile);box-shadow:var(--sh-card);padding:12px 6px 10px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;border:0;font-family:var(--sans);transition:transform .16s cubic-bezier(.3,.9,.3,1)}
+[data-vibe="sticker"] .tile{border:2px solid var(--tx)}
+.tile:nth-child(3n+1){transform:rotate(-1.4deg)}
+.tile:nth-child(3n){transform:rotate(1.4deg)}
+[data-vibe="clay"] .tile:nth-child(3n+1),[data-vibe="clay"] .tile:nth-child(3n){transform:none}
+.tile:active{transform:var(--press)}
+.tile img{width:42px;height:42px}
+.tile span{font-size:12px;color:var(--tx);font-weight:600}
+.tile .cnt{font-size:9.5px;color:var(--sb)}
+@keyframes tilePop{0%{opacity:0;transform:translateY(26px) scale(.6) rotate(-6deg)}70%{opacity:1;transform:translateY(-4px) scale(1.06) rotate(1deg)}100%{opacity:1;transform:none}}
+.sheet.on .tile{animation:tilePop .34s cubic-bezier(.34,1.4,.4,1) backwards}
+.sheet.on .tile:nth-child(1){animation-delay:.06s}.sheet.on .tile:nth-child(2){animation-delay:.11s}
+.sheet.on .tile:nth-child(3){animation-delay:.16s}.sheet.on .tile:nth-child(4){animation-delay:.21s}
+.sheet.on .tile:nth-child(5){animation-delay:.26s}.sheet.on .tile:nth-child(6){animation-delay:.31s}
+.sheet.on .tile:nth-child(7){animation-delay:.36s}.sheet.on .tile:nth-child(8){animation-delay:.41s}
+.sheet.on .tile:nth-child(9){animation-delay:.46s}.sheet.on .tile:nth-child(10){animation-delay:.51s}
+.more-row{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;color:var(--sb);background:none;border:0;cursor:pointer;padding:6px;font-family:var(--sans)}
+.more-row svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;transition:transform .25s}
+.more-row.open svg{transform:rotate(180deg)}
+.tiles .rest{display:none}
+.tiles.open .rest{display:flex}
+
+/* ---------- P09 录入页 ---------- */
+.form-row{display:flex;justify-content:space-between;align-items:center;padding:13px 14px;background:var(--sf);border-radius:var(--r-card);box-shadow:var(--sh-card);margin-bottom:10px}
+[data-vibe="sticker"] .form-row{border:2px solid var(--tx)}
+.form-row label{font-size:13.5px;color:var(--sb)}
+.form-row .val{font-size:14px;font-weight:600;color:var(--tx);display:flex;align-items:center;gap:6px}
+.seg-ctl{display:flex;background:var(--sf);border-radius:var(--r-card);box-shadow:var(--sh-card);padding:4px;margin-bottom:10px;gap:4px}
+[data-vibe="sticker"] .seg-ctl{border:2px solid var(--tx)}
+.seg-ctl button{flex:1;border:0;background:transparent;padding:8px 0;border-radius:calc(var(--r-card) - 8px);font-size:13px;color:var(--sb);cursor:pointer;font-family:var(--sans);transition:.2s}
+.seg-ctl button.on{background:var(--grad);color:#fff;font-weight:700;box-shadow:0 3px 8px rgba(0,0,0,.12)}
+.stepper{display:flex;align-items:center;gap:14px}
+.stepper button{width:34px;height:34px;border-radius:50%;border:0;background:var(--psoft);color:var(--pd);font-size:18px;font-weight:700;cursor:pointer;box-shadow:var(--sh-card);transition:transform .12s}
+.stepper button:active{transform:var(--press-btn)}
+.stepper .num{font-size:22px;font-weight:800;min-width:74px;text-align:center}
+.stepper .num small{font-size:11px;color:var(--sb);font-weight:400}
+textarea.note{width:100%;border:0;background:var(--sf);border-radius:var(--r-card);box-shadow:var(--sh-card);padding:12px;font-size:13px;font-family:var(--sans);color:var(--tx);resize:none;height:74px;outline:none}
+[data-vibe="sticker"] textarea.note{border:2px solid var(--tx)}
+textarea.note::placeholder{color:var(--sb);opacity:.7}
+.addphoto{width:64px;height:64px;border-radius:var(--r-tile);border:2px dashed var(--ln);display:grid;place-items:center;color:var(--sb);font-size:22px;cursor:pointer;background:none}
+.btn{width:100%;border:0;border-radius:var(--r-btn);padding:15px;font-size:15.5px;font-weight:700;cursor:pointer;font-family:var(--sans);background:var(--grad);color:#fff;box-shadow:var(--sh-btn);transition:transform .14s cubic-bezier(.3,.9,.3,1)}
+[data-vibe="sticker"] .btn{border:2.5px solid var(--tx)}
+.btn:active{transform:var(--press-btn);box-shadow:var(--sh-btn-a)}
+.btn.ghost{background:var(--sf);color:var(--sb);box-shadow:var(--sh-card);font-weight:600}
+[data-vibe="sticker"] .btn.ghost{border:2px solid var(--ln)}
+.btn.danger{background:var(--dg)}
+.btn.sm{width:auto;padding:9px 18px;font-size:13px}
+.type-head{display:flex;align-items:center;gap:10px;margin:4px 2px 14px}
+.type-head img{width:46px;height:46px;border-radius:var(--r-tile);box-shadow:var(--sh-card)}
+.type-head b{font-size:17px}
+.type-head small{display:block;color:var(--sb);font-size:11.5px}
+
+/* ---------- 庆祝动效 ---------- */
+.celebrate{position:absolute;inset:0;z-index:50;display:none;place-items:center;background:rgba(20,14,10,.4)}
+.celebrate.on{display:grid}
+.celebrate .pop{position:relative;text-align:center;animation:celebIn .55s cubic-bezier(.34,1.5,.4,1)}
+@keyframes celebIn{0%{opacity:0;transform:scale(.4) translateY(40px)}100%{opacity:1;transform:none}}
+.celebrate .halo{width:150px;height:150px;margin:0 auto;border-radius:50%;background:var(--grad);display:grid;place-items:center;box-shadow:0 18px 50px rgba(0,0,0,.3)}
+.celebrate .halo svg{width:110px;height:110px}
+@keyframes mascotJump{0%,100%{transform:translateY(0) scale(1,1)}18%{transform:translateY(4px) scale(1.08,.9)}42%{transform:translateY(-26px) scale(.94,1.1)}64%{transform:translateY(0) scale(1.06,.92)}80%{transform:translateY(-9px) scale(.98,1.03)}92%{transform:translateY(0) scale(1.02,.98)}}
+.celebrate.on .halo svg{animation:mascotJump .9s cubic-bezier(.3,.9,.3,1) .25s}
+.celebrate .txt{margin-top:14px;color:#fff;font-weight:800;font-size:17px;text-shadow:0 2px 10px rgba(0,0,0,.3)}
+.celebrate .sub{color:rgba(255,255,255,.85);font-size:12px;margin-top:2px}
+.confetti{position:absolute;top:-12px;width:9px;height:13px;border-radius:3px;animation:confFall 1.4s cubic-bezier(.4,.1,.7,1) forwards}
+[data-vibe="clay"] .confetti{border-radius:50%;width:11px;height:11px}
+@keyframes confFall{0%{transform:translateY(0) rotate(0) scale(1);opacity:1}85%{opacity:1}100%{transform:translateY(780px) rotate(560deg) scale(.7);opacity:0}}
+
+/* ---------- 危险确认 ---------- */
+.modal{position:absolute;inset:0;z-index:55;display:none;place-items:center;background:rgba(20,14,10,.5)}
+.modal.on{display:grid}
+.modal .box{width:280px;background:var(--sf);border-radius:var(--r-card);padding:22px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.35);animation:celebIn .35s cubic-bezier(.34,1.4,.4,1)}
+[data-vibe="sticker"] .modal .box{border:2.5px solid var(--tx)}
+.modal .warn-ic{width:52px;height:52px;margin:0 auto 12px;border-radius:50%;background:rgba(181,84,74,.12);display:grid;place-items:center}
+.modal .warn-ic svg{width:26px;height:26px;stroke:var(--dg);fill:none;stroke-width:2.2;stroke-linecap:round}
+.modal h4{font-size:16px;margin-bottom:6px}
+.modal p{font-size:12.5px;color:var(--sb);margin-bottom:16px}
+.modal .acts{display:flex;gap:10px}
+.modal .acts button{flex:1}
+
+/* ---------- P13 生长曲线 ---------- */
+.chart-card{background:var(--sf);border-radius:var(--r-card);box-shadow:var(--sh-card);padding:14px;margin-bottom:12px}
+[data-vibe="sticker"] .chart-card{border:2px solid var(--tx)}
+.chart-card h4{font-size:14px;display:flex;justify-content:space-between;align-items:center}
+.chart-card h4 .pct{font-size:11px;color:var(--pd);background:var(--psoft);padding:3px 9px;border-radius:999px;font-weight:700}
+.chart-svg{width:100%;height:auto;display:block;margin-top:8px}
+@keyframes drawLine{to{stroke-dashoffset:0}}
+.curve-path{stroke-dasharray:600;stroke-dashoffset:600}
+.scr.active .curve-path{animation:drawLine 1.1s cubic-bezier(.4,0,.2,1) .25s forwards}
+@keyframes dotPop{0%{transform:scale(0)}70%{transform:scale(1.5)}100%{transform:scale(1)}}
+.curve-dot{transform-origin:center;transform:scale(0)}
+.scr.active .curve-dot{animation:dotPop .34s cubic-bezier(.34,1.5,.4,1) forwards}
+@keyframes nowRing{0%{r:5;opacity:.9}100%{r:13;opacity:0}}
+.now-ring{animation:nowRing 1.6s ease-out infinite}
+.metric-row{display:flex;gap:10px;margin-bottom:12px}
+.metric{flex:1;background:var(--sf);border-radius:var(--r-card);box-shadow:var(--sh-card);padding:12px;text-align:center}
+[data-vibe="sticker"] .metric{border:2px solid var(--tx)}
+.metric b{font-size:19px;display:block}
+.metric span{font-size:10.5px;color:var(--sb)}
+.metric em{font-style:normal;font-size:10px;color:var(--ok);font-weight:700}
+.disclaim{font-size:10.5px;color:var(--sb);background:var(--s);border-radius:12px;padding:9px 12px;margin-top:10px;line-height:1.5}
+.correction{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--acd);background:var(--acsoft);padding:4px 10px;border-radius:999px;margin-bottom:10px}
+
+/* ---------- P30 家长模式 ---------- */
+.elder .appbar h1{font-size:24px}
+.elder .body{font-size:18px;padding-bottom:110px}
+.el-row{display:flex;justify-content:space-between;align-items:center;padding:18px 16px;background:var(--sf);border-radius:20px;box-shadow:var(--sh-card);margin-bottom:14px}
+[data-vibe="sticker"] .el-row{border:2px solid var(--tx)}
+.el-row .lab b{font-size:19px;font-weight:700;display:block}
+.el-row .lab span{font-size:13px;color:var(--sb)}
+.switch{width:58px;height:32px;border-radius:999px;background:var(--ln);position:relative;cursor:pointer;transition:background .25s;flex:none;border:0}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.2);transition:left .25s cubic-bezier(.34,1.4,.4,1)}
+.switch.on{background:var(--ok)}
+.switch.on::after{left:29px}
+.el-big{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:6px 0 14px}
+.el-big button{min-height:96px;border:0;border-radius:22px;background:var(--grad);color:#fff;font-size:22px;font-weight:800;font-family:var(--sans);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;box-shadow:var(--sh-btn);cursor:pointer;transition:transform .14s}
+[data-vibe="sticker"] .el-big button{border:2.5px solid var(--tx)}
+.el-big button:active{transform:var(--press-btn)}
+.el-big button img{width:40px;height:40px}
+.el-big button.alt{background:var(--ac)}
+.el-stat{background:var(--sf);border-radius:20px;box-shadow:var(--sh-card);padding:18px;margin-bottom:14px}
+[data-vibe="sticker"] .el-stat{border:2px solid var(--tx)}
+.el-stat b{font-size:26px}
+.el-stat p{font-size:15px;color:var(--sb);margin-top:4px}
+.el-hint{font-size:11.5px;color:var(--doc-faint);text-align:center;margin-top:8px}
+
+/* ---------- 四态 ---------- */
+.state-pane{display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:60px 30px;min-height:420px}
+.state-pane.on{display:flex}
+.state-pane h4{font-size:16px;margin:14px 0 4px}
+.state-pane p{font-size:12.5px;color:var(--sb);max-width:240px}
+@keyframes floaty{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-9px) rotate(2deg)}}
+.state-pane .msc{width:110px;height:110px;animation:floaty 2.6s ease-in-out infinite}
+.state-pane .msc.hurry{animation:floaty 1s ease-in-out infinite}
+.skel{width:100%;display:flex;flex-direction:column;gap:12px}
+.skel i{height:74px;border-radius:var(--r-card);background:linear-gradient(100deg,var(--ln) 40%,var(--sf) 50%,var(--ln) 60%);background-size:200% 100%;animation:shimmer 1.3s linear infinite}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+.err-ic{width:64px;height:64px;border-radius:50%;background:rgba(181,84,74,.12);display:grid;place-items:center;animation:shake .5s ease .3s}
+.err-ic svg{width:30px;height:30px;stroke:var(--dg);stroke-width:2.4;fill:none;stroke-linecap:round}
+@keyframes arrowBounce{0%,100%{transform:translate(0,0)}50%{transform:translate(-10px,8px)}}
+.empty-arrow{position:absolute;right:26px;bottom:150px;color:var(--pd);font-size:12px;font-weight:700;animation:arrowBounce 1.2s ease-in-out infinite;z-index:24;display:flex;flex-direction:column;align-items:flex-end}
+.empty-arrow svg{width:30px;height:30px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;transform:rotate(120deg)}
+
+/* ---------- 吉祥物 SVG（黏土/贴纸双渲染） ---------- */
+.msc{display:block}
+.msc .body-fill{fill:var(--mb)}
+.msc .dark{fill:var(--mbd)}
+.msc .light{fill:var(--mbl)}
+.msc .blush{fill:#F2A0A0;opacity:.55}
+.msc .eye{fill:#4A332A}
+.msc .mouth{stroke:#4A332A;stroke-width:3;fill:none;stroke-linecap:round}
+[data-vibe="sticker"] .msc .out{stroke:#6B4A3A;stroke-width:5;paint-order:stroke fill}
+[data-vibe="sticker"] .msc .diecut{stroke:#fff;stroke-width:14;paint-order:stroke fill;fill:none}
+[data-vibe="clay"] .msc .out{stroke:none}
+[data-vibe="clay"] .msc .gloss{opacity:.5}
+[data-vibe="sticker"] .msc .gloss{opacity:0}
+[data-vibe="sticker"] .msc{filter:drop-shadow(2px 4px 0 rgba(107,74,58,.25))}
+[data-vibe="clay"] .msc{filter:drop-shadow(0 8px 10px rgba(0,0,0,.16))}
+[data-ip=bear]{--mb:#D8A279;--mbd:#B9814F;--mbl:#EAC49E}
+[data-ip=duck]{--mb:#FFD968;--mbd:#E8B93E;--mbl:#FFEBA6}
+.msc .happy,.msc .peek,.msc .cry{display:none}
+.msc.happy .open{display:none}.msc.happy .happy-e{display:block}
+.msc .happy-e{display:none}
+.msc.happy .happy-e{display:block}
+@keyframes wig{0%,100%{transform:rotate(0)}25%{transform:rotate(-7deg)}75%{transform:rotate(7deg)}}
+.wig{animation:wig .5s ease}
+@keyframes blinkE{0%,90%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+.msc .eyes{transform-origin:center;animation:blinkE 4.2s infinite}
+
+/* ---------- 动效规格 / 图标清单 ---------- */
+.spec td:nth-child(3),.spec td:nth-child(4){white-space:nowrap}
+.spec .easing{font-family:var(--mono);font-size:11px;color:var(--doc-teal)}
+.iconlist{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+@media(max-width:900px){.iconlist{grid-template-columns:1fr}}
+.iconlist .col{background:var(--doc-panel);border:1px solid var(--doc-line);border-radius:var(--doc-r);padding:22px}
+.iconlist .col h3{font-family:var(--serif);font-size:18px;margin-bottom:6px}
+.iconlist .col .verdict{font-size:12.5px;padding:8px 12px;border-radius:10px;margin:10px 0 14px}
+.iconlist .col.ok .verdict{background:rgba(143,211,167,.1);color:#8FD3A7;border:1px solid rgba(143,211,167,.25)}
+.iconlist .col.no .verdict{background:rgba(232,154,140,.08);color:#E89A8C;border:1px solid rgba(232,154,140,.25)}
+.filenames{font-family:var(--mono);font-size:11.5px;color:var(--doc-sub);line-height:1.9;word-spacing:6px}
+.filenames b{color:var(--doc-acc);font-weight:600}
+
+/* ---------- 下一步 ---------- */
+.next{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+@media(max-width:900px){.next{grid-template-columns:1fr}}
+.next .step{background:var(--doc-panel);border:1px solid var(--doc-line);border-radius:var(--doc-r);padding:22px}
+.next .step .n{font-family:var(--serif);font-size:26px;color:var(--doc-acc)}
+.next .step h4{margin:8px 0 6px;font-size:15.5px}
+.next .step p{font-size:13px;color:var(--doc-sub)}
+footer{padding:40px 0 60px;color:var(--doc-faint);font-size:12px;text-align:center}
+
+/* ---------- 补充：状态切换 / toast / 新卡片插入 ---------- */
+.rec.rise{animation:rise .5s cubic-bezier(.34,1.3,.4,1)}
+@keyframes rise{0%{opacity:0;transform:translateY(26px) scale(.94)}70%{transform:translateY(-4px) scale(1.01)}100%{opacity:1;transform:none}}
+.scr.hasstate .feed{display:none}
+.scr .appbar+.body{padding-top:6px}
+.toast{position:absolute;left:50%;bottom:132px;transform:translateX(-50%) translateY(8px);background:rgba(30,22,18,.92);color:#fff;font-size:12.5px;padding:9px 18px;border-radius:999px;z-index:70;opacity:0;transition:.25s;pointer-events:none;white-space:nowrap}
+.toast.on{opacity:1;transform:translateX(-50%)}
+.sheet .hintrow{font-size:11px;color:var(--sb);text-align:center;margin-top:12px}
+[data-msc]{display:inline-flex}
+.mini{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px}
+.mini .m-t{font-size:11px;font-weight:700;color:var(--tx)}
+.mini .m-s{font-size:9px;color:var(--sb)}
+.mini.launch{background:var(--grad);gap:4px}
+.mini.launch .m-t{color:#fff;font-family:var(--serif);font-size:15px;letter-spacing:.2em}
+.mini.launch .m-s{color:rgba(255,255,255,.8)}
+.mini.ok{background:var(--psoft)}
+.mini.ok .m-t{color:var(--pd)}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-kicker">SUIJI · DESIGN LANGUAGE · V3</div>
+    <h1>岁记 v3 · 卡通动物主题<br><em>从绘本走进「手作玩具盒」</em></h1>
+    <p class="lead">v2 是森林绘本里的扁平 Kawaii；v3 把岁岁熊与叽叽鸭从纸面上「捏」出来 —— 两个可选气质方向（黏土玩具 / 模切贴纸）× 三套候选色系（燕麦奶茶 / 薄荷奶糖 / 水果软糖），与 v2 的马卡龙蜂蜜橙体系完全分道。以下所有手机效果图均为真实可交互原型，顶部控制台可任意切换气质 × 色系 × IP 组合预览。</p>
+    <div class="hero-meta">
+      <span class="tag hot">基于 PRD v1.2 §4.5 页面全景</span>
+      <span class="tag">uniapp / H5 可实现</span>
+      <span class="tag">375 × 812</span>
+      <span class="tag">图标库 suiji-icons 只读引用</span>
+      <span class="tag">WCAG 对比度已逐项标注</span>
+    </div>
+    <div class="hero-jump">
+      <a href="#diff">v2 → v3 差异说明</a><a href="#vibes">① 形象演绎</a><a href="#schemes">② 色系方案</a><a href="#stage">③ 高保真效果图</a><a href="#spec">④ 动效规格</a><a href="#icons">⑤ 图标重绘清单</a>
+    </div>
+  </div>
+</header>
+
+<div class="console">
+  <div class="wrap">
+    <div class="cgroup"><span>气质</span>
+      <div class="seg" id="seg-vibe">
+        <button data-v="clay" class="on">黏土玩具</button>
+        <button data-v="sticker">模切贴纸</button>
+      </div>
+    </div>
+    <div class="cgroup"><span>色系</span>
+      <div class="seg" id="seg-scheme">
+        <button data-s="a" class="on"><i class="dot" style="background:#C98D7B"></i>燕麦奶茶</button>
+        <button data-s="b"><i class="dot" style="background:#3FA8A0"></i>薄荷奶糖</button>
+        <button data-s="c"><i class="dot" style="background:#F2668B"></i>水果软糖</button>
+      </div>
+    </div>
+    <div class="cgroup"><span>IP</span>
+      <div class="seg" id="seg-ip">
+        <button data-i="bear" class="on">岁岁熊</button>
+        <button data-i="duck">叽叽鸭</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section id="diff">
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">00</span><h2 class="sec-title">v2 → v3 差异说明</h2></div>
+    <p class="sec-sub">逐项对照 suiji-ui-v2 已落地的方案，v3 在风格、色系、版式、动效编排上的改变点 —— 无任何一项复刻 v2。</p>
+    <table class="diff">
+      <tr><th>维度</th><th>v2（森林绘本 Kawaii）</th><th>v3 方向 A · 黏土玩具</th><th>v3 方向 B · 模切贴纸</th></tr>
+      <tr><td>形象气质</td><td class="v2">扁平绘本插画：细描边 + 平涂 + 腮红，纸面感</td><td class="v3">无描边黏土捏塑：径向高光、底部压痕、可「捏」的体积感</td><td class="v3">模切贴纸：保留粗描边 + 白色刀切边 + 微旋转拼贴</td></tr>
+      <tr><td>主色系</td><td class="v2">蜂蜜橙 #F7A15C / 奶油黄 #F5B32C 高亮马卡龙</td><td class="v3" colspan="2">全部弃用。换为低饱和莫兰迪暖调 / 奶系清新调 / 果冻高饱和渐变三套候选（见 §02），且家长操作色与宝宝内容色分离</td></tr>
+      <tr><td>卡片语言</td><td class="v2">大圆角 + 同色柔影，居中对称</td><td class="v3">双层「挤出」阴影（顶高光+底投影），按压=整体下沉 4px</td><td class="v3">硬偏移影 3px + 2px 粗描边，卡片/磁贴带 ±1.5° 手贴旋转</td></tr>
+      <tr><td>背景氛围</td><td class="v2">奶油纯色 + 漂浮光点（drift 动效）</td><td class="v3">哑光渐变 + 柔和光斑，无漂浮元素（更静，突出内容）</td><td class="v3">方格纸纹理 + 和纸胶带 + 涂鸦虚线分隔（拼贴叙事）</td></tr>
+      <tr><td>动效编排</td><td class="v2">8 组：drift / breathe / blink / peek / confetti 下落等，氛围型</td><td class="v3">物理形变系：squash &amp; stretch（保存=压扁回弹）、磁贴「捏出」、按压下沉</td><td class="v3">粘贴系：磁贴逐张「贴上」（旋转落位）、庆祝=贴纸屑迸出、卡片按压=掀起</td></tr>
+      <tr><td>类别色</td><td class="v2">10 类固定高饱和色</td><td class="v3" colspan="2">随色系派生（每套 10 色），饱和度整体收一档，与页面主色同温</td></tr>
+      <tr><td>图标关系</td><td class="v2">直接复用扁平图标，风格统一</td><td class="v3">冲突：需全量重绘为无描边黏土 3D（60 枚，见 §05）</td><td class="v3">兼容：现有粗描边图标天然像贴纸，零重绘（见 §05）</td></tr>
+    </table>
+  </div>
+</section>
+<section id="vibes">
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">01</span><h2 class="sec-title">形象演绎 · 两个气质方向</h2></div>
+    <p class="sec-sub">均保留 bear / duck 双 IP 切换机制（与 suiji-icons 图标库一致）。两个方向都把形象从 v2 的「纸面绘本」拉进「手作玩具盒」，但材质语言相反：一个做体积（黏土），一个做拼贴（贴纸）。下方迷你屏随顶部控制台色系 / IP 实时联动。</p>
+    <div class="vibes">
+
+      <div class="vibe-card v-clay sel" id="vc-clay">
+        <button class="pick on" data-v="clay">选用此气质</button>
+        <h3>方向 A · 黏土玩具</h3>
+        <div class="en">CLAY TOY — 把岁岁从纸里「捏」出来</div>
+        <ul>
+          <li>无描边，靠光影塑形：径向高光 + 底部压痕，吉祥物像一团捏出来的软陶</li>
+          <li>按钮 / FAB 用「挤出式」双层阴影，按压整体下沉 4px —— 像按下一块软黏土</li>
+          <li>卡片厚圆角（26px）+ 顶高光柔影，整体是玩具盒的哑光质感</li>
+          <li>动效语言 = squash &amp; stretch：保存成功 = 吉祥物压扁回弹 + 陶土色圆点彩带</li>
+          <li>背景安静（哑光渐变 + 柔光斑），无漂浮元素，突出记录内容本身</li>
+        </ul>
+        <div class="vibe-mini-row">
+          <div class="mini launch" data-vibe="clay" data-scheme="a" data-ip="bear"><span data-msc data-size="64"></span><div class="m-t">岁记</div><div class="m-s">记录成长的每一岁</div><div class="cap">启动页</div></div>
+          <div class="mini" data-vibe="clay" data-scheme="a" data-ip="bear" style="background:var(--bg)"><span data-msc data-size="52"></span><div class="m-t">今天还是空白</div><div class="m-s">点下方 + 捏出第一条</div><div class="cap">空状态</div></div>
+          <div class="mini ok" data-vibe="clay" data-scheme="a" data-ip="bear"><span data-msc data-size="52"></span><div class="m-t">已记录 ✓</div><div class="m-s">岁岁也开心</div><div class="cap">保存成功</div></div>
+        </div>
+        <div class="vibe-note">⚠ 图标冲突：现有图标为扁平粗描边，与黏土无描边语言相悖 —— 60 枚需全量重绘（清单见 §05）。</div>
+      </div>
+
+      <div class="vibe-card v-stk" id="vc-stk">
+        <button class="pick" data-v="sticker">选用此气质</button>
+        <h3>方向 B · 模切贴纸 <span class="rec-badge">图标零重绘</span></h3>
+        <div class="en">DIE-CUT STICKER — 手账本里贴出来的成长</div>
+        <ul>
+          <li>把现有图标的粗描边顺势当作贴纸描线，外加白色刀切边 + 硬偏移影（3px）</li>
+          <li>卡片 / 磁贴带 ±1.5° 手贴旋转，方格纸纹理背景 + 和纸胶带点缀（拼贴叙事）</li>
+          <li>按压反馈 = 贴纸掀起（translate(-2,-2)），松手啪嗒贴回</li>
+          <li>动效语言 = 粘贴：P08 磁贴带旋转逐张「贴上」，庆祝 = 贴纸屑迸出</li>
+          <li>分隔线用涂鸦虚线，日记卡片像剪贴簿里剪下来的一页</li>
+        </ul>
+        <div class="vibe-mini-row">
+          <div class="mini launch" data-vibe="sticker" data-scheme="a" data-ip="bear"><span data-msc data-size="64"></span><div class="m-t">岁记</div><div class="m-s">记录成长的每一岁</div><div class="cap">启动页</div></div>
+          <div class="mini" data-vibe="sticker" data-scheme="a" data-ip="bear" style="background:var(--bg)"><span data-msc data-size="52"></span><div class="m-t">今天还是空白</div><div class="m-s">点下方 + 贴第一张</div><div class="cap">空状态</div></div>
+          <div class="mini ok" data-vibe="sticker" data-scheme="a" data-ip="bear"><span data-msc data-size="52"></span><div class="m-t">已记录 ✓</div><div class="m-s">岁岁也开心</div><div class="cap">保存成功</div></div>
+        </div>
+        <div class="vibe-note">✔ 图标兼容：suiji-icons 现有 60 枚（粗描边 + 平涂）天然像贴纸，零重绘直接可用；仅需新增吉祥物大图素材（启动 / 庆祝 / 四态，见 §05）。</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+<section id="schemes">
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">02</span><h2 class="sec-title">色系方案 · 三套候选</h2></div>
+    <p class="sec-sub">全部弃用 v2 的蜂蜜橙 #F7A15C / 奶油黄 #F5B32C。每套均把「宝宝内容色」（暖侧：记录卡片、时间轴、类别色）与「家长操作色」（冷侧：按钮、开关、系统提示）分离，且主色不与性别绑定 —— 男孩女孩用同一套。对比度按 WCAG 2.1 计算：正文 ≥4.5:1（AA）、大字号 ≥3:1；装饰色不承载文字则单独标注。</p>
+    <div class="schemes">
+
+      <div class="scheme-card sel" id="sc-a" data-s="a">
+        <button class="pick on" data-s="a">选用</button>
+        <h3>A · 燕麦奶茶</h3>
+        <div class="desc">低饱和莫兰迪暖调，安静柔和，与记录内容不争抢；适合长时间浏览时光轴。</div>
+        <div class="swatch-strip">
+          <i style="background:#C98D7B" data-n="主 #C98D7B"></i><i style="background:#F0E3CD" data-n="辅 #F0E3CD"></i><i style="background:#7C93A8" data-n="操作 #7C93A8"></i><i style="background:#FAF4EE" data-n="背景 #FAF4EE"></i><i style="background:#4A3F38" data-n="文字 #4A3F38"></i><i style="background:#A65A47" data-n="深主 #A65A47"></i>
+        </div>
+        <table>
+          <tr><th>组合</th><th>对比度</th><th>判定</th></tr>
+          <tr><td>文字 #4A3F38 / 背景 #FAF4EE</td><td class="mono">9.34:1</td><td class="pass">AA ✓</td></tr>
+          <tr><td>次要 #7A6858 / 背景</td><td class="mono">4.87:1</td><td class="pass">AA ✓</td></tr>
+          <tr><td>白字 / 按钮深主 #A65A47</td><td class="mono">5.03:1</td><td class="pass">AA ✓</td></tr>
+          <tr><td>白字 / 家长操作 #52708C</td><td class="mono">5.18:1</td><td class="pass">AA ✓</td></tr>
+          <tr><td>白字 / 危险 #B5544A</td><td class="mono">4.85:1</td><td class="pass">AA ✓</td></tr>
+          <tr><td>白字 / 成功 #4E7A42</td><td class="mono">5.02:1</td><td class="pass">AA ✓</td></tr>
+          <tr><td>主色 #C98D7B / 背景（仅装饰）</td><td class="mono">2.54:1</td><td class="fail">不承载正文</td></tr>
+        </table>
+        <div class="role">宝宝内容 = 燕麦玫棕暖侧；家长操作 = 灰蓝冷侧（#7C93A8 系）。危险 / 成功色均压暗一档融入暖底。</div>
+      </div>
+
+      <div class="scheme-card" id="sc-b" data-s="b">
+        <button class="pick" data-s="b">选用</button>
+        <h3>B · 薄荷奶糖</h3>
+        <div class="desc">珊瑚橙 × 薄荷青互补，清亮有活力；留白多、对比明快，适合白天快速单手记录。</div>
+        <div class="swatch-strip">
+          <i style="background:#FF9B85" data-n="主 #FF9B85"></i><i style="background:#EDE4FA" data-n="辅 #EDE4FA"></i><i style="background:#3FA8A0" data-n="操作 #3FA8A0"></i><i style="background:#F7FBF9" data-n="背景 #F7FBF9"></i><i style="background:#33504C" data-n="文字 #33504C"></i><i style="background:#C24E33" data-n="深主 #C24E33"></i>
+        </div>
+        <table>
+          <tr><th>组合</th><th>对比度</th><th>判定</th></tr>
+          <tr><td>文字 #33504C / 背景 #F7FBF9</td><td class="mono">8.41:1</td><td class="pass">AA ✓</td></tr>
+          <tr><td>次要 #57716C / 背景（已调深）</td><td class="mono">4.60:1</td><td class="pass">AA ✓</td></tr>
+          <tr><td>白字 / 按钮深主 #C24E33</td><td class="mono">4.74:1</td><td class="pass">AA ✓</td></tr>
+          <tr><td>白字 / 家长操作 #277A71</td><td class="mono">5.11:1</td><td class="pass">AA ✓</td></tr>
+          <tr><td>白字 / 危险 #C24038</td><td class="mono">5.14:1</td><td class="pass">AA ✓</td></tr>
+          <tr><td>白字 / 成功 #27794F</td><td class="mono">4.60:1</td><td class="pass">AA ✓</td></tr>
+          <tr><td>主色 #FF9B85 / 背景（仅装饰）</td><td class="mono">1.96:1</td><td class="fail">不承载正文</td></tr>
+        </table>
+        <div class="role">宝宝内容 = 珊瑚橙暖侧；家长操作 = 薄荷青冷侧（开关、同步、系统按钮全青）。类别色 10 色取同温糖果调。</div>
+      </div>
+
+      <div class="scheme-card" id="sc-c" data-s="c">
+        <button class="pick" data-s="c">选用</button>
+        <h3>C · 水果软糖</h3>
+        <div class="desc">果冻高饱和渐变主色（树莓→橘），玩乐感最强；与「模切贴纸」气质最搭，庆祝场面记忆点足。</div>
+        <div class="swatch-strip">
+          <i style="background:#F2668B" data-n="主 #F2668B"></i><i style="background:#FFE9D2" data-n="辅 #FFE9D2"></i><i style="background:#3E9BD6" data-n="操作 #3E9BD6"></i><i style="background:#FFF6F8" data-n="背景 #FFF6F8"></i><i style="background:#4A2F3C" data-n="文字 #4A2F3C"></i><i style="background:#C13A5E" data-n="深主 #C13A5E"></i>
+        </div>
+        <table>
+          <tr><th>组合</th><th>对比度</th><th>判定</th></tr>
+          <tr><td>文字 #4A2F3C / 背景 #FFF6F8</td><td class="mono">11.22:1</td><td class="pass">AA+ ✓</td></tr>
+          <tr><td>次要 #826576 / 背景</td><td class="mono">4.86:1</td><td class="pass">AA ✓</td></tr>
+          <tr><td>白字 / 按钮深主 #C13A5E</td><td class="mono">5.21:1</td><td class="pass">AA ✓</td></tr>
+          <tr><td>白字 / 家长操作 #2472A4</td><td class="mono">5.23:1</td><td class="pass">AA ✓</td></tr>
+          <tr><td>白字 / 危险 #B8304E</td><td class="mono">5.88:1</td><td class="pass">AA ✓</td></tr>
+          <tr><td>白字 / 成功 #27794F</td><td class="mono">4.60:1</td><td class="pass">AA ✓</td></tr>
+          <tr><td>主色 #F2668B / 背景（仅装饰）</td><td class="mono">2.81:1</td><td class="fail">不承载正文</td></tr>
+        </table>
+        <div class="role">宝宝内容 = 树莓红粉暖侧；家长操作 = 天空蓝冷侧。渐变（#F2668B→#FF8A3D）只用于 FAB / 主按钮 / 庆祝，正文一律用深主色。</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+<section id="stage">
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">03</span><h2 class="sec-title">高保真效果图 · 可交互演示</h2></div>
+    <p class="sec-sub">375 × 812 手机内为真实原型：点 FAB 唤起 P08 面板、点磁贴进入 P09 录入、保存触发庆祝动效并回插时光轴、删除走危险二次确认、状态页签切换空 / 加载 / 错误 / 边界四态与只读角色。顶部控制台切换气质 × 色系 × IP，手机与图标资源实时联动。</p>
+
+    <div class="stage" id="stageRoot" data-scheme="a" data-vibe="clay" data-ip="bear">
+      <div style="width:100%">
+        <div class="stage-bar">
+          <div class="demo-tabs" id="demoTabs">
+            <button data-demo="p01" class="on">P01 时光轴首页</button>
+            <button data-demo="p08">P08 面板 + P09 录入</button>
+            <button data-demo="p13">P13 生长曲线</button>
+            <button data-demo="p30">P30 家长模式 · 大字号</button>
+          </div>
+          <div class="state-tabs" id="stateTabs">
+            <span>页面状态</span>
+            <button data-state="" class="on">正常</button><button data-state="empty">空</button><button data-state="loading">加载</button><button data-state="error">错误</button><button data-state="boundary">边界</button><button data-state="ro">只读角色</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="phone-col">
+        <div class="phone"><div class="island"></div>
+          <div class="viewport" id="vp">
+            <div class="statusbar"><span>14:52</span><span class="sb-r">
+              <svg viewBox="0 0 16 12"><path d="M1 9h2v3H1zM5 6h2v6H5zM9 3h2v9H9zM13 0h2v12h-2z"/></svg>
+              <svg viewBox="0 0 16 12"><path d="M8 10l7-7a10 10 0 0 0-14 0z"/></svg>
+              <svg viewBox="0 0 20 12"><rect x="0.5" y="1" width="15" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="2.5" y="3" width="9" height="6" rx="1.2"/><rect x="17.5" y="4" width="1.8" height="4" rx="0.9"/></svg>
+            </span></div>
+
+            <!-- ============ P01 时光轴 ============ -->
+            <div class="scr active" id="scr-p01">
+              <div class="appbar">
+                <div class="baby-chip" data-act="baby"><span class="av"><span data-msc data-size="22"></span></span>岁岁 ▾</div>
+                <button class="iconbtn" data-act="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></button>
+                <button class="iconbtn" data-act="notify"><svg viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><i class="badge">3</i></button>
+              </div>
+              <div class="body">
+                <div class="ro-banner">亲友浏览模式 · 可查看与点赞，不可新增或修改记录</div>
+                <div class="feed" id="feed">
+                  <div class="day-head"><b>今天</b><span>周三 · 10月26日</span><span class="line"></span></div>
+                  <div class="card rec pressable"><span class="ic"><img data-ic="01-feeding" alt=""></span><div class="tx"><div class="t"><b>瓶喂</b><time>14:30</time></div><p>150ml · 先左后右，一口气喝完没吐奶</p><div class="meta"><span class="pill">150ml</span><span class="pill cool">已同步</span></div></div></div>
+                  <div class="card rec pressable"><i class="tape" style="top:-7px;left:30px;transform:rotate(-4deg)"></i><span class="ic"><img data-ic="04-photo" alt=""></span><div class="tx"><div class="t"><b>第一次翻身！</b><time>13:05</time></div><p>妈妈抓拍：从左往右一气呵成，自己还吓了一跳</p><div class="photos"><i></i><i></i><i></i></div><div class="meta"><span class="pill">里程碑</span></div></div></div>
+                  <div class="card rec pressable"><span class="ic"><img data-ic="02-sleep" alt=""></span><div class="tx"><div class="t"><b>小睡</b><time>12:10</time></div><p>1 小时 20 分 · 独立小床，放下后自主入睡</p><div class="meta"><span class="pill cool">睡眠</span></div></div></div>
+                  <div class="day-head"><b>昨天</b><span>周二 · 10月25日</span><span class="line"></span></div>
+                  <div class="card rec pressable"><span class="ic"><img data-ic="05-measure" alt=""></span><div class="tx"><div class="t"><b>每周称重</b><time>09:00</time></div><p>6.8kg（+0.3）· 61.2cm · 头围 40.5cm</p><div class="meta"><span class="pill">生长</span><span class="pill cool">已同步</span></div></div></div>
+                  <div class="card rec pressable"><span class="ic"><img data-ic="09-text-mood" alt=""></span><div class="tx"><div class="t"><b>爸爸日记</b><time>23:40</time></div><p>夜醒只有一次，拍嗝后自己接着睡。记录 30 天，回头看全是细碎的甜。</p><div class="meta"><span class="pill late">补录</span></div></div></div>
+                </div>
+                <div class="state-pane" data-pane="empty"><span data-msc data-size="110"></span><h4>岁岁的一天还是空白</h4><p>点击下方 + 按钮，捏出第一条记录</p></div>
+                <div class="state-pane" data-pane="loading"><div class="skel"><i></i><i></i><i></i><i></i></div><h4>正在加载记录…</h4><p>岁岁在帮你翻日记本</p></div>
+                <div class="state-pane" data-pane="error"><div class="err-ic"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 8v5M12 16.5h.01"/></svg></div><h4>网络开小差了</h4><p>记录已存到本地，恢复联网后会自动同步</p><button class="btn sm" style="margin-top:14px" data-act="retry">重试</button></div>
+                <div class="state-pane" data-pane="boundary"><span data-msc data-size="110" data-cls="hurry"></span><h4>到底啦 · 已到达缓存边界</h4><p>离线仅保留最近 90 天记录，上滑需联网加载更早内容</p></div>
+                <div class="empty-arrow" id="emptyArrow" style="display:none"><span>点这里记录</span><svg viewBox="0 0 24 24"><path d="M4 4c7 1 12 7 14 15"/><path d="M13 15l5 4 3-7"/></svg></div>
+              </div>
+              <button class="fab in" id="fab"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+              <div class="tabbar">
+                <button class="on" data-tab="p01"><img data-ic="10-tab-home" alt=""><span>时光</span></button>
+                <button data-tab="p13"><img data-ic="11-tab-growth" alt=""><span>成长</span></button>
+                <button data-tab="fam"><img data-ic="12-tab-family" alt=""><span>亲友</span></button>
+                <button data-tab="me"><img data-ic="13-tab-me" alt=""><span>我的</span></button>
+              </div>
+            </div>
+
+            <!-- ============ P09 录入 ============ -->
+            <div class="scr" id="scr-p09">
+              <div class="appbar"><button class="iconbtn" data-act="back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><h1>添加记录</h1></div>
+              <div class="body">
+                <div class="type-head"><img data-ic="01-feeding" id="p09ic" alt=""><div><b id="p09name">喂养</b><small id="p09sub">上次记录 11:20 · 距今 3 小时 20 分</small></div></div>
+                <div class="seg-ctl" id="p09seg"><button>亲喂</button><button class="on">瓶喂</button><button>辅食</button></div>
+                <div class="form-row"><label>奶量</label><div class="stepper"><button data-step="-10">−</button><span class="num" id="p09num">150<small>ml</small></span><button data-step="10">＋</button></div></div>
+                <div class="form-row"><label>时间</label><span class="val">刚刚 <span class="pill cool">自动定位</span></span></div>
+                <div class="form-row"><label>补录为更早时间</label><span class="val" style="color:var(--sb);font-weight:400;font-size:12.5px">开启后可选历史时刻</span><button class="switch" style="width:48px;height:26px"></button></div>
+                <textarea class="note" placeholder="补一句话（可选）：先喂哪侧、有没有吐奶、宝宝状态…"></textarea>
+                <div style="display:flex;gap:8px;margin:12px 0 18px;align-items:center"><button class="addphoto">＋</button><div style="width:64px;height:64px;border-radius:var(--r-tile);background:linear-gradient(135deg,var(--s),var(--psoft));box-shadow:var(--sh-card)"></div><span style="font-size:11px;color:var(--sb)">照片自动脱敏<br>（去除 EXIF 位置）</span></div>
+                <button class="btn" data-act="save">保存记录</button>
+                <div style="height:10px"></div>
+                <button class="btn ghost" style="color:var(--dg)" data-act="del">删除草稿</button>
+              </div>
+            </div>
+
+            <!-- ============ P13 生长曲线 ============ -->
+            <div class="scr" id="scr-p13">
+              <div class="appbar"><button class="iconbtn" data-act="back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><h1>生长曲线</h1><button class="iconbtn" data-act="cmp"><svg viewBox="0 0 24 24"><path d="M4 20V8M10 20V4M16 20v-9M22 20h-19"/></svg></button></div>
+              <div class="body">
+                <span class="correction">早产 5 周 · 已按矫正月龄显示 3m12d</span>
+                <div class="metric-row">
+                  <div class="metric"><b>6.8<small>kg</small></b><span>体重</span><em>P50–75 ↑</em></div>
+                  <div class="metric"><b>61.2<small>cm</small></b><span>身长</span><em>P25–50</em></div>
+                  <div class="metric"><b>40.5<small>cm</small></b><span>头围</span><em>P50</em></div>
+                </div>
+                <div class="chart-card">
+                  <h4>体重 / 月龄 <span class="pct">当前 P62</span></h4>
+                  <svg class="chart-svg" viewBox="0 0 330 210">
+                    <rect x="25" y="24" width="285" height="162" fill="none"/>
+                    <rect x="25" y="24" width="285" height="42" fill="var(--s)" opacity=".35"/>
+                    <rect x="25" y="66" width="285" height="54" fill="var(--s)" opacity=".6"/>
+                    <rect x="25" y="120" width="285" height="66" fill="var(--s)" opacity=".35"/>
+                    <path d="M25 150h285M25 96h285M25 48h285" stroke="var(--ln)" stroke-dasharray="3 5" fill="none"/>
+                    <text x="14" y="51" font-size="8" fill="var(--sb)">P97</text><text x="14" y="99" font-size="8" fill="var(--sb)">P50</text><text x="16" y="153" font-size="8" fill="var(--sb)">P3</text>
+                    <path d="M25 185 C 60 172, 78 152, 110 138 S 168 112, 200 96 S 262 72, 305 58" class="curve-path" fill="none" stroke="var(--pd)" stroke-width="3.5" stroke-linecap="round"/>
+                    <circle cx="25" cy="185" r="4" fill="var(--p)" class="curve-dot" style="animation-delay:.35s"/>
+                    <circle cx="85" cy="152" r="4" fill="var(--p)" class="curve-dot" style="animation-delay:.55s"/>
+                    <circle cx="145" cy="124" r="4" fill="var(--p)" class="curve-dot" style="animation-delay:.75s"/>
+                    <circle cx="205" cy="95" r="4" fill="var(--p)" class="curve-dot" style="animation-delay:.95s"/>
+                    <circle cx="265" cy="72" r="4" fill="var(--p)" class="curve-dot" style="animation-delay:1.15s"/>
+                    <circle cx="305" cy="58" r="5" fill="var(--pd)" class="curve-dot" style="animation-delay:1.3s"/>
+                    <circle cx="305" cy="58" r="5" fill="none" stroke="var(--pd)" stroke-width="1.5" class="now-ring"/>
+                    <text x="22" y="202" font-size="8" fill="var(--sb)">0月</text><text x="112" y="202" font-size="8" fill="var(--sb)">2月</text><text x="200" y="202" font-size="8" fill="var(--sb)">4月</text><text x="290" y="202" font-size="8" fill="var(--sb)">6月</text>
+                  </svg>
+                </div>
+                <div class="card"><b style="font-size:13.5px">趋势解读</b><p style="font-size:12.5px;color:var(--sb);margin-top:6px">体重沿 P50–75 通道稳定增长，近两周增速略缓属正常波动。建议维持每周称重；若连续两周下滑穿越 P25，再咨询儿保医生。</p></div>
+                <div class="disclaim">⚠ 参考曲线为 WHO 生长标准，仅作趋势参考、不构成诊断依据；早产宝宝自动按矫正月龄计算。</div>
+              </div>
+              <div class="tabbar">
+                <button data-tab="p01"><img data-ic="10-tab-home" alt=""><span>时光</span></button>
+                <button class="on" data-tab="p13"><img data-ic="11-tab-growth" alt=""><span>成长</span></button>
+                <button data-tab="fam"><img data-ic="12-tab-family" alt=""><span>亲友</span></button>
+                <button data-tab="me"><img data-ic="13-tab-me" alt=""><span>我的</span></button>
+              </div>
+            </div>
+
+            <!-- ============ P30 家长模式 ============ -->
+            <div class="scr elder" id="scr-p30">
+              <div class="appbar"><button class="iconbtn" data-act="back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><h1>爷爷奶奶模式</h1></div>
+              <div class="body">
+                <div class="el-big">
+                  <button data-act="el-feed"><img data-ic="01-feeding" alt="">喂 奶</button>
+                  <button class="alt" data-tab="p01"><img data-ic="10-tab-home" alt="">看 时 光</button>
+                </div>
+                <div class="el-stat"><b>岁岁今天喝了 3 瓶</b><p>共 450ml · 最近一次 14:30</p></div>
+                <div class="el-row"><div class="lab"><b>记录自动读给我听</b><span>新记录用语音播报内容</span></div><button class="switch on"></button></div>
+                <div class="el-row"><div class="lab"><b>超大字号 · 高对比</b><span>当前为 1.5 倍字号</span></div><button class="switch on"></button></div>
+                <div class="el-row"><div class="lab"><b>视频通话</b><span>一键呼叫主监护人</span></div><button class="btn sm" data-act="call">呼叫</button></div>
+                <div class="el-hint">长辈模式仅保留「记录 / 查看」两件事，复杂操作交给子女</div>
+              </div>
+            </div>
+
+            <!-- ============ 浮层 ============ -->
+            <div class="scrim" id="scrim"></div>
+            <div class="sheet" id="sheet">
+              <i class="tape" style="top:12px;right:26px;transform:rotate(6deg)"></i>
+              <div class="grab"></div>
+              <h3>记点什么？<small>今天已记 6 条</small></h3>
+              <div class="tiles" id="tiles">
+                <button class="tile" data-tile="01-feeding" data-name="喂养" data-sub="上次记录 11:20 · 距今 3 小时 20 分"><img data-ic="01-feeding" alt=""><span>喂养</span><small class="cnt">11:20</small></button>
+                <button class="tile" data-tile="02-sleep" data-name="睡眠" data-sub="上次小睡 12:10 · 1 小时 20 分"><img data-ic="02-sleep" alt=""><span>睡眠</span><small class="cnt">12:10</small></button>
+                <button class="tile" data-tile="04-photo" data-name="照片" data-sub="今天已拍 3 张 · 自动按时间归档"><img data-ic="04-photo" alt=""><span>照片</span><small class="cnt">3 张</small></button>
+                <button class="tile" data-tile="05-measure" data-name="测量" data-sub="最近 6.8kg · 61.2cm · 10/25"><img data-ic="05-measure" alt=""><span>测量</span><small class="cnt">6.8kg</small></button>
+                <button class="tile" data-tile="06-poop" data-name="便便" data-sub="今早 08:15 · 金黄色糊状"><img data-ic="06-poop" alt=""><span>便便</span><small class="cnt">08:15</small></button>
+                <button class="tile" data-tile="09-text-mood" data-name="心情日记" data-sub="爸爸昨晚写了一条 · 补录"><img data-ic="09-text-mood" alt=""><span>日记</span><small class="cnt">昨天</small></button>
+                <button class="more-row" id="moreRow">更多类型（里程碑 / 体温 / 用药 / 语音）<svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></button>
+                <button class="tile rest" data-tile="03-milestone" data-name="里程碑" data-sub="上次：第一次翻身 · 今天"><img data-ic="03-milestone" alt=""><span>里程碑</span><small class="cnt">1 条</small></button>
+                <button class="tile rest" data-tile="07-temp" data-name="体温" data-sub="昨夜 36.8℃ · 正常"><img data-ic="07-temp" alt=""><span>体温</span><small class="cnt">36.8℃</small></button>
+                <button class="tile rest" data-tile="08-med" data-name="用药" data-sub="维D 每天 1 粒 · 已设提醒"><img data-ic="08-med" alt=""><span>用药</span><small class="cnt">每日</small></button>
+                <button class="tile rest" data-tile="09-voice" data-name="语音记" data-sub="按住即说 · 自动转文字"><img data-ic="09-voice" alt=""><span>语音记</span><small class="cnt">—</small></button>
+              </div>
+              <div class="hintrow">只读亲友角色不展示此面板与 + 按钮（PRD §4.5）</div>
+            </div>
+
+            <div class="celebrate" id="celeb"><div class="pop"><div class="halo"><span data-msc data-size="110" data-cls="happy"></span></div><div class="txt">记录成功！</div><div class="sub">岁岁也为你开心 ✦</div></div></div>
+
+            <div class="modal" id="modal"><div class="box">
+              <div class="warn-ic"><svg viewBox="0 0 24 24"><path d="M10.3 3.8 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01"/></svg></div>
+              <h4>删除这条记录？</h4>
+              <p>删除后不可撤销，云端与全家共享时光轴将同步移除</p>
+              <div class="acts"><button class="btn ghost sm" data-act="cancel-del">取消</button><button class="btn danger sm" data-act="confirm-del">删除</button></div>
+            </div></div>
+
+            <div class="toast" id="toast"></div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--doc-faint)">375 × 812 · 真实交互原型，可在手机内直接操作</div>
+      </div>
+
+      <div class="notes">
+        <h4>交互指引（效果图内均可演示）</h4>
+        <ul>
+          <li><b>FAB →</b> 点右下 + 唤起 P08 面板，磁贴带旋转逐个「弹出 / 贴上」</li>
+          <li><b>磁贴 →</b> 关闭面板并 push 进入 P09 录入（标题、图标、副标题随类型切换）</li>
+          <li><b>保存 →</b> 吉祥物跳跃 + 彩带庆祝 2.2s，自动关闭并在 P01 顶部插入新卡片（上浮动画）</li>
+          <li><b>删除草稿 →</b> 危险操作二次确认弹窗（PRD §4.5 页面级约定）</li>
+          <li><b>状态页签 →</b> 空 / 加载 / 错误 / 边界四态均有动物主题动效；「只读角色」隐藏 FAB 并显示顶部横幅</li>
+          <li><b>Tab 栏 →</b> 图标 hop 跳跃 + 页面过渡；「成长」进 P13 曲线入场绘制</li>
+          <li><b>吉祥物 / 卡片 →</b> 点按有 wig 摆动与按压形变反馈；吉祥物自动眨眼</li>
+          <li><b>P30 →</b> 大字号长辈态：主按钮 ≥96px 触控区、开关 58px、正文 18px+</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+<section id="spec">
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">04</span><h2 class="sec-title">动效规格 · 时长 / 缓动 / uniapp 性能</h2></div>
+    <p class="sec-sub">总原则：只动画 <span class="mono">transform</span> 与 <span class="mono">opacity</span>（合成层，不触发重排重绘）；阴影 / 圆角变化一律用「预写两套 class 瞬时切换」而非动画 box-shadow。uniapp 侧：H5 直接 CSS；小程序端注意 <span class="mono">rpx</span> 换算与 <span class="mono">cover-view</span> 限制；nvue/weex 用 <span class="mono">binding.animation</span> 或 <span class="mono">animation</span> 模块。</p>
+    <table class="spec">
+      <tr><th>动效</th><th>触发</th><th>时长</th><th>缓动</th><th>uniapp 实现与性能注意</th></tr>
+      <tr><td>页面 push / pop（P01↔P09）</td><td>磁贴进入 / 返回</td><td class="mono">340ms</td><td class="easing">cubic-bezier(.3,.9,.3,1)</td><td>uni.navigateTo 自带转场即可；自绘浮层页只动 transform/opacity，禁止动画 left/top</td></tr>
+      <tr><td>Tab 切换 hop</td><td>点底部 Tab</td><td class="mono">450ms</td><td class="easing">cubic-bezier(.34,1.3,.4,1)</td><td>仅图标 img 做 transform 关键帧；页面内容用 v-show 切换，列表走 recycle-view 且不加动画，避免整页重渲染</td></tr>
+      <tr><td>FAB → P08 面板 + 磁贴级联</td><td>点 FAB</td><td class="mono">380ms + 每片 340ms（50ms 级联）</td><td class="easing">cubic-bezier(.3,1.25,.4,1) / (.34,1.4,.4,1)</td><td>磁贴 ≤10 片、animation-delay 错峰；低端安卓勿动画 backdrop-filter，scrim 退化为纯色半透明</td></tr>
+      <tr><td>保存庆祝（吉祥物跳 + 彩带）</td><td>保存成功</td><td class="mono">入场 550ms / 跳 900ms / 彩带 1400ms</td><td class="easing">(.34,1.5,.4,1) / (.3,.9,.3,1)</td><td>彩带 ≤24 片 DOM，animationend 即移除节点；squash&amp;stretch 全用 transform；勿在 nvue 用 CSS keyframes，改 animation 模块</td></tr>
+      <tr><td>卡片按压（黏土下沉 / 贴纸掀起）</td><td>touchstart</td><td class="mono">150–160ms</td><td class="easing">cubic-bezier(.3,.9,.3,1)</td><td>黏土：translateY(4px)+切换浅阴影 class（阴影不做动画）；贴纸：translate(-2,-2)。小程序用 hover-class 实现零 JS</td></tr>
+      <tr><td>图标 / 吉祥物微动效</td><td>点击 wig / 常态眨眼</td><td class="mono">wig 500ms / blink 4.2s 循环</td><td class="easing">ease / steps-free</td><td>眨眼=scaleY 变换；吉祥物 SVG 节点 ≤60；filter:drop-shadow 静态挂类，勿动画 filter；列表内图标不做循环动画</td></tr>
+      <tr><td>生长曲线入场绘制</td><td>P13 首次进入</td><td class="mono">描线 1100ms + 点级联 340ms</td><td class="easing">cubic-bezier(.4,0,.2,1)</td><td>stroke-dashoffset 动画；H5 用 SVG，跨端建议 uCharts 内置动画或 canvas 分帧；仅入场播一次，滚动回来不重播</td></tr>
+      <tr><td>骨架屏 shimmer</td><td>加载态</td><td class="mono">1300ms/循环</td><td class="easing">linear</td><td>background-position 动画有重绘成本：骨架条 ≤6 根、数据到达立即移除；小程序勿用 backdrop 滤镜</td></tr>
+      <tr><td>空态漂浮 / 错误抖动</td><td>对应状态出现</td><td class="mono">float 2600ms 循环 / shake 500ms 一次</td><td class="easing">ease-in-out / ease</td><td>仅 transform；错误图标动画用 forwards 停住，避免循环抖动造成焦虑；页面离开时清除定时器</td></tr>
+      <tr><td>危险确认弹窗 / toast</td><td>删除 / 轻反馈</td><td class="mono">弹 350ms / scrim 280ms / toast 1800ms 驻留</td><td class="easing">(.34,1.4,.4,1) / ease</td><td>确认按钮触控区 ≥44px；弹窗期间锁背景滚动（catchtouchmove / body overflow）</td></tr>
+    </table>
+  </div>
+</section>
+<section id="icons">
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">05</span><h2 class="sec-title">图标重绘清单 · 按 suiji-icons 文件名</h2></div>
+    <p class="sec-sub">结论先行：<b style="color:var(--doc-teal)">贴纸气质零重绘</b>（现有粗描边天然即贴纸描线）；<b style="color:#E89A8C">黏土气质需全量重绘 60 枚</b>（无描边 + 顶光哑光质感与现有描边风冲突）。以下按两套 IP 目录逐一列出，未改动任何图标文件。</p>
+    <div class="iconlist">
+
+      <div class="col ok">
+        <h3>方向 B · 模切贴纸</h3>
+        <div class="verdict">✔ 60 枚全部直接复用，零重绘</div>
+        <p style="font-size:13px;color:var(--doc-sub)">现有 <span class="mono">bear/</span> 与 <span class="mono">duck/</span> 各 30 枚图标均为「粗描边 + 平涂」，与贴纸描线语言一致；白色刀切边、硬偏移影、微旋转全部由 CSS 叠加，无需动源文件。</p>
+        <div class="filenames" style="margin-top:12px">
+          <b>仅需新增（非重绘）的吉祥物大图素材：</b><br>
+          ip-{bear|duck}-splash.png（启动页主形象）<br>
+          ip-{bear|duck}-celebrate.png（庆祝跳跃帧）<br>
+          ip-{bear|duck}-empty / loading / error / boundary.png（四态表情 ×4）<br>
+          <b>建议同时导出：</b>上述素材的透明底 @2x/@3x 各一套（共 16 张），供 uniapp 静态资源目录。
+        </div>
+      </div>
+
+      <div class="col no">
+        <h3>方向 A · 黏土玩具</h3>
+        <div class="verdict">✘ 60 枚全量重绘（两套 IP × 30 枚）</div>
+        <p style="font-size:13px;color:var(--doc-sub)">重绘规范：无描边、哑光软陶质感、统一左上 45° 光源（顶部高光 + 底部压痕投影）、圆钝倒角；尺寸沿用现有 256×256 PNG 透明底。</p>
+        <div class="filenames" style="margin-top:12px">
+          <b>bear/（30 枚）：</b><br>
+          01-feeding · 02-sleep · 03-milestone · 04-photo · 05-measure · 06-poop · 07-temp · 08-med · 09-text-mood · 09-voice · 10-tab-home · 11-tab-growth · 12-tab-family · 13-tab-me · 20-fn-diary · 21-fn-remind · 22-fn-backup · 23-fn-privacy · 24-fn-search · 25-fn-notify · 26-fn-export · 27-fn-trash · 28-fn-invite · 29-fn-babies · 30-fn-elder · 31-fn-compare · 32-fn-card · 33-fn-video · 34-fn-vaccine · 35-fn-audit<br>
+          <b>duck/（30 枚）：</b>同名同清单，共 60 枚。
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<section id="next" style="border-top:1px solid var(--doc-line)">
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">06</span><h2 class="sec-title">下一步 · 等你拍板</h2></div>
+    <p class="sec-sub">本轮只交付风格方案；确认前不扩展全站页面。</p>
+    <div class="next">
+      <div class="step"><div class="n">1</div><h4>选形象气质</h4><p>黏土玩具（需重绘 60 枚图标）或模切贴纸（零重绘）。可在 §01 卡片点「选用」，或直接告诉我。</p></div>
+      <div class="step"><div class="n">2</div><h4>选色系</h4><p>A 燕麦奶茶 / B 薄荷奶糖 / C 水果软糖，可单选或组合（如：默认 A、庆祝场景 C）。气质 × 色系可自由搭配，效果图区实时预览 6×3 组合。</p></div>
+      <div class="step"><div class="n">3</div><h4>说「开始扩展」</h4><p>确认后我再按 PRD §4.5 的 P01–P34 全景扩展全部页面，并同步交接 uniapp 落地标注（rpx、组件拆分、动效实现清单）。</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>岁记 UI v3 设计语言提案 · 2026-10 · 单文件零依赖 · suiji-ui-v2 与 suiji-prototype 仅只读参考，未改动任何既有文件</footer>
+<script>
+(function(){
+"use strict";
+var state={vibe:"clay",scheme:"a",ip:"bear"};
+var stage=document.getElementById("stageRoot"),vp=document.getElementById("vp");
+var $=function(s,c){return (c||document).querySelector(s)},$$=function(s,c){return [].slice.call((c||document).querySelectorAll(s))};
+
+/* ---------- 吉祥物 SVG（黏土/贴纸双渲染，CSS 按 data-vibe 接管描边） ---------- */
+function mscSVG(ip,size,cls){
+  var s='class="msc '+(cls||"")+'" viewBox="0 0 120 120" width="'+size+'" height="'+size+'"';
+  var eyes='<g class="eyes open"><circle class="eye" cx="45" cy="62" r="5"/><circle class="eye" cx="75" cy="62" r="5"/></g>'+
+           '<g class="happy-e"><path class="mouth" d="M40 64q5-7 10 0"/><path class="mouth" d="M70 64q5-7 10 0"/></g>'+
+           '<ellipse class="blush" cx="34" cy="74" rx="6" ry="4"/><ellipse class="blush" cx="86" cy="74" rx="6" ry="4"/>';
+  var gloss='<ellipse class="gloss" cx="46" cy="42" rx="16" ry="8" fill="#fff" transform="rotate(-16 46 42)"/>';
+  if(ip==="duck")return '<svg '+s+'>'+
+    '<g class="diecut"><ellipse cx="60" cy="74" rx="42" ry="38"/><path d="M60 16c-5 7-3 12 0 15 3-3 5-8 0-15z"/></g>'+
+    '<path class="body-fill out" d="M60 16c-5 7-3 12 0 15 3-3 5-8 0-15z"/>'+
+    '<ellipse class="body-fill out" cx="60" cy="74" rx="42" ry="38"/>'+
+    '<ellipse class="dark" cx="22" cy="84" rx="9" ry="15" transform="rotate(14 22 84)"/><ellipse class="dark" cx="98" cy="84" rx="9" ry="15" transform="rotate(-14 98 84)"/>'+
+    eyes+'<ellipse cx="60" cy="82" rx="15" ry="9" fill="#F6A83B"/><path class="mouth" d="M52 84q8 5 16 0"/>'+gloss+'</svg>';
+  return '<svg '+s+'>'+
+    '<g class="diecut"><circle cx="33" cy="31" r="15"/><circle cx="87" cy="31" r="15"/><ellipse cx="60" cy="72" rx="44" ry="40"/></g>'+
+    '<circle class="body-fill out" cx="33" cy="31" r="15"/><circle class="body-fill out" cx="87" cy="31" r="15"/>'+
+    '<ellipse class="body-fill out" cx="60" cy="72" rx="44" ry="40"/>'+
+    '<circle class="light" cx="33" cy="31" r="8"/><circle class="light" cx="87" cy="31" r="8"/>'+
+    '<ellipse class="light" cx="60" cy="84" rx="18" ry="12"/>'+
+    eyes+'<circle cx="60" cy="78" r="4" fill="#4A332A"/><path class="mouth" d="M54 88q6 5 12 0"/>'+gloss+'</svg>';
+}
+function renderMascots(){$$("[data-msc]").forEach(function(el){el.innerHTML=mscSVG(state.ip,+el.dataset.size||60,el.dataset.cls||"")})}
+function renderIcons(){$$("img[data-ic]").forEach(function(im){im.src="../suiji-icons/"+state.ip+"/"+im.dataset.ic+".png"})}
+
+/* ---------- 控制台 ---------- */
+function syncUI(){
+  stage.dataset.vibe=state.vibe;stage.dataset.scheme=state.scheme;stage.dataset.ip=state.ip;
+  $$(".mini").forEach(function(m){m.dataset.scheme=state.scheme;m.dataset.ip=state.ip});
+  $$("#seg-vibe button").forEach(function(b){b.classList.toggle("on",b.dataset.v===state.vibe)});
+  $$("#seg-scheme button").forEach(function(b){b.classList.toggle("on",b.dataset.s===state.scheme)});
+  $$("#seg-ip button").forEach(function(b){b.classList.toggle("on",b.dataset.i===state.ip)});
+  $("#vc-clay").classList.toggle("sel",state.vibe==="clay");$("#vc-stk").classList.toggle("sel",state.vibe==="sticker");
+  $$(".vibe-card .pick").forEach(function(b){b.classList.toggle("on",b.dataset.v===state.vibe)});
+  $$(".scheme-card").forEach(function(c){c.classList.toggle("sel",c.dataset.s===state.scheme)});
+  $$(".scheme-card .pick").forEach(function(b){b.classList.toggle("on",b.dataset.s===state.scheme)});
+  renderMascots();renderIcons();
+}
+$("#seg-vibe").addEventListener("click",function(e){var b=e.target.closest("button");if(b){state.vibe=b.dataset.v;syncUI()}});
+$("#seg-scheme").addEventListener("click",function(e){var b=e.target.closest("button");if(b){state.scheme=b.dataset.s;syncUI()}});
+$("#seg-ip").addEventListener("click",function(e){var b=e.target.closest("button");if(b){state.ip=b.dataset.i;syncUI()}});
+$$(".vibe-card .pick").forEach(function(b){b.addEventListener("click",function(){state.vibe=b.dataset.v;syncUI()})});
+$$(".scheme-card").forEach(function(c){c.addEventListener("click",function(){state.scheme=c.dataset.s;syncUI()})});
+
+/* ---------- toast ---------- */
+var tt,timer;function toast(msg){tt.textContent=msg;tt.classList.add("on");clearTimeout(timer);timer=setTimeout(function(){tt.classList.remove("on")},1800)}
+
+/* ---------- 屏幕切换 ---------- */
+var demoBtnMap={ "scr-p01":0,"scr-p09":1,"scr-p13":2,"scr-p30":3 };
+function showScreen(id){
+  $$(".scr").forEach(function(s){s.classList.remove("active","behind")});
+  if(id==="scr-p09")$("#scr-p01").classList.add("behind");
+  $(id).classList.add("active");
+  closeSheet();
+  var i=demoBtnMap[id];if(i!==undefined)$$("#demoTabs button").forEach(function(b,j){b.classList.toggle("on",j===i)});
+}
+$("#demoTabs").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;
+  if(b.dataset.demo==="p08"){showScreen("scr-p01");openSheet()}
+  else showScreen("scr-"+b.dataset.demo);
+});
+
+/* ---------- P08 面板 ---------- */
+var fab=$("#fab"),sheet=$("#sheet"),scrim=$("#scrim");
+function openSheet(){sheet.classList.add("on");scrim.classList.add("on");fab.classList.add("open")}
+function closeSheet(){sheet.classList.remove("on");scrim.classList.remove("on");fab.classList.remove("open")}
+fab.addEventListener("click",function(){sheet.classList.contains("on")?closeSheet():openSheet()});
+scrim.addEventListener("click",closeSheet);
+$("#moreRow").addEventListener("click",function(){var t=$("#tiles");t.classList.toggle("open");this.classList.toggle("open")});
+$$(".tile").forEach(function(t){t.addEventListener("click",function(){
+  $("#p09ic").dataset.ic=t.dataset.tile;$("#p09ic").src="../suiji-icons/"+state.ip+"/"+t.dataset.tile+".png";
+  $("#p09name").textContent=t.dataset.name;$("#p09sub").textContent=t.dataset.sub;
+  showScreen("scr-p09");
+})});
+
+/* ---------- P09 表单 ---------- */
+$$("[data-act=back]").forEach(function(b){b.addEventListener("click",function(){showScreen("scr-p01")})});
+$("#p09seg").addEventListener("click",function(e){var b=e.target.closest("button");if(b)$$("#p09seg button").forEach(function(x){x.classList.toggle("on",x===b)})});
+var num=150;
+$$("[data-step]").forEach(function(b){b.addEventListener("click",function(){num=Math.min(300,Math.max(0,num+ +b.dataset.step));$("#p09num").innerHTML=num+"<small>ml</small>"})});
+$$(".switch").forEach(function(s){s.addEventListener("click",function(){s.classList.toggle("on")})});
+$$("[data-act=del]").forEach(function(b){b.addEventListener("click",function(){$("#modal").classList.add("on")})});
+$$("[data-act=cancel-del]").forEach(function(b){b.addEventListener("click",function(){$("#modal").classList.remove("on")})});
+$$("[data-act=confirm-del]").forEach(function(b){b.addEventListener("click",function(){$("#modal").classList.remove("on");showScreen("scr-p01");toast("草稿已删除（演示）")})});
+
+/* ---------- 保存庆祝 ---------- */
+var celeb=$("#celeb"),feed=$("#feed");
+function confetti(){
+  var cs=getComputedStyle(stage),cols=[];for(var i=1;i<=10;i++)cols.push(cs.getPropertyValue("--c"+i).trim());
+  for(var k=0;k<22;k++){(function(){
+    var p=document.createElement("i");p.className="confetti";
+    p.style.left=(4+Math.random()*92)+"%";p.style.background=cols[k%10];
+    p.style.animationDelay=(Math.random()*.35)+"s";p.style.animationDuration=(1.1+Math.random()*.6)+"s";
+    p.addEventListener("animationend",function(){p.remove()});
+    celeb.appendChild(p);
+  })()}
+}
+$$("[data-act=save]").forEach(function(b){b.addEventListener("click",function(){
+  celeb.classList.add("on");confetti();
+  setTimeout(function(){
+    celeb.classList.remove("on");
+    var d=document.createElement("div");d.className="card rec pressable rise";
+    d.innerHTML='<span class="ic"><img data-ic="01-feeding" src="../suiji-icons/'+state.ip+'/01-feeding.png"></span><div class="tx"><div class="t"><b>瓶喂</b><time>刚刚</time></div><p>'+num+'ml · 演示插入的新记录</p><div class="meta"><span class="pill">'+num+'ml</span><span class="pill cool">待同步</span></div></div>';
+    var dh=feed.querySelector(".day-head");dh.parentNode.insertBefore(d,dh.nextSibling);
+    showScreen("scr-p01");
+  },2200);
+})});
+
+/* ---------- Tab 栏 ---------- */
+$$(".tabbar button").forEach(function(b){b.addEventListener("click",function(){
+  b.classList.add("hop");setTimeout(function(){b.classList.remove("hop")},460);
+  if(b.dataset.tab==="p01"||b.dataset.tab==="p13"){
+    $$(".tabbar button").forEach(function(x){x.classList.toggle("on",x.dataset.tab===b.dataset.tab)});
+    showScreen("scr-"+b.dataset.tab);
+  }else toast("亲友圈 / 我的：待「开始扩展」后落地");
+})});
+
+/* ---------- 四态 + 只读 ---------- */
+var p01=$("#scr-p01");
+$("#stateTabs").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;
+  $$("#stateTabs button").forEach(function(x){x.classList.toggle("on",x===b)});
+  var st=b.dataset.state;
+  $$(".state-pane").forEach(function(p){p.classList.toggle("on",p.dataset.pane===st)});
+  p01.classList.toggle("hasstate",!!st&&st!=="ro");
+  $("#emptyArrow").style.display=st==="empty"?"flex":"none";
+  vp.classList.toggle("ro",st==="ro");
+  if(st!==""){showScreen("scr-p01")}
+});
+$$("[data-act=retry]").forEach(function(b){b.addEventListener("click",function(){
+  $$(".state-pane").forEach(function(p){p.classList.toggle("on",p.dataset.pane==="loading")});
+  setTimeout(function(){$$("#stateTabs button")[0].click()},1000);
+})});
+
+/* ---------- 杂项反馈 ---------- */
+$$("[data-act]").forEach(function(el){var a=el.dataset.act;
+  if(a==="baby")el.addEventListener("click",function(){toast("宝宝切换：岁岁 / 妹妹（演示）")});
+  if(a==="search")el.addEventListener("click",function(){toast("P24 全局搜索：待扩展")});
+  if(a==="notify")el.addEventListener("click",function(){toast("3 条提醒：喂维D / 疫苗 / 体检（P21）")});
+  if(a==="cmp")el.addEventListener("click",function(){toast("P31 曲线对比：待扩展")});
+  if(a==="call")el.addEventListener("click",function(){toast("正在呼叫妈妈…（演示）")});
+  if(a==="el-feed")el.addEventListener("click",function(){showScreen("scr-p01");openSheet()});
+});
+$$(".addphoto,.photos i").forEach(function(el){el.addEventListener("click",function(){toast("拍照 / 相册：待扩展")})});
+$$(".card.rec.pressable").forEach(function(el){el.addEventListener("click",function(){toast("记录详情 P02：待扩展")})});
+
+/* ---------- 吉祥物微动效 ---------- */
+document.addEventListener("click",function(e){
+  var svg=e.target.closest(".msc");if(!svg)return;
+  svg.classList.add("wig","happy");
+  setTimeout(function(){svg.classList.remove("wig","happy")},900);
+});
+
+tt=$("#toast");syncUI();
+})();
+</script>
+</body>
+</html>

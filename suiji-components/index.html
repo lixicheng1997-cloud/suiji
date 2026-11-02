@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>岁记 · 控件样式库 v1.0</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="stage">
+
+  <!-- 页头 -->
+  <header class="stage-head">
+    <div class="brand">
+      <div class="brand-ic">岁</div>
+      <div class="brand-text">
+        <h1>岁记 · 控件样式库 <span class="brand-en">SuiJi Controls</span></h1>
+        <p class="brand-sub">弹窗 / 时间选择 / 表单 / 反馈控件 · 与 suiji-prototype v0.3 设计系统同源</p>
+      </div>
+    </div>
+    <button class="head-chip">v1.0 · 暖粉橙</button>
+  </header>
+
+  <div class="stage-body">
+
+    <!-- 左侧规格卡 -->
+    <aside class="spec-card">
+      <div class="spec-title">设计规格</div>
+      <div class="spec-sub">令牌来源：suiji-prototype/styles.css</div>
+
+      <div class="spec-sec">
+        <h3>分类导航</h3>
+        <ul class="nav-list">
+          <li><a href="#sec-dialog">弹窗与反馈<span class="nav-n">7</span></a></li>
+          <li><a href="#sec-picker">日期与时间<span class="nav-n">5</span></a></li>
+          <li><a href="#sec-form">表单控件<span class="nav-n">10</span></a></li>
+          <li><a href="#sec-btn">按钮<span class="nav-n">7</span></a></li>
+          <li><a href="#sec-state">反馈与状态<span class="nav-n">4</span></a></li>
+        </ul>
+      </div>
+
+      <div class="spec-sec">
+        <h3>核心令牌</h3>
+        <div class="token-chips">
+          <span class="token-chip grad">主渐变 #FF6B8B→#FF9E58</span>
+          <span class="token-chip">底色 #FFF6F0</span>
+          <span class="token-chip r18">卡片圆角 18px</span>
+          <span class="token-chip r24">弹窗圆角 24px</span>
+          <span class="token-chip rpill">按钮胶囊</span>
+        </div>
+      </div>
+
+      <div class="spec-sec">
+        <h3>使用约定</h3>
+        <ul class="spec-list">
+          <li>弹窗宽 <code>min(320px, 100vw-48px)</code>，标题 16px/700</li>
+          <li>危险操作确认按钮用 <code>--danger</code> 渐变，文案带后果</li>
+          <li>滚轮行高 <code>36px</code>，选中 17px/700 + 粉色高亮带</li>
+          <li>Toast 深底 <code>rgba(74,58,62,.92)</code>，2.2s 自动消失</li>
+          <li>开关 <code>46×26</code>，步进器按钮 <code>36px</code> 圆形</li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- 画廊 -->
+    <main class="gallery">
+
+      <!-- ============ 1. 弹窗与反馈 ============ -->
+      <section class="cat" id="sec-dialog">
+        <div class="cat-head"><h2>弹窗与反馈</h2><span class="cat-n">7 个控件</span></div>
+        <p class="cat-desc">遮罩统一 <code>rgba(90,50,60,.28)</code> + 2px 模糊；弹窗弹入用回弹曲线 <code>ease-spring</code>，面板类从底部滑入。</p>
+        <div class="cards">
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">信息弹窗<code>.dialog</code></div>
+              <div class="dc-desc">图标 + 标题 + 正文 + 单按钮，用于告知与引导</div>
+            </div>
+            <div class="dc-demo"><button class="btn btn-primary" data-open="ov-info">打开信息弹窗</button></div>
+            <div class="dc-note"><b>图标底</b> 56px 圆 · 按语义换色（info 粉 / warn 黄 / ok 绿）</div>
+          </div>
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">二次确认弹窗<code>.dlg-btns</code></div>
+              <div class="dc-desc">取消在左（ghost），确认在右（主渐变）</div>
+            </div>
+            <div class="dc-demo"><button class="btn btn-primary" data-open="ov-confirm">打开确认弹窗</button></div>
+            <div class="dc-note"><b>规则</b> 点遮罩 / 取消均关闭；确认按钮不超过 4 字</div>
+          </div>
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">危险操作弹窗<code>.dlg-ic.danger</code></div>
+              <div class="dc-desc">删除等不可逆操作，正文必须写明后果</div>
+            </div>
+            <div class="dc-demo"><button class="btn btn-danger" data-open="ov-danger">打开删除确认</button></div>
+            <div class="dc-note"><b>文案</b> 关键数字加粗，如「30 天后彻底删除」</div>
+          </div>
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">表单弹窗<code>.dlg-form</code></div>
+              <div class="dc-desc">轻量输入场景（重命名 / 填写邀请码）</div>
+            </div>
+            <div class="dc-demo"><button class="btn btn-ghost" data-open="ov-form">打开重命名弹窗</button></div>
+            <div class="dc-note"><b>校验</b> 空值时保存按钮禁用态（opacity .45）</div>
+          </div>
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">动作面板<code>.asheet</code></div>
+              <div class="dc-desc">底部滑出的操作列表 + 独立取消项</div>
+            </div>
+            <div class="dc-demo"><button class="btn btn-ghost" data-open="ov-sheet">打开操作面板</button></div>
+            <div class="dc-note"><b>结构</b> 把手条 36px · 每项 14px 图标 + 标题/副文案</div>
+          </div>
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">Toast 轻提示<code>.toast</code></div>
+              <div class="dc-desc">操作结果反馈，成功 / 失败 / 信息三态</div>
+            </div>
+            <div class="dc-demo">
+              <div class="demo-row">
+                <button class="btn btn-sm btn-ghost" data-toast="ok|已保存">成功</button>
+                <button class="btn btn-sm btn-ghost" data-toast="err|网络异常，请重试">失败</button>
+                <button class="btn btn-sm btn-ghost" data-toast="info|邀请链接已复制">信息</button>
+              </div>
+            </div>
+            <div class="dc-note"><b>时长</b> 2.2s 自动消失 · 最多同时 3 条堆叠</div>
+          </div>
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">Loading 加载<code>.spinner</code></div>
+              <div class="dc-desc">行内 spinner + 全屏阻塞加载</div>
+            </div>
+            <div class="dc-demo">
+              <div class="demo-row">
+                <span class="spinner"></span>
+                <span class="spinner" style="border-top-color:var(--accent)"></span>
+                <button class="btn btn-primary" data-open="ov-loading">模拟保存（2s）</button>
+              </div>
+            </div>
+            <div class="dc-note"><b>尺寸</b> 行内 22px / 阻塞 34px · 轨道 20% 主色</div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ============ 2. 日期与时间 ============ -->
+      <section class="cat" id="sec-picker">
+        <div class="cat-head"><h2>日期与时间</h2><span class="cat-n">5 个控件</span></div>
+        <p class="cat-desc">滚轮选择器：行高 36px、可视 6 行（216px）、scroll-snap 吸附，选中放大加粗并落在粉色高亮带上。</p>
+        <div class="cards">
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">日期选择器<code>.picker</code></div>
+              <div class="dc-desc">年 / 月 / 日 三列滚轮，日列随年月自动联动</div>
+            </div>
+            <div class="dc-demo"><button class="btn btn-primary" data-open="ov-date">选择日期</button></div>
+            <div class="dc-note"><b>头部</b> 取消 · 标题 · 「今天」快捷定位</div>
+          </div>
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">时间选择器<code>.pk-col</code></div>
+              <div class="dc-desc">时 / 分 两列滚轮，支持「现在」快捷定位</div>
+            </div>
+            <div class="dc-demo"><button class="btn btn-primary" data-open="ov-time">选择时间</button></div>
+            <div class="dc-note"><b>联动</b> 分钟列 5 分钟一档，减少滚动距离</div>
+          </div>
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">日期时间组合<code>.pk-seg</code></div>
+              <div class="dc-desc">分段切换日期 / 时间两组滚轮</div>
+            </div>
+            <div class="dc-demo"><button class="btn btn-primary" data-open="ov-dt">选择记录时间</button></div>
+            <div class="dc-note"><b>场景</b> 记录编辑页「发生时间」一步选完</div>
+          </div>
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">快捷时间<code>.qchip</code></div>
+              <div class="dc-desc">今天 / 昨天 / 前天 / 自定义（唤起日期滚轮）</div>
+            </div>
+            <div class="dc-demo">
+              <div class="qchips" id="quick-time" data-mode="single">
+                <button class="qchip active" data-val="今天">今天</button>
+                <button class="qchip" data-val="昨天">昨天</button>
+                <button class="qchip" data-val="前天">前天</button>
+                <button class="qchip" data-val="自定义" data-open="ov-date">自定义…</button>
+              </div>
+              <div class="form-sub" id="quick-time-val">已选：今天 14:30 · 自动填充当前时间</div>
+            </div>
+            <div class="dc-note"><b>补录</b> 非「今天」选中时记录卡片自动加「补录」徽章</div>
+          </div>
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">月龄选择<code>.qchips</code></div>
+              <div class="dc-desc">里程碑 / 疫苗场景按月龄圈选</div>
+            </div>
+            <div class="dc-demo">
+              <div class="qchips" id="m-age-pick" data-mode="single"></div>
+            </div>
+            <div class="dc-note"><b>规则</b> 0–12 个月逐档 + 「1 岁+」；选中项主色渐变</div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ============ 3. 表单控件 ============ -->
+      <section class="cat" id="sec-form">
+        <div class="cat-head"><h2>表单控件</h2><span class="cat-n">10 个控件</span></div>
+        <p class="cat-desc">输入类控件统一 1.5px 描边 <code>--border</code>，聚焦时描边转主色并加 3px 粉色光晕。</p>
+        <div class="cards">
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">文本输入<code>.text-input</code></div>
+              <div class="dc-desc">默认 / 错误 / 禁用三态</div>
+            </div>
+            <div class="dc-demo start">
+              <div class="demo-col">
+                <div><div class="form-label">昵称</div><input class="text-input" placeholder="宝宝的小名，如「小满」"></div>
+                <div><div class="form-label">家庭地址 <span class="err-tip"><span data-icon="alert"></span>不能超过 30 个字</span></div><input class="text-input err" value="上海市浦东新区张江高科技园区某某某某某某某"></div>
+                <div><div class="form-label">邀请码（已锁定）</div><input class="text-input" value="SJ-2026-6688" disabled></div>
+              </div>
+            </div>
+            <div class="dc-note"><b>错误态</b> 描边 <code>--danger</code> + 底纹 #FFF7F5 + 下方红色小字</div>
+          </div>
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">多行文本 + 计数<code>.note-input</code></div>
+              <div class="dc-desc">日记 / 备注输入，右下角实时字数</div>
+            </div>
+            <div class="dc-demo start">
+              <div class="demo-col">
+                <div class="form-label">今天的心情 <span class="hint-chip">写点给未来的话</span></div>
+                <div class="note-wrap">
+                  <textarea class="note-input" id="note-demo" maxlength="200" placeholder="第一次翻身，全家都在鼓掌…"></textarea>
+                  <span class="note-count" id="note-count">0/200</span>
+                </div>
+              </div>
+            </div>
+            <div class="dc-note"><b>计数</b> 达上限转红；最小高 88px，可纵向拉伸</div>
+          </div>
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">数字步进器<code>.num-stepper</code></div>
+              <div class="dc-desc">奶量 / 体重等数值录入，支持小数步进</div>
+            </div>
+            <div class="dc-demo start">
+              <div class="demo-col">
+                <div class="form-label">奶量</div>
+                <div class="num-stepper" data-step="10" data-min="0" data-max="500">
+                  <button class="ns-btn" data-dir="-1">−</button>
+                  <input class="ns-input" value="150">
+                  <span class="ns-unit">ml</span>
+                  <button class="ns-btn" data-dir="1">+</button>
+                </div>
+                <div class="form-label" style="margin-top:10px">体温</div>
+                <div class="num-stepper" data-step="0.1" data-min="34" data-max="43" data-dec="1">
+                  <button class="ns-btn" data-dir="-1">−</button>
+                  <input class="ns-input" value="36.5">
+                  <span class="ns-unit">°C</span>
+                  <button class="ns-btn" data-dir="1">+</button>
+                </div>
+              </div>
+            </div>
+            <div class="dc-note"><b>布局</b> 圆形按钮 36px 暖底 · 单位在右侧 · 超界自动钳制</div>
+          </div>
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">开关<code>.switch</code></div>
+              <div class="dc-desc">设置项开关，带标题 + 副文案行</div>
+            </div>
+            <div class="dc-demo start">
+              <div class="demo-col">
+                <div class="switch-row"><div class="sr-text"><span class="sr-name">提醒音</span><span class="sr-desc">到点后播放轻柔提示音</span></div><button class="switch on" data-switch></button></div>
+                <div class="switch-row"><div class="sr-text"><span class="sr-name">原图上传云端</span><span class="sr-desc">默认关闭 · 开启需二次确认</span></div><button class="switch" data-switch></button></div>
+              </div>
+            </div>
+            <div class="dc-note"><b>状态</b> 开 = 主色渐变 + 圆钮右移 20px（spring 曲线）</div>
+          </div>
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">协议复选<code>.check-item</code></div>
+              <div class="dc-desc">同意项列表，必选项带红色标记</div>
+            </div>
+            <div class="dc-demo start">
+              <div class="demo-col">
+                <div class="check-item" data-check>
+                  <span class="c-check on"><span data-icon="check"></span></span>
+                  <div class="ci-text"><span class="ci-title">用户协议与隐私政策<span class="c-req">必需</span></span><span class="ci-desc">已阅读并同意《用户协议》《隐私政策》</span></div>
+                </div>
+                <div class="check-item" data-check>
+                  <span class="c-check"></span>
+                  <div class="ci-text"><span class="ci-title">接收成长周报邮件</span><span class="ci-desc">每周日汇总本周记录，可随时退订</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="dc-note"><b>勾选</b> 22px 圆角方块 · 对勾弹入 scale 0.5→1</div>
+          </div>
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">单选<code>.c-check.round</code></div>
+              <div class="dc-desc">角色 / 类型等互斥选择</div>
+            </div>
+            <div class="dc-demo start">
+              <div class="demo-col" id="role-pick" data-radio>
+                <div class="check-item"><span class="c-check round on"></span><div class="ci-text"><span class="ci-title">妈妈</span><span class="ci-desc">创建者 · 全部权限</span></div></div>
+                <div class="check-item"><span class="c-check round"></span><div class="ci-text"><span class="ci-title">爸爸</span><span class="ci-desc">共同记录者 · 可编辑</span></div></div>
+                <div class="check-item"><span class="c-check round"></span><div class="ci-text"><span class="ci-title">长辈</span><span class="ci-desc">只读亲友 · 仅查看</span></div></div>
+              </div>
+            </div>
+            <div class="dc-note"><b>形态</b> 圆形描边 + 内点渐变；整行可点</div>
+          </div>
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">快捷选项<code>.qchip</code></div>
+              <div class="dc-desc">单选组 / 多选组（标签、场景圈选）</div>
+            </div>
+            <div class="dc-demo">
+              <div class="demo-label">单选 · 记录类型</div>
+              <div class="qchips" data-mode="single">
+                <button class="qchip active">母乳</button><button class="qchip">配方奶</button><button class="qchip">辅食</button>
+              </div>
+              <div class="demo-label" style="margin-top:6px">多选 · 标签</div>
+              <div class="qchips" data-mode="multi">
+                <button class="qchip active">第一次</button><button class="qchip">搞笑</button><button class="qchip">成长</button><button class="qchip">家庭</button>
+              </div>
+            </div>
+            <div class="dc-note"><b>选中</b> 主渐变填充 + 粉色投影；未选描边胶囊</div>
+          </div>
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">下拉选择<code>.pick-select</code></div>
+              <div class="dc-desc">选项 ≤ 6 项的枚举选择，带色点</div>
+            </div>
+            <div class="dc-demo start">
+              <div class="pick-wrap" id="vax-drop">
+                <div class="pick-select" data-drop><span class="ds-val">乙肝疫苗</span><span data-icon="chevronDown"></span></div>
+                <div class="pick-menu">
+                  <div class="pm-item sel" data-val="乙肝疫苗"><span class="pm-dot" style="background:var(--c-med)"></span>乙肝疫苗<span class="pm-check"><span data-icon="check"></span></span></div>
+                  <div class="pm-item" data-val="卡介苗"><span class="pm-dot" style="background:var(--c-temp)"></span>卡介苗<span class="pm-check"><span data-icon="check"></span></span></div>
+                  <div class="pm-item" data-val="百白破"><span class="pm-dot" style="background:var(--c-feeding)"></span>百白破<span class="pm-check"><span data-icon="check"></span></span></div>
+                  <div class="pm-item" data-val="麻腮风"><span class="pm-dot" style="background:var(--c-sleep)"></span>麻腮风<span class="pm-check"><span data-icon="check"></span></span></div>
+                </div>
+              </div>
+            </div>
+            <div class="dc-note"><b>菜单</b> 下挂 6px · 弹入 spring · 选中行粉底主色 + 对勾</div>
+          </div>
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">搜索栏<code>.search-bar</code></div>
+              <div class="dc-desc">胶囊搜索框，有值时显示清除钮</div>
+            </div>
+            <div class="dc-demo start">
+              <div class="search-bar" id="search-demo">
+                <span class="sb-ic" data-icon="search"></span>
+                <input class="search-input" placeholder="搜索记录、照片、里程碑…">
+                <button class="sb-clear" data-icon="x" data-clear></button>
+              </div>
+            </div>
+            <div class="dc-note"><b>聚焦</b> 描边转主色 + 光晕；清除钮 15px</div>
+          </div>
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">照片添加<code>.photo-add</code></div>
+              <div class="dc-desc">虚线添加位 + 已选缩略图（可删）</div>
+            </div>
+            <div class="dc-demo start">
+              <div class="photo-adds" id="photo-demo">
+                <button class="photo-add" data-photo-add><span data-icon="plus"></span></button>
+              </div>
+            </div>
+            <div class="dc-note"><b>上限</b> 6 张 · 满位隐藏添加钮 · 缩略图右上角删除</div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ============ 4. 按钮 ============ -->
+      <section class="cat" id="sec-btn">
+        <div class="cat-head"><h2>按钮</h2><span class="cat-n">7 个变体</span></div>
+        <p class="cat-desc">主操作用渐变 + 投影，次操作用描边 ghost，危险操作用红渐变；按下统一 scale 0.95。</p>
+        <div class="cards wide">
+          <div class="demo-card">
+            <div class="dc-head"><div class="dc-name">按钮矩阵<code>.btn</code></div></div>
+            <div class="dc-demo">
+              <div class="demo-row">
+                <button class="btn btn-primary">主按钮</button>
+                <button class="btn btn-ghost">次按钮</button>
+                <button class="btn btn-danger">危险按钮</button>
+                <button class="btn btn-dashed">虚线添加</button>
+              </div>
+              <div class="demo-row">
+                <button class="btn btn-primary btn-lg" style="max-width:280px">保存记录</button>
+              </div>
+              <div class="demo-row">
+                <button class="btn btn-primary btn-sm">小按钮</button>
+                <button class="btn btn-ghost btn-sm">小按钮</button>
+                <button class="ph-chip">+ 邀请</button>
+                <button class="btn btn-primary" disabled>禁用态</button>
+              </div>
+            </div>
+            <div class="dc-note"><b>规格</b> 常规 padding 11×22 · 大按钮 14px 字 / 通栏 · 禁用 opacity .45</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 5. 反馈与状态 ============ -->
+      <section class="cat" id="sec-state">
+        <div class="cat-head"><h2>反馈与状态</h2><span class="cat-n">4 个控件</span></div>
+        <p class="cat-desc">徽章、进度、通告、空状态——记录流与设置页的通用状态表达。</p>
+        <div class="cards">
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">徽章<code>.badge</code></div>
+              <div class="dc-desc">记录流状态标记</div>
+            </div>
+            <div class="dc-demo">
+              <div class="demo-row">
+                <span class="badge milestone">里程碑</span>
+                <span class="badge backfill">补录</span>
+                <span class="badge ongoing">睡眠中</span>
+                <span class="badge p50">P50</span>
+                <span class="badge new">NEW</span>
+              </div>
+            </div>
+            <div class="dc-note"><b>规格</b> 10px/700 · 胶囊内边距 3×9 · 补录用虚线弱化</div>
+          </div>
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">进度条<code>.pg-bar</code></div>
+              <div class="dc-desc">存储占用 / 备份进度</div>
+            </div>
+            <div class="dc-demo">
+              <div class="bar">
+                <div class="pg-bar"><i class="pg-fill" id="pg-demo" style="width:38%"></i></div>
+                <div class="pg-text"><span id="pg-label">已用 3.8 GB</span><span>共 10 GB</span></div>
+              </div>
+              <button class="btn btn-sm btn-ghost" data-pg>+20%</button>
+            </div>
+            <div class="dc-note"><b>规格</b> 高 8px 胶囊 · 渐变方向随场景（存储主→辅）</div>
+          </div>
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">通告条<code>.notice</code></div>
+              <div class="dc-desc">页面内嵌提示：警告 / 信息 / 成功</div>
+            </div>
+            <div class="dc-demo start">
+              <div class="notice warn"><span data-icon="alert"></span>宝宝为早产儿，生长曲线已按矫正月龄计算<span class="n-tag">重要</span></div>
+              <div class="notice info"><span data-icon="sparkles"></span>AI 已自动整理本周 12 条记录为日记草稿</div>
+              <div class="notice ok"><span data-icon="check"></span>云端备份完成 · 236 条记录已同步</div>
+            </div>
+            <div class="dc-note"><b>变体</b> 警告用虚线框 + 黄底；成功绿底；右侧可挂小标签</div>
+          </div>
+
+          <div class="demo-card">
+            <div class="dc-head">
+              <div class="dc-name">空状态<code>.empty</code></div>
+              <div class="dc-desc">列表无数据时的引导</div>
+            </div>
+            <div class="dc-demo">
+              <div class="empty">
+                <div class="empty-illu" data-icon="moon" data-ic-size="40"></div>
+                <div class="empty-text">还没有睡眠记录</div>
+                <div class="empty-text" style="font-size:11px;color:var(--text-faint)">点击右下角 + 记录宝宝的第一次小睡</div>
+                <button class="btn btn-primary btn-sm empty-btn">现在记录</button>
+              </div>
+            </div>
+            <div class="dc-note"><b>结构</b> 88px 圆底插画 + 主文案 + 副引导 + 行动按钮</div>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ================================================================
+     浮层（弹窗 / 面板 / 滚轮 / Loading）
+     ================================================================ -->
+
+<!-- 信息弹窗 -->
+<div class="overlay" id="ov-info">
+  <div class="dialog">
+    <div class="dlg-ic info"><span data-icon="cloud" data-ic-color="#FF6B8B"></span></div>
+    <div class="dlg-title">开启云端同步</div>
+    <div class="dlg-body">同步后，家人在任何设备都能实时看到小满的成长记录。照片原图默认<strong>仅存本机</strong>。</div>
+    <div class="dlg-btns"><button class="btn btn-primary" data-close>我知道了</button></div>
+  </div>
+</div>
+
+<!-- 二次确认弹窗 -->
+<div class="overlay" id="ov-confirm">
+  <div class="dialog">
+    <div class="dlg-ic ok"><span data-icon="users" data-ic-color="#5FB87A"></span></div>
+    <div class="dlg-title">邀请「爷爷」加入？</div>
+    <div class="dlg-body">他将获得<strong>只读亲友</strong>权限，可查看时光轴与成长曲线，不能编辑或删除记录。</div>
+    <div class="dlg-btns">
+      <button class="btn btn-ghost" data-close>取消</button>
+      <button class="btn btn-primary" data-ok="邀请链接已复制">发送邀请</button>
+    </div>
+  </div>
+</div>
+
+<!-- 危险操作弹窗 -->
+<div class="overlay" id="ov-danger">
+  <div class="dialog">
+    <div class="dlg-ic danger"><span data-icon="trash" data-ic-color="#E85D5D"></span></div>
+    <div class="dlg-title">删除这条记录？</div>
+    <div class="dlg-body">「第一次翻身 · 里程碑」将移入回收站，<strong class="em-danger">30 天后彻底删除</strong>，期间可在回收站恢复。</div>
+    <div class="dlg-btns">
+      <button class="btn btn-ghost" data-close>取消</button>
+      <button class="btn btn-danger" data-ok="已移入回收站">删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- 表单弹窗 -->
+<div class="overlay" id="ov-form">
+  <div class="dialog">
+    <div class="dlg-title">重命名家庭空间</div>
+    <div class="dlg-form"><input class="text-input" id="dlg-rename" placeholder="如：小满的成长小屋" maxlength="12"></div>
+    <div class="dlg-btns">
+      <button class="btn btn-ghost" data-close>取消</button>
+      <button class="btn btn-primary" id="dlg-rename-ok" disabled>保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 动作面板 -->
+<div class="overlay bottom" id="ov-sheet">
+  <div class="asheet">
+    <div class="as-grab"></div>
+    <div class="as-title">记录操作 · 第一次翻身</div>
+    <div class="as-item" data-ok="进入编辑"><span data-icon="pencil" data-ic-color="#FF6B8B"></span><div class="as-main"><span>编辑记录</span><span class="as-sub">修改时间、数值与备注</span></div></div>
+    <div class="as-item" data-ok="已导出 PDF"><span data-icon="download" data-ic-color="#FF9E58"></span><div class="as-main"><span>导出为 PDF</span></div></div>
+    <div class="as-item" data-ok="已生成纪念卡"><span data-icon="sparkles" data-ic-color="#FFC24B"></span><div class="as-main"><span>生成纪念卡</span></div></div>
+    <div class="as-item danger" data-ok="已移入回收站"><span data-icon="trash" data-ic-color="#E85D5D"></span><div class="as-main"><span>删除记录</span></div></div>
+    <button class="as-cancel" data-close>取消</button>
+  </div>
+</div>
+
+<!-- Loading -->
+<div class="overlay" id="ov-loading">
+  <div class="loading-box"><span class="spinner big on-dark"></span><span>正在保存…</span></div>
+</div>
+
+<!-- 日期选择器 -->
+<div class="overlay bottom" id="ov-date">
+  <div class="picker" data-picker="date">
+    <div class="pk-head">
+      <button class="pk-btn" data-close>取消</button>
+      <span class="pk-title">选择日期</span>
+      <button class="pk-today" data-pk="today">今天</button>
+    </div>
+    <div class="pk-body">
+      <div class="pk-col"><div class="pk-list" data-col="year"></div><div class="pk-band"></div><div class="pk-mask"></div></div>
+      <div class="pk-col"><div class="pk-list" data-col="month"></div><div class="pk-band"></div><div class="pk-mask"></div></div>
+      <div class="pk-col"><div class="pk-list" data-col="day"></div><div class="pk-band"></div><div class="pk-mask"></div></div>
+    </div>
+    <div class="pk-head" style="border-bottom:none;padding-top:0">
+      <span></span><button class="pk-btn ok" data-pk="date-ok">确定</button><span style="width:44px"></span>
+    </div>
+  </div>
+</div>
+
+<!-- 时间选择器 -->
+<div class="overlay bottom" id="ov-time">
+  <div class="picker" data-picker="time">
+    <div class="pk-head">
+      <button class="pk-btn" data-close>取消</button>
+      <span class="pk-title">选择时间</span>
+      <button class="pk-today" data-pk="now">现在</button>
+    </div>
+    <div class="pk-body">
+      <div class="pk-col"><div class="pk-list" data-col="hour"></div><div class="pk-band"></div><div class="pk-mask"></div></div>
+      <div class="pk-col"><div class="pk-list" data-col="minute"></div><div class="pk-band"></div><div class="pk-mask"></div></div>
+    </div>
+    <div class="pk-head" style="border-bottom:none;padding-top:0">
+      <span></span><button class="pk-btn ok" data-pk="time-ok">确定</button><span style="width:44px"></span>
+    </div>
+  </div>
+</div>
+
+<!-- 日期时间组合 -->
+<div class="overlay bottom" id="ov-dt">
+  <div class="picker" data-picker="dt">
+    <div class="pk-head">
+      <button class="pk-btn" data-close>取消</button>
+      <span class="pk-title">发生时间</span>
+      <button class="pk-today" data-pk="dt-now">现在</button>
+    </div>
+    <div class="pk-seg">
+      <button class="metric-tab active" data-tab="date">日期</button>
+      <button class="metric-tab" data-tab="time">时间</button>
+    </div>
+    <div class="pk-body" data-group="date">
+      <div class="pk-col"><div class="pk-list" data-col="year"></div><div class="pk-band"></div><div class="pk-mask"></div></div>
+      <div class="pk-col"><div class="pk-list" data-col="month"></div><div class="pk-band"></div><div class="pk-mask"></div></div>
+      <div class="pk-col"><div class="pk-list" data-col="day"></div><div class="pk-band"></div><div class="pk-mask"></div></div>
+    </div>
+    <div class="pk-body hidden" data-group="time">
+      <div class="pk-col"><div class="pk-list" data-col="hour"></div><div class="pk-band"></div><div class="pk-mask"></div></div>
+      <div class="pk-col"><div class="pk-list" data-col="minute"></div><div class="pk-band"></div><div class="pk-mask"></div></div>
+    </div>
+    <div class="pk-head" style="border-bottom:none;padding-top:0">
+      <span></span><button class="pk-btn ok" data-pk="dt-ok">确定</button><span style="width:44px"></span>
+    </div>
+  </div>
+</div>
+
+<div class="toast-area" id="toast-area"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

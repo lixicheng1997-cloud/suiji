@@ -1,0 +1,65 @@
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+sdist/
+wheels/
+*.egg-info/
+*.egg
+MANIFEST
+
+# ---------- 虚拟环境 ----------
+.venv/
+venv/
+# env/
+ENV/
+.python-version
+
+# ---------- 环境变量 / 密钥 ----------
+# .env 不再忽略：单人自用项目，凭据随仓库一起管理（.env 与 .env.example 逐行保持一致）。
+# 将来若要开源/共享，把下面被注释的那行恢复即可，并把凭据改成占位值。
+# .env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# ---------- 测试 / 覆盖率 ----------
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+nosetests.xml
+
+# ---------- 数据库 / 运行时数据 ----------
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# ---------- 日志 ----------
+logs/
+*.log
+
+# ---------- 编辑器 / IDE ----------
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ---------- 系统 ----------
+.DS_Store
+Thumbs.db

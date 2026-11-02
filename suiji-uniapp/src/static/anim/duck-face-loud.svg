@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" role="img" aria-label="小鸭叽叽（大声）">
+<style>
+  .m-float{animation:breathe 3.2s ease-in-out infinite;transform-origin:70px 100px}
+  @keyframes breathe{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+  .tuft{transform-box:fill-box;transform-origin:50% 100%;animation:sway 2.6s ease-in-out infinite}
+  @keyframes sway{0%,100%{transform:rotate(0)}50%{transform:rotate(5deg)}}
+</style>
+<g class="m-float">
+  <path class="tuft" d="M62 34 q4 -16 16 -18 q-4 10 2 16" fill="#FFD85C" stroke="#D98E1F" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="70" cy="80" r="46" fill="#FFD85C" stroke="#D98E1F" stroke-width="5"/>
+  <g class="eyes" stroke="#4A3226" stroke-width="4.5" fill="none" stroke-linecap="round">
+    <path d="M48 71 q6 -9 12 0"/><path d="M80 71 q6 -9 12 0"/>
+  </g>
+  <path d="M52 86 q18 -10 36 0 q-4 14 -18 14 q-14 0 -18 -14Z" fill="#FF9E4A" stroke="#D98E1F" stroke-width="4" stroke-linejoin="round"/>
+  <ellipse cx="70" cy="93" rx="9" ry="5.5" fill="#C96A1F"/>
+  <ellipse cx="38" cy="84" rx="8" ry="5" fill="#F9A8B8" opacity=".85"/>
+  <ellipse cx="102" cy="84" rx="8" ry="5" fill="#F9A8B8" opacity=".85"/>
+</g>
+</svg>

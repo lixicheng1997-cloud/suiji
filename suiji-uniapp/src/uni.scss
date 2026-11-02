@@ -1,0 +1,86 @@
+/**
+ * 岁记 · Design Tokens（uni-app 版 · v2 森林绘本 Kawaii）
+ * 单一来源：本文件（SCSS 静态令牌，bear 默认）+ theme/theme.js（运行时双主题）+ utils/mock.js TYPES。
+ * 单位规则：原型 px × 2 → rpx。
+ * uni.scss 由 uni-app 自动注入所有 vue 的 <style lang="scss">，无需手动 import。
+ * 运行时换肤（duck）通过页面根节点 :style="themeVars" 覆盖 CSS 变量，见 theme/useTheme.js。
+ */
+
+/* ---------- 品牌色（bear 蜂蜜暖棕） ---------- */
+$sj-primary: #F7A15C;          // 主色（蜂蜜橙）
+$sj-primary-hover: #E07E33;
+$sj-primary-deep: #E07E33;     // 选中态 / 强调文字
+$sj-accent: #FFB86B;           // 强调（浅蜜）
+$sj-accent-soft: #FFEBD8;
+$sj-gold: #F5B32C;             // 里程碑金 / 鸭黄
+
+/* ---------- 中性色 ---------- */
+$sj-bg: #FFF8F0;               // 页面底色（奶油）
+$sj-surface: rgba(255, 253, 251, 0.80);
+                               // 卡片/面板面：v3 起为「面板级玻璃」（半透暖白，非纯白）。
+                               // 运行时白色块一律用 var(--sj-surface)；贴页面背景的模糊补齐见
+                               // App.vue 的玻璃面板选择器列表；弹层/弹窗用 .94 近实底。
+$sj-white: #FFFFFF;            // 真·不透明白（反色文字、图片描边、色卡内芯等特殊底）
+$sj-border: #F3E4D3;           // 暖描边（line）
+
+/* ---------- 文字 ---------- */
+$sj-text: #5B4636;             // 正文（可可墨）
+$sj-text-sub: #9C8878;         // 次要
+$sj-text-faint: #C7B6A8;       // 弱化 / tabBar 未选中
+
+/* ---------- 语义色 ---------- */
+$sj-success: #5FC08C;          // 薄荷
+$sj-warning: #F6B23C;          // 琥珀
+$sj-danger: #EF7A7A;           // 珊瑚
+
+/* ---------- 点缀色 ---------- */
+$sj-duck: #F5B32C;
+$sj-duck-soft: #FFF3C4;
+$sj-blush: #FF8FAB;            // 腮红粉
+$sj-blush-soft: #FFE7EE;
+
+/* ---------- 类别色（与 utils/mock.js TYPES.color 一一对应） ---------- */
+$sj-c-feeding: #F7A15C;
+$sj-c-sleep: #8FA8DC;
+$sj-c-milestone: #F5B32C;
+$sj-c-photo: #FF8FAB;
+$sj-c-measure: #5FC08C;
+$sj-c-poop: #C49066;
+$sj-c-temp: #FF7B6B;
+$sj-c-med: #A994D8;
+$sj-c-mood: #E86FA0;
+$sj-c-voice: #6FBDE0;
+
+/* 类别浅底色（图标块背景） */
+$sj-tint-feeding: #FFEBD8;
+$sj-tint-sleep: #E9EEFB;
+$sj-tint-milestone: #FFF3C4;
+$sj-tint-photo: #FFE7EE;
+$sj-tint-measure: #E2F5EA;
+$sj-tint-poop: #F5E9DC;
+$sj-tint-temp: #FFE7E2;
+$sj-tint-med: #F0EAFB;
+$sj-tint-mood: #FDE9F2;
+$sj-tint-voice: #E4F3FB;
+
+/* ---------- 圆角 ---------- */
+$sj-r-sm: 24rpx;               // 原型 12px
+$sj-r-md: 40rpx;               // 原型 20px
+$sj-r-lg: 56rpx;               // 原型 28px
+$sj-r-pill: 999rpx;
+
+/* ---------- 阴影（暖棕投影） ---------- */
+$sj-sh-sm: 0 4rpx 20rpx rgba(214, 158, 99, 0.12);
+$sj-sh-md: 0 20rpx 56rpx rgba(214, 158, 99, 0.16);
+$sj-sh-lg: 0 40rpx 96rpx rgba(180, 110, 60, 0.22);
+
+/* ---------- 缓动 ---------- */
+$sj-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+$sj-ease-out: cubic-bezier(0.22, 0.8, 0.3, 1);
+
+/* ---------- 字体 ---------- */
+$sj-font-display: "Yuanti SC", "YouYuan", "幼圆", "PingFang SC", "Microsoft YaHei", sans-serif;
+$sj-font-body: "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei", sans-serif;
+
+/* ---------- uview-plus 主题变量（组件行为层，色板经 App.vue 的 --up-* CSS 变量映射到岁记令牌） ---------- */
+@import 'uview-plus/theme.scss';

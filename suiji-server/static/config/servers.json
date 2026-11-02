@@ -1,0 +1,20 @@
+[
+  {
+    "name": "云服务",
+    "url": "http://49.233.77.155:30080/api/v1",
+    "env": "prod",
+    "remark": "线上环境（nginx 统一入口 30080）",
+    "enabled": 1,
+    "is_default": 1,
+    "sort": 1
+  },
+  {
+    "name": "本地调试",
+    "url": "http://localhost:30080/api/v1",
+    "env": "dev",
+    "remark": "本机 docker-compose / nginx 30080 端口",
+    "enabled": 1,
+    "is_default": 0,
+    "sort": 2
+  }
+]

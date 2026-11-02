@@ -1,0 +1,352 @@
+[
+ {
+  "ip": "bear",
+  "name": "40-ctl-btn-confirm",
+  "bg": "#FFE991"
+ },
+ {
+  "ip": "bear",
+  "name": "41-ctl-btn-add",
+  "bg": "#FEBB97"
+ },
+ {
+  "ip": "bear",
+  "name": "42-ctl-tag",
+  "bg": "#FFF2C9"
+ },
+ {
+  "ip": "bear",
+  "name": "43-ctl-tag-filter",
+  "bg": "#BFF3FF"
+ },
+ {
+  "ip": "bear",
+  "name": "44-ctl-badge-dot",
+  "bg": "#FFCB89"
+ },
+ {
+  "ip": "bear",
+  "name": "45-ctl-avatar",
+  "bg": "#FCE287"
+ },
+ {
+  "ip": "bear",
+  "name": "46-ctl-loading",
+  "bg": "#D9E573"
+ },
+ {
+  "ip": "bear",
+  "name": "47-ctl-input",
+  "bg": "#FDE7A6"
+ },
+ {
+  "ip": "bear",
+  "name": "48-ctl-clear",
+  "bg": "#AACB98"
+ },
+ {
+  "ip": "bear",
+  "name": "49-ctl-search-voice",
+  "bg": "#BAF8E5"
+ },
+ {
+  "ip": "bear",
+  "name": "50-ctl-switch",
+  "bg": "#A6F0C9"
+ },
+ {
+  "ip": "bear",
+  "name": "51-ctl-checkbox",
+  "bg": "#DAC2FF"
+ },
+ {
+  "ip": "bear",
+  "name": "52-ctl-radio",
+  "bg": "#8ED4FF"
+ },
+ {
+  "ip": "bear",
+  "name": "53-ctl-slider",
+  "bg": "#FFBD72"
+ },
+ {
+  "ip": "bear",
+  "name": "54-ctl-numberbox",
+  "bg": "#D7D5C3"
+ },
+ {
+  "ip": "bear",
+  "name": "55-ctl-rate",
+  "bg": "#FB8072"
+ },
+ {
+  "ip": "bear",
+  "name": "56-ctl-segment",
+  "bg": "#FFE385"
+ },
+ {
+  "ip": "bear",
+  "name": "57-ctl-picker",
+  "bg": "#C2AFFF"
+ },
+ {
+  "ip": "bear",
+  "name": "58-ctl-upload",
+  "bg": "#FD8976"
+ },
+ {
+  "ip": "bear",
+  "name": "59-ctl-nav-back",
+  "bg": "#FCBFC7"
+ },
+ {
+  "ip": "bear",
+  "name": "60-ctl-nav-more",
+  "bg": "#E1D692"
+ },
+ {
+  "ip": "bear",
+  "name": "61-ctl-tabs",
+  "bg": "#FFCC6F"
+ },
+ {
+  "ip": "bear",
+  "name": "62-ctl-steps",
+  "bg": "#BAF1FF"
+ },
+ {
+  "ip": "bear",
+  "name": "63-ctl-cell",
+  "bg": "#F8D082"
+ },
+ {
+  "ip": "bear",
+  "name": "64-ctl-modal-warn",
+  "bg": "#F9BFC7"
+ },
+ {
+  "ip": "bear",
+  "name": "65-ctl-modal-info",
+  "bg": "#ADDDFF"
+ },
+ {
+  "ip": "bear",
+  "name": "66-ctl-modal-ok",
+  "bg": "#B7E3AA"
+ },
+ {
+  "ip": "bear",
+  "name": "67-ctl-popup",
+  "bg": "#FEC39D"
+ },
+ {
+  "ip": "bear",
+  "name": "68-ctl-toast",
+  "bg": "#F9C6CF"
+ },
+ {
+  "ip": "bear",
+  "name": "69-ctl-empty",
+  "bg": "#ABF5FD"
+ },
+ {
+  "ip": "bear",
+  "name": "70-ctl-skeleton",
+  "bg": "#FDE38C"
+ },
+ {
+  "ip": "bear",
+  "name": "71-ctl-progress",
+  "bg": "#FBDE7C"
+ },
+ {
+  "ip": "bear",
+  "name": "72-ctl-ring",
+  "bg": "#FDBFC9"
+ },
+ {
+  "ip": "bear",
+  "name": "73-ctl-calendar",
+  "bg": "#FFF1A6"
+ },
+ {
+  "ip": "bear",
+  "name": "74-ctl-calendar-range",
+  "bg": "#FDE187"
+ },
+ {
+  "ip": "duck",
+  "name": "40-ctl-btn-confirm",
+  "bg": "#FFEC95"
+ },
+ {
+  "ip": "duck",
+  "name": "41-ctl-btn-add",
+  "bg": "#FFD5A5"
+ },
+ {
+  "ip": "duck",
+  "name": "42-ctl-tag",
+  "bg": "#FFF6BC"
+ },
+ {
+  "ip": "duck",
+  "name": "43-ctl-tag-filter",
+  "bg": "#C5F5FF"
+ },
+ {
+  "ip": "duck",
+  "name": "44-ctl-badge-dot",
+  "bg": "#FFE7CB"
+ },
+ {
+  "ip": "duck",
+  "name": "45-ctl-avatar",
+  "bg": "#FADBC1"
+ },
+ {
+  "ip": "duck",
+  "name": "46-ctl-loading",
+  "bg": "#EFFF9A"
+ },
+ {
+  "ip": "duck",
+  "name": "47-ctl-input",
+  "bg": "#FFF9E9"
+ },
+ {
+  "ip": "duck",
+  "name": "48-ctl-clear",
+  "bg": "#D3DBC2"
+ },
+ {
+  "ip": "duck",
+  "name": "49-ctl-search-voice",
+  "bg": "#BBFCF5"
+ },
+ {
+  "ip": "duck",
+  "name": "50-ctl-switch",
+  "bg": "#88E5BE"
+ },
+ {
+  "ip": "duck",
+  "name": "51-ctl-checkbox",
+  "bg": "#C9BCFF"
+ },
+ {
+  "ip": "duck",
+  "name": "52-ctl-radio",
+  "bg": "#A0D7FF"
+ },
+ {
+  "ip": "duck",
+  "name": "53-ctl-slider",
+  "bg": "#FCAB56"
+ },
+ {
+  "ip": "duck",
+  "name": "54-ctl-numberbox",
+  "bg": "#D5D3C4"
+ },
+ {
+  "ip": "duck",
+  "name": "55-ctl-rate",
+  "bg": "#FD8479"
+ },
+ {
+  "ip": "duck",
+  "name": "56-ctl-segment",
+  "bg": "#FDE389"
+ },
+ {
+  "ip": "duck",
+  "name": "57-ctl-picker",
+  "bg": "#C5B5FF"
+ },
+ {
+  "ip": "duck",
+  "name": "58-ctl-upload",
+  "bg": "#F56E5C"
+ },
+ {
+  "ip": "duck",
+  "name": "59-ctl-nav-back",
+  "bg": "#FCB1CB"
+ },
+ {
+  "ip": "duck",
+  "name": "60-ctl-nav-more",
+  "bg": "#D3CF99"
+ },
+ {
+  "ip": "duck",
+  "name": "61-ctl-tabs",
+  "bg": "#FECB6F"
+ },
+ {
+  "ip": "duck",
+  "name": "62-ctl-steps",
+  "bg": "#CDF8F9"
+ },
+ {
+  "ip": "duck",
+  "name": "63-ctl-cell",
+  "bg": "#F5CF93"
+ },
+ {
+  "ip": "duck",
+  "name": "64-ctl-modal-warn",
+  "bg": "#FDC9BE"
+ },
+ {
+  "ip": "duck",
+  "name": "65-ctl-modal-info",
+  "bg": "#D1EBFF"
+ },
+ {
+  "ip": "duck",
+  "name": "66-ctl-modal-ok",
+  "bg": "#E0FFE5"
+ },
+ {
+  "ip": "duck",
+  "name": "67-ctl-popup",
+  "bg": "#FEC181"
+ },
+ {
+  "ip": "duck",
+  "name": "68-ctl-toast",
+  "bg": "#FBBAC7"
+ },
+ {
+  "ip": "duck",
+  "name": "69-ctl-empty",
+  "bg": "#B8F2FB"
+ },
+ {
+  "ip": "duck",
+  "name": "70-ctl-skeleton",
+  "bg": "#FDE69C"
+ },
+ {
+  "ip": "duck",
+  "name": "71-ctl-progress",
+  "bg": "#E7CC7B"
+ },
+ {
+  "ip": "duck",
+  "name": "72-ctl-ring",
+  "bg": "#FDBFC5"
+ },
+ {
+  "ip": "duck",
+  "name": "73-ctl-calendar",
+  "bg": "#FDE58E"
+ },
+ {
+  "ip": "duck",
+  "name": "74-ctl-calendar-range",
+  "bg": "#FDE58B"
+ }
+]

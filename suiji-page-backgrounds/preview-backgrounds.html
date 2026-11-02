@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>岁记 · 页面背景套图预览（bear / duck / pony）</title>
+<style>
+  :root { --ink: #6B4A3A; --sub: #A98872; --line: #F1E2D1; --cream: #FFF8F0; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 32px 28px 56px; background: var(--cream); color: var(--ink);
+         font: 14px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  h1 { margin: 0 0 6px; font-size: 24px; }
+  .lead { margin: 0 0 22px; color: var(--sub); }
+  .bar { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: center;
+         padding: 12px 16px; margin-bottom: 26px; background: #fff;
+         border: 1px solid var(--line); border-radius: 14px; }
+  .bar label { display: flex; gap: 7px; align-items: center; cursor: pointer; }
+  .bar input { accent-color: #F58FB6; }
+  h2 { margin: 30px 0 14px; font-size: 18px; display: flex; gap: 10px; align-items: baseline; }
+  h2 small { color: var(--sub); font-size: 12px; font-weight: 400; }
+  .row { display: flex; flex-wrap: wrap; gap: 22px; }
+  .cell { width: 262px; }
+  .phone { position: relative; width: 262px; height: 466px; border-radius: 30px; overflow: hidden;
+           border: 9px solid #2f2a28; box-shadow: 0 10px 26px rgba(107,74,58,.18);
+           background-size: cover; background-position: center top; }
+  .ui { position: absolute; inset: 0; display: flex; flex-direction: column; }
+  .status { display: flex; justify-content: space-between; padding: 8px 14px 0;
+            font-size: 11px; color: #8a6a55; }
+  .nav { padding: 10px 16px 2px; font-size: 17px; font-weight: 700; }
+  .body { flex: 1; padding: 10px 14px; display: flex; flex-direction: column; gap: 9px; }
+  .card { background: rgba(255,255,255,.86); border-radius: 14px; padding: 10px 12px;
+          box-shadow: 0 3px 10px rgba(107,74,58,.07); }
+  .card b { display: block; font-size: 13px; }
+  .card span { font-size: 11px; color: var(--sub); }
+  .card.tall { height: 92px; }
+  .card.mid { height: 58px; }
+  .tabs { margin: auto 12px 12px; padding: 7px; display: flex; justify-content: space-around;
+          background: rgba(255,255,255,.92); border-radius: 22px; box-shadow: 0 6px 16px rgba(107,74,58,.14); }
+  .tabs i { width: 44px; height: 30px; border-radius: 15px; display: block; }
+  .tabs i.on { background: #FFE3EE; }
+  .tabs i + i { margin-left: 6px; }
+  .cap { margin-top: 9px; font-size: 12px; color: var(--sub); }
+  .cap b { color: var(--ink); font-size: 13px; }
+  body.no-ui .ui { display: none; }
+  body.splash .cell:not(.splash) .ui { opacity: .25; }
+  .tip { margin-top: 34px; padding: 14px 16px; background: #fff; border: 1px solid var(--line);
+         border-radius: 14px; color: var(--sub); font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>岁记 · 页面背景套图预览</h1>
+<p class="lead">三个形象（小熊 · 森林 / 小鸭 · 池塘 / 小马 · 樱花牧场）× 五个主页面，共 15 张。母版 1440×2560 PNG，投放 1440×2560 JPG。</p>
+
+<div class="bar">
+  <label><input type="checkbox" id="tUi" checked> 叠加页面 UI（模拟真实遮挡）</label>
+  <label><input type="checkbox" id="tTop"> 对齐到顶部（默认居中裁切）</label>
+  <span style="color:#A98872">中间 20%–75% 高度是留白区，卡片不会被景物压住。</span>
+</div>
+
+<div id="app"></div>
+
+<p class="tip">图片直接引用 <code>app/</code> 目录下的投放 JPG；右下角的「Qoder AI生成」水印已在出图管线里整块镜像补绘，
+详见 <code>tools/build_backgrounds.py</code> 与 <code>README.md</code>。</p>
+
+<script>
+const IPS = [
+  { key: 'bear', name: '小熊 · 森林', tone: '#E8A87C' },
+  { key: 'duck', name: '小鸭 · 池塘', tone: '#7FC8E8' },
+  { key: 'pony', name: '小马 · 樱花牧场', tone: '#F58FB6' }
+];
+const PAGES = [
+  { key: 'home', name: '首页 · 时光轴', route: 'pages/index/index', cards: ['tall', 'mid', 'mid'] },
+  { key: 'grow', name: '成长', route: 'pages/grow/grow', cards: ['mid', 'tall', 'mid'] },
+  { key: 'family', name: '家庭', route: 'pages/family/family', cards: ['mid', 'mid', 'tall'] },
+  { key: 'me', name: '我的', route: 'pages/me/me', cards: ['mid', 'tall', 'mid'] },
+  { key: 'splash', name: '启动页', route: 'pages/splash/splash', cards: [], splash: true }
+];
+
+const el = document.getElementById('app');
+el.innerHTML = IPS.map(ip => `
+  <h2>${ip.name}<small>bg-${ip.key}-*.jpg</small></h2>
+  <div class="row">${PAGES.map(pg => `
+    <div class="cell${pg.splash ? ' splash' : ''}">
+      <div class="phone" style="background-image:url('app/bg-${ip.key}-${pg.key}.jpg')">
+        <div class="ui">
+          <div class="status"><span>9:41</span><span>岁记</span><span>100%</span></div>
+          <div class="nav">${pg.splash ? '' : pg.name.split(' · ')[0]}</div>
+          <div class="body">
+            ${pg.splash ? '' : pg.cards.map(c => `<div class="card ${c}"></div>`).join('')}
+          </div>
+          ${pg.splash ? `<div class="body"><div class="card mid" style="margin-top:auto"></div></div>` : ''}
+          <div class="tabs"><i class="on"></i><i></i><i></i><i></i></div>
+        </div>
+      </div>
+      <div class="cap"><b>${pg.name}</b><br>${pg.route}<br>bg-${ip.key}-${pg.key}.jpg</div>
+    </div>`).join('')}
+  </div>`).join('');
+
+document.getElementById('tUi').onchange = e => document.body.classList.toggle('no-ui', !e.target.checked);
+document.getElementById('tTop').onchange = e =>
+  document.querySelectorAll('.phone').forEach(p =>
+    p.style.backgroundPosition = e.target.checked ? 'center top' : 'center center');
+</script>
+</body>
+</html>

@@ -1,0 +1,248 @@
+# 岁记服务端一键部署（契约 §16）：db=postgres:16 + redis=redis:7-alpine + minio + api + nginx
+# 所有可调项均为环境变量：复制 .env.example 为 .env 后按需修改，未设置时用下方 ${VAR:-默认值}
+# （默认值与 .env.example 中给出的值一致，避免“删掉 .env 后端口/行为整个变样”）
+# 例外：所有密码类变量（POSTGRES_PASSWORD / REDIS_PASSWORD / MINIO_ROOT_PASSWORD / MINIO_SECRET_KEY）
+# 与 JWT_SECRET 一律用 ${VAR:?错误提示} 声明为必填——缺失时 compose 直接报错，
+# 不会退化成 "suiji" / "change-me-redis" 这类公开弱密码。
+# 所有持久化数据统一挂在公共目录 DATA_DIR（默认 ./data）下，方便备份/迁移
+#
+# 常用覆盖示例：
+#   DATA_DIR=/mnt/suiji-data NGINX_PORT=8080 docker compose up -d
+#
+# 端口约定：形如 "${宿主端口}:${容器端口}"，容器端口固定（db 5432 / redis 6379 / minio 9000,9001 /
+# api 8000），宿主端口可改；nginx 容器端口由 NGINX_LISTEN_PORT 决定，宿主侧由 NGINX_PORT 决定。
+#
+# 除 nginx 外一律只绑 127.0.0.1：数据库、对象存储、api 直连端口都不该被公网触达——
+# 它们要么只有密码一道防线（Postgres/MinIO），要么会绕过 nginx 的脱敏与限流（api 8000）。
+# 需要临时从外部调试时，用 ssh 端口转发，不要改成 0.0.0.0。
+
+# 日志轮转：不限制的话 Docker 默认 json-file 会无限增长，直到把磁盘写满
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-suiji}
+      # 无兜底默认值：缺配置时直接拒绝启动，杜绝用 "suiji" 这类公开弱密码起库。
+      # 注意 POSTGRES_PASSWORD 仅在数据目录为空（首次初始化）时生效；已有库改密码须 ALTER USER。
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?未设置 POSTGRES_PASSWORD —— 请在 .env 中配置强随机密码}
+      POSTGRES_DB: ${POSTGRES_DB:-suiji}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - "${DATA_DIR:-./data}/postgres:/var/lib/postgresql/data"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-suiji} -d ${POSTGRES_DB:-suiji}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    # 端口只绑 127.0.0.1：仅供宿主机上的图形客户端（RedisInsight / Another Redis Desktop 等）连，
+    # 局域网与公网都访问不到。切勿改成 "6379:6379"——那会监听 0.0.0.0，
+    # 一旦安全组没拦，等同于把会话撤销账本（登出黑名单）公网裸奔。
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:?未设置 REDIS_PASSWORD —— 请在 .env 中配置强随机密码}
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+    volumes:
+      - "${DATA_DIR:-./data}/redis:/data"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      # 密码会出现在进程命令行（docker inspect / ps 可见）；受 127.0.0.1 端口约束，
+      # 能上这台机器的才看得到。换成 redis-cli -a 的替代写法需要配置文件，暂保持现状。
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?未设置 REDIS_PASSWORD —— 请在 .env 中配置强随机密码}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  # 非结构化文件（图片/附件）对象存储：兼容 S3 协议
+  # 控制台 http://<host>:${MINIO_CONSOLE_PORT}，API 端点 http://<host>:${MINIO_PORT}
+  minio:
+    image: pgsty/minio:latest
+    # 列表式 command：与 redis 等保持一致，避免依赖字符串拆分
+    command:
+      - server
+      - /data
+      - --console-address
+      - ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-suiji}
+      # 无兜底默认值：MinIO 要求 ≥8 位，缺配置直接拒绝启动
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?未设置 MINIO_ROOT_PASSWORD —— 请在 .env 中配置强随机密码}
+      MINIO_DOMAIN: ${MINIO_DOMAIN:-}
+    ports:
+      # 只绑 127.0.0.1：控制台拿到 root 凭据 = 拿到全部家庭的照片/视频，绝不能公网可达
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - "${DATA_DIR:-./data}/minio:/data"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  # 可选：随 Compose 启动自动创建桶（默认 api 侧也会自动创建，可省略）
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    # 用列表式 entrypoint（Compose 规范写法），避免依赖字符串折叠/拆分；
+    # 凭据加引号，防密码里出现 & | ; 等字符被 shell 解释
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        mc alias set local "http://minio:9000" "${MINIO_ROOT_USER:-suiji}" "${MINIO_ROOT_PASSWORD:?未设置 MINIO_ROOT_PASSWORD —— 请在 .env 中配置强随机密码}"
+        mc mb --ignore-existing "local/${MINIO_BUCKET:-suiji}"
+    restart: on-failure
+
+  api:
+    build: .
+    ports:
+      # 只绑 127.0.0.1：直连 8000 会绕过 nginx 的日志脱敏与限流，对外一律走 nginx
+      - "${API_PORT:-8000}:8000"
+    logging: *default-logging
+    environment:
+      # 信任 nginx 的 X-Real-IP / X-Forwarded-For（限流键的真实来源）。
+      # 部署在 nginx 之后必须为 1；若哪天直接暴露 api，必须改回 0，
+      # 否则任何人伪造该头就能绕过限流。
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+      # 无鉴权端点的限流配额（次 / 窗口秒），与 nginx 侧 auth_limit 呼应
+      RL_REGISTER: ${RL_REGISTER:-5}
+      RL_REGISTER_WINDOW: ${RL_REGISTER_WINDOW:-3600}
+      RL_LOGIN: ${RL_LOGIN:-10}
+      RL_LOGIN_WINDOW: ${RL_LOGIN_WINDOW:-300}
+      RL_JOIN: ${RL_JOIN:-10}
+      RL_JOIN_WINDOW: ${RL_JOIN_WINDOW:-300}
+      RL_UPLOAD: ${RL_UPLOAD:-60}
+      RL_UPLOAD_WINDOW: ${RL_UPLOAD_WINDOW:-300}
+      PASSWORD_MIN_LENGTH: ${PASSWORD_MIN_LENGTH:-8}
+      MEDIA_URL_MAX_EXPIRES: ${MEDIA_URL_MAX_EXPIRES:-3600}
+      # CORS 白名单（逗号分隔）。H5 用独立开发服务器（如 Vite 的 5173）跨域调试时必须配置，
+      # 否则浏览器一律 "blocked by CORS policy"。App / 小程序不需要（不发起 CORS 请求）。
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      # 与 db 服务的凭据保持一致：改 POSTGRES_* 时这里自动跟随
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-suiji}:${POSTGRES_PASSWORD:?未设置 POSTGRES_PASSWORD —— 请在 .env 中配置强随机密码}@db:5432/${POSTGRES_DB:-suiji}
+      # 启动时自动执行 Alembic 迁移（alembic upgrade head，判存幂等）；默认 0 不迁移
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-0}
+      # 与 redis 服务的 --requirepass 一致；密码含 @ : / 等特殊字符需 URL 编码
+      REDIS_URL: redis://:${REDIS_PASSWORD:?未设置 REDIS_PASSWORD —— 请在 .env 中配置强随机密码}@redis:6379/0
+      # 不提供默认值兜底：未配置时 api 直接拒绝启动，杜绝用公开占位密钥签令牌
+      JWT_SECRET: ${JWT_SECRET:?未设置 JWT_SECRET —— HS256 密钥泄露等于可以伪造任意用户令牌}
+      MEDIA_DIR: /app/data/media
+      # 非结构化文件存储：minio（对象存储）| local（本地卷，MediaStore MediaDir 实现）
+      MEDIA_BACKEND: ${MEDIA_BACKEND:-minio}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      # api 以 root 身份访问 MinIO：SECRET_KEY 必须与 MINIO_ROOT_PASSWORD 完全一致
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-suiji}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?未设置 MINIO_SECRET_KEY —— 请在 .env 中配置强随机密码}
+      MINIO_BUCKET: ${MINIO_BUCKET:-suiji}
+      MINIO_SECURE: ${MINIO_SECURE:-false}
+      MINIO_REGION: ${MINIO_REGION:-}
+      # 客户端实际可访问的对象存储地址（预签名 URL 重定向用）
+      # 直连 MinIO：http://<host>:<MINIO_PORT>（默认 9000）；nginx 已不再转发 /minio
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:9000}
+      MEDIA_URL_EXPIRES: ${MEDIA_URL_EXPIRES:-600}
+      MEDIA_DOWNLOAD_MODE: ${MEDIA_DOWNLOAD_MODE:-auto}
+      MEDIA_PATH_DATE_UTC: ${MEDIA_PATH_DATE_UTC:-0}
+      FILE_MAX_BYTES: ${FILE_MAX_BYTES:-209715200}
+      # 外部依赖（数据库、对象存储）不可用时的降级开关：1=降级到本地实现，0=直接报错（容器部署一律 0）
+      # 注意：设 1 时 MinIO 连不上会静默写回本地磁盘，接口仍返回成功——这正是"上传成功却看不到文件"的根因
+      SUIJI_ALLOW_FALLBACK: ${SUIJI_ALLOW_FALLBACK:-0}
+      LLM_API_BASE: ${LLM_API_BASE:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      # 应用层传输加密（敏感接口端到端加密，见 app/core/crypto.py）：
+      # optional=兼容明文，required=清单内接口必须加密（客户端全量升级后建议开启）
+      CRYPTO_MODE: ${CRYPTO_MODE:-optional}
+      # 私钥落在已授权的数据卷里（/app/data 属主 suiji），随 data/ 一起备份
+      CRYPTO_KEY_FILE: /app/data/crypto/app_rsa_private.pem
+      CRYPTO_TS_WINDOW: ${CRYPTO_TS_WINDOW:-300}
+    volumes:
+      - "${DATA_DIR:-./data}/media:/app/data/media"
+      # RSA 私钥必须持久化：不挂出去的话每次重建镜像都重新生成密钥，
+      # kid 一变，所有客户端缓存的公钥集体失效（H5 表现为登录 409）
+      - "${DATA_DIR:-./data}/crypto:/app/data/crypto"
+    # 镜像内以非 root 用户 suiji 运行（见 Dockerfile）。若 media 卷是宿主 bind mount
+    # 且宿主目录属主不是容器内的 suiji，写入会 EACCES；此时二选一：
+    #   chown -R 1000:1000 ${DATA_DIR}/media     （推荐，容器内 suiji 一般是 1000）
+    #   或临时加 user: "root" 覆盖（不推荐，仅排障用）
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  # 统一入口反向代理：对外只需暴露 NGINX_PORT（默认 30080），转发规则见 nginx/templates/default.conf.template
+  # 客户端/App 的服务器地址填 http://<host>[:<NGINX_PORT>]/api/v1
+  nginx:
+    image: nginx:1.27-alpine
+    # 官方镜像会把 /etc/nginx/templates/*.template 用下面两个变量渲染后写入 /etc/nginx/conf.d/
+    environment:
+      NGINX_LISTEN_PORT: ${NGINX_LISTEN_PORT:-80}
+      NGINX_CLIENT_MAX_BODY_SIZE: ${NGINX_CLIENT_MAX_BODY_SIZE:-200m}
+      # /docs、/openapi.json 的 IP 白名单。
+      # 默认只放行容器自身（等价于关掉公网访问）；调试时改成自己的公网 IP 或 0.0.0.0/0。
+      NGINX_ADMIN_ALLOW: ${NGINX_ADMIN_ALLOW:-127.0.0.1}
+      # 启用 HTTPS 后由 tls.conf.template 使用
+      NGINX_TLS_LISTEN_PORT: ${NGINX_TLS_LISTEN_PORT:-443}
+      NGINX_SERVER_NAME: ${NGINX_SERVER_NAME:-localhost}
+    ports:
+      - "${NGINX_PORT:-30080}:${NGINX_LISTEN_PORT:-80}"
+    volumes:
+      - "./nginx/nginx.conf:/etc/nginx/nginx.conf:ro"
+      # 只挂 default.conf.template：官方镜像会把 templates 目录下所有 *.template 都渲染，
+      # 所以 HTTPS 配置必须显式挂载才生效（见 nginx/templates/tls.conf.template 头注释）
+      - "./nginx/templates/default.conf.template:/etc/nginx/templates/default.conf.template:ro"
+      # 官网静态资源（static/suiji-website，含 downloads/*.apk 安装包），
+      # 由 nginx 直接以 /suiji-website/ 路径对外提供（见 default.conf.template）
+      - "./static/suiji-website:/usr/share/nginx/html/suiji-website:ro"
+      # 启用 HTTPS 时追加这两行（证书目录换成自己的域名）：
+      # - "./nginx/templates/tls.conf.template:/etc/nginx/templates/tls.conf.template:ro"
+      # - "/etc/letsencrypt/live/<你的域名>:/etc/nginx/certs:ro"
+      # 并补端口映射："${NGINX_TLS_PORT:-443}:443"
+    logging: *default-logging
+    depends_on:
+      api:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:${NGINX_LISTEN_PORT:-80}/healthz >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+# 不再使用具名卷：数据统一落在 ${DATA_DIR:-./data} 下的 postgres / minio / media 子目录
+# 首次启动前请确保各子目录存在（Windows 下 Docker 会自动创建，Linux 下建议手动 mkdir -p 并注意权限）

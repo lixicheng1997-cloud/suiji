@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 180" role="img" aria-label="小熊岁岁为你采集星星">
+<style>
+  .bob{animation:gbob 1.2s ease-in-out infinite}
+  @keyframes gbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+  .reach{transform-box:fill-box;transform-origin:50% 12%;animation:reach 1.2s ease-in-out infinite}
+  @keyframes reach{0%,100%{transform:rotate(68deg)}50%{transform:rotate(108deg)}}
+  .swing{transform-box:fill-box;transform-origin:50% 12%;animation:swing 1.2s ease-in-out infinite}
+  @keyframes swing{0%,100%{transform:rotate(-16deg)}50%{transform:rotate(4deg)}}
+  .tail{transform-box:fill-box;transform-origin:0% 30%;animation:flutter 1.2s ease-in-out infinite}
+  @keyframes flutter{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(10deg)}}
+  .dA{animation:dA 2.4s linear infinite}
+  .dB{animation:dB 2.4s linear .8s infinite}
+  .dC{animation:dC 2.4s linear 1.6s infinite}
+  @keyframes dA{0%{transform:translate(0,0) scale(.5);opacity:0}12%{opacity:1}58%{transform:translate(-28px,100px) scale(1);opacity:1}70%{transform:translate(-28px,102px) scale(.45);opacity:0}100%{opacity:0}}
+  @keyframes dB{0%{transform:translate(0,0) scale(.5);opacity:0}12%{opacity:1}58%{transform:translate(-65px,102px) scale(1);opacity:1}70%{transform:translate(-65px,104px) scale(.45);opacity:0}100%{opacity:0}}
+  @keyframes dC{0%{transform:translate(0,0) scale(.5);opacity:0}12%{opacity:1}58%{transform:translate(-8px,106px) scale(1);opacity:1}70%{transform:translate(-8px,108px) scale(.45);opacity:0}100%{opacity:0}}
+  .basket{transform-box:fill-box;transform-origin:50% 100%;animation:bpop .8s ease-out infinite}
+  @keyframes bpop{0%{transform:scale(1)}30%{transform:scale(1.1,.88)}60%{transform:scale(.96,1.06)}100%{transform:scale(1)}}
+  .tw{transform-box:fill-box;transform-origin:center;animation:tw 1.2s ease-in-out infinite}
+  .tw2{animation-delay:.6s}
+  @keyframes tw{0%,100%{opacity:.15;transform:scale(.6)}50%{opacity:1;transform:scale(1.1)}}
+  .eyes{transform-box:fill-box;transform-origin:center;animation:blink 3.2s infinite}
+  @keyframes blink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+</style>
+
+<ellipse cx="146" cy="168" rx="48" ry="6" fill="#5B4232" opacity=".12"/>
+<ellipse cx="72" cy="158" rx="30" ry="5" fill="#5B4232" opacity=".10"/>
+
+<g class="basket">
+  <path d="M58 122 q14 -14 28 0" fill="none" stroke="#C9925A" stroke-width="4" stroke-linecap="round"/>
+  <path d="M54 130 h36 l-5 24 h-26 Z" fill="#E8B87E" stroke="#5B4232" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M58 140 h28" stroke="#C9925A" stroke-width="3" stroke-linecap="round"/>
+  <rect x="48" y="120" width="48" height="11" rx="5.5" fill="#D9A066" stroke="#5B4232" stroke-width="4"/>
+</g>
+
+<g class="dA"><g transform="translate(93,14) scale(.55)">
+  <path d="M12 2.6l2.7 6.1 6.6.6-5 4.4 1.4 6.5L12 16.8 6.3 20.2l1.4-6.5-5-4.4 6.6-.6z" fill="#F5B32C" stroke="#D9911B" stroke-width="2" stroke-linejoin="round"/>
+</g></g>
+<g class="dB"><g transform="translate(130,8) scale(.6)">
+  <path d="M12 21s-8-5.6-8-11a4.6 4.6 0 0 1 8-3.1A4.6 4.6 0 0 1 20 10c0 5.4-8 11-8 11z" fill="#FF8FAB" stroke="#E86FA0" stroke-width="2"/>
+</g></g>
+<g class="dC"><g transform="translate(80,16)">
+  <path d="M0 -8 L2.4 -2.4 L8 0 L2.4 2.4 L0 8 L-2.4 2.4 L-8 0 L-2.4 -2.4 Z" fill="#FFD85C" stroke="#D9911B" stroke-width="1.6" stroke-linejoin="round"/>
+</g></g>
+
+<g class="bob">
+  <rect class="swing" x="166" y="102" width="14" height="30" rx="7" fill="#F5E4CB" stroke="#5B4232" stroke-width="4.5"/>
+  <circle cx="128" cy="66" r="13" fill="#FFF3E2" stroke="#5B4232" stroke-width="5"/>
+  <circle cx="172" cy="64" r="13" fill="#FFF3E2" stroke="#5B4232" stroke-width="5"/>
+  <circle cx="150" cy="112" r="40" fill="#FFF3E2" stroke="#5B4232" stroke-width="5"/>
+  <circle cx="128" cy="66" r="5.5" fill="#F7B8C4"/>
+  <circle cx="172" cy="64" r="5.5" fill="#F7B8C4"/>
+  <ellipse cx="146" cy="120" rx="14" ry="10" fill="#F0DEBC"/>
+  <g class="eyes"><circle cx="138" cy="104" r="4.6" fill="#3E2B22"/><circle cx="158" cy="104" r="4.6" fill="#3E2B22"/></g>
+  <ellipse cx="148" cy="116" rx="4.4" ry="3.2" fill="#5B4232"/>
+  <path d="M148 119 q0 4 -4.5 5 M148 119 q0 4 4.5 5" stroke="#5B4232" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+  <ellipse cx="126" cy="114" rx="6.5" ry="4" fill="#F9A8B8" opacity=".85"/>
+  <ellipse cx="168" cy="112" rx="6.5" ry="4" fill="#F9A8B8" opacity=".85"/>
+  <path d="M124 136 q26 12 52 3 l2 9 q-28 10 -56 -2 Z" fill="#A8E6D0" stroke="#5B4232" stroke-width="4"/>
+  <path class="tail" d="M168 138 q18 2 26 14 q-12 4 -20 0 l-2 9 q-8 -11 -12 -15 Z" fill="#85D4B8" stroke="#5B4232" stroke-width="4" stroke-linejoin="round"/>
+  <rect class="reach" x="118" y="94" width="14" height="34" rx="7" fill="#FFF3E2" stroke="#5B4232" stroke-width="4.5"/>
+</g>
+
+<path class="tw" d="M60 106 l1.6 4.4 4.4 1.6 -4.4 1.6 -1.6 4.4 -1.6 -4.4 -4.4 -1.6 4.4 -1.6z" fill="#FFD85C"/>
+<path class="tw tw2" d="M96 112 l1.4 3.8 3.8 1.4 -3.8 1.4 -1.4 3.8 -1.4 -3.8 -3.8 -1.4 3.8 -1.4z" fill="#FFB3C8"/>
+</svg>

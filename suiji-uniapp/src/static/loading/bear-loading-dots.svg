@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 84 30" role="img" aria-label="小熊岁岁 · 加载中">
+<style>
+  .h{animation:hop .96s cubic-bezier(.34,1.56,.64,1) infinite}
+  .h2{animation-delay:.16s}.h3{animation-delay:.32s}
+  @keyframes hop{0%,58%,100%{transform:translateY(0)}24%{transform:translateY(-10px)}}
+  .s{transform-box:fill-box;transform-origin:center;animation:sh .96s ease-in-out infinite}
+  .s2{animation-delay:.16s}.s3{animation-delay:.32s}
+  @keyframes sh{0%,58%,100%{transform:scaleX(1);opacity:.16}24%{transform:scaleX(.6);opacity:.07}}
+  @media (prefers-reduced-motion:reduce){.h,.s{animation:none}}
+</style>
+<g transform="translate(14,20)"><ellipse class="s" cy="6" rx="7" ry="2" fill="#6B4A3A"/><g class="h"><path d="M0 -10.5C3.6 -4.6 6.4 -1.6 6.4 1.6A6.4 6.4 0 1 1 -6.4 1.6C-6.4 -1.6 -3.6 -4.6 0 -10.5Z" fill="#F7A15C" stroke="#E07E33" stroke-width="2" stroke-linejoin="round"/></g></g>
+<g transform="translate(42,20)"><ellipse class="s s2" cy="6" rx="7" ry="2" fill="#6B4A3A"/><g class="h h2"><path d="M0 -10.5C3.6 -4.6 6.4 -1.6 6.4 1.6A6.4 6.4 0 1 1 -6.4 1.6C-6.4 -1.6 -3.6 -4.6 0 -10.5Z" fill="#F7A15C" stroke="#E07E33" stroke-width="2" stroke-linejoin="round"/></g></g>
+<g transform="translate(70,20)"><ellipse class="s s3" cy="6" rx="7" ry="2" fill="#6B4A3A"/><g class="h h3"><path d="M0 -10.5C3.6 -4.6 6.4 -1.6 6.4 1.6A6.4 6.4 0 1 1 -6.4 1.6C-6.4 -1.6 -3.6 -4.6 0 -10.5Z" fill="#F7A15C" stroke="#E07E33" stroke-width="2" stroke-linejoin="round"/></g></g>
+</svg>

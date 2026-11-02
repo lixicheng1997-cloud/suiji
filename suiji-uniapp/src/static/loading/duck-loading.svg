@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="小鸭叽叽 · 数据加载中">
+<style>
+  .ring{transform-box:view-box;transform-origin:64px 64px;animation:orbit 1.6s linear infinite}
+  @keyframes orbit{to{transform:rotate(360deg)}}
+  .head{animation:bob 1.6s ease-in-out infinite}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+  .tuft{transform-box:view-box;transform-origin:63px 45px;animation:sway 1.6s ease-in-out infinite}
+  @keyframes sway{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}
+  .eyes{transform-box:view-box;transform-origin:64px 63.3px;animation:blink 4.2s infinite}
+  @keyframes blink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+  @media (prefers-reduced-motion:reduce){.ring,.head,.tuft,.eyes{animation:none}}
+</style>
+
+<g class="ring">
+  <circle cx="64" cy="64" r="48" fill="none" stroke="#F5B32C" stroke-width="3" stroke-dasharray=".1 9" stroke-linecap="round" opacity=".35"/>
+  <g transform="translate(105.6,88)" opacity="1">
+    <circle r="6.8" fill="#CFEBFA" stroke="#6FBDE0" stroke-width="2.2"/><circle cx="-2.2" cy="-2.4" r="1.7" fill="#FFFFFF" opacity=".9"/>
+  </g>
+  <g transform="translate(64,16) scale(.82)" opacity=".65">
+    <circle r="6.8" fill="#CFEBFA" stroke="#6FBDE0" stroke-width="2.7"/><circle cx="-2.2" cy="-2.4" r="1.7" fill="#FFFFFF" opacity=".9"/>
+  </g>
+  <g transform="translate(22.4,88) scale(.66)" opacity=".34">
+    <circle r="6.8" fill="#CFEBFA" stroke="#6FBDE0" stroke-width="3.4"/><circle cx="-2.2" cy="-2.4" r="1.7" fill="#FFFFFF" opacity=".9"/>
+  </g>
+</g>
+
+<g class="head">
+  <path class="tuft" d="M59 45q-3 -9 4 -14q1.5 5 4.5 6.5q2 -4 5.5 -4.5q-.5 8 -7 12.5Z" fill="#FFD85C" stroke="#D98E1F" stroke-width="4" stroke-linejoin="round"/>
+  <circle cx="64" cy="68" r="27" fill="#FFD85C" stroke="#D98E1F" stroke-width="4.5"/>
+  <g class="eyes"><circle cx="54.6" cy="63.3" r="3.2" fill="#4A3226"/><circle cx="73.4" cy="63.3" r="3.2" fill="#4A3226"/></g>
+  <path d="M53.4 71.5q10.6 -5.9 21.1 0q-2.4 8.2 -10.6 8.2q-8.2 0 -10.6 -8.2Z" fill="#FF9E4A" stroke="#D98E1F" stroke-width="3.5" stroke-linejoin="round"/>
+  <ellipse cx="45.2" cy="70.3" rx="4.7" ry="2.9" fill="#F9A8B8" opacity=".85"/>
+  <ellipse cx="82.8" cy="70.3" rx="4.7" ry="2.9" fill="#F9A8B8" opacity=".85"/>
+</g>
+</svg>

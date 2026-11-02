@@ -1,0 +1,75 @@
+# 依赖
+node_modules/
+.pnpm-store/
+.yarn/
+.npm/
+jspm_packages/
+
+# 构建产物
+dist/
+dist.zip
+build/
+.output/
+.temp/
+.cache/
+
+# HBuilderX 产物与工程文件
+unpackage/
+.hbuilderx/
+.hbuilderx
+.project
+.unpackage/
+
+# 小程序/Mp 产物
+.mp-weixin/
+.mp-alipay/
+.mp-baidu/
+.mp-toutiao/
+.mp-qq/
+.mp-kuaishou/
+.mp-lark/
+.mp-jd/
+.mp-xhs/
+.mp-360/
+.quickapp/
+
+# App 原生工程产物
+app-plus/
+nativeplugins/
+/android/
+/ios/
+
+# 测试产物与覆盖率
+coverage/
+.nyc_output/
+tests/e2e/videos/
+tests/e2e/screenshots/
+allure-results/
+playwright-report/
+
+# 日志
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# 环境变量
+.env
+.env.*
+!.env.example
+
+# 编辑器 / IDE
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.iml
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db

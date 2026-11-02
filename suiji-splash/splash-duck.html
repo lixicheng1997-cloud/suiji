@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>岁记 · 启动动效 · 小鸭「叽叽」· 池塘破水</title>
+<style>
+/* ================================================================
+   岁记 App 启动动效 · 小鸭主题「池塘破水」
+   色板/缓动/手机壳 100% 复用 suiji-ui-v2 设计令牌（鸭主题）
+   ================================================================ */
+:root{
+  --primary:#F5B32C; --primary-deep:#D9911B; --primary-soft:#FFF3C4;
+  --blush:#FF8FAB; --blush-soft:#FFE7EE;
+  --duck-body:#FFD85C; --duck-line:#D98E1F;
+  --water:#6FBDE0; --water-soft:#E4F3FB;
+  --c-feeding:#F7A15C; --c-sleep:#8FA8DC; --c-milestone:#F5B32C; --c-photo:#FF8FAB;
+  --ink:#5B4636; --sub:#9C8878; --faint:#C7B6A8;
+  --cream:#FFF8F0; --surface:#fff; --line:#F3E4D3;
+  --r-sm:12px; --r-md:20px; --r-lg:28px; --r-pill:999px;
+  --sh-sm:0 2px 10px rgba(214,158,99,.12);
+  --sh-md:0 10px 28px rgba(214,158,99,.16);
+  --sh-lg:0 20px 48px rgba(180,110,60,.22);
+  --spring:cubic-bezier(.34,1.56,.64,1);
+  --smooth:cubic-bezier(.22,.8,.3,1);
+  --font-display:"Yuanti SC","YouYuan","幼圆","PingFang SC","Microsoft YaHei",sans-serif;
+  --font-body:"PingFang SC","HarmonyOS Sans SC","MiSans","Microsoft YaHei",sans-serif;
+  --s:1;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font-body);color:var(--ink);background:var(--cream);line-height:1.6;overflow-x:hidden}
+.bg-deco{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.deco{position:absolute;border-radius:50%;opacity:.5;animation:drift 14s ease-in-out infinite}
+.d1{width:180px;height:180px;left:-60px;top:12%;background:radial-gradient(circle at 35% 35%,#FFEFBC,#FFE38A);opacity:.5}
+.d2{width:90px;height:90px;right:6%;top:22%;background:radial-gradient(circle at 35% 35%,#DFF1FB,#C9E6F7);animation-delay:-4s}
+.d3{width:140px;height:140px;left:8%;bottom:16%;background:radial-gradient(circle at 35% 35%,#FFE7EE,#FFD3E0);animation-delay:-8s;opacity:.4}
+.d4{width:60px;height:60px;right:14%;bottom:28%;background:radial-gradient(circle at 35% 35%,#E2F5EA,#CDEEDB);animation-delay:-2s}
+@keyframes drift{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-26px) scale(1.06)}}
+
+.page{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:48px 24px 64px}
+.kicker{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--primary-deep);background:#fff;border:1px dashed var(--primary);border-radius:var(--r-pill);padding:6px 16px}
+h1{font-family:var(--font-display);font-size:40px;font-weight:900;letter-spacing:3px;margin-top:16px}
+h1 em{font-style:normal;color:var(--primary-deep);font-size:22px;vertical-align:10px;letter-spacing:0}
+.lead{color:var(--sub);margin-top:8px;font-size:15px;max-width:760px}
+.meta-chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+.mc{font-size:12.5px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:var(--r-pill);padding:5px 14px;box-shadow:var(--sh-sm)}
+.mc b{color:var(--primary-deep)}
+
+.layout{display:grid;grid-template-columns:auto 1fr;gap:40px;align-items:start;margin-top:36px}
+@media (max-width:900px){.layout{grid-template-columns:1fr}}
+.phone-col{position:sticky;top:24px}
+@media (max-width:900px){.phone-col{position:static;justify-self:center}}
+.phone-frame{position:relative;width:406px;height:860px;background:linear-gradient(160deg,#4A3226,#2E1F17);border-radius:54px;padding:9px;box-shadow:var(--sh-lg),inset 0 0 0 2px rgba(255,255,255,.08)}
+.phone-notch{position:absolute;top:16px;left:50%;transform:translateX(-50%);width:118px;height:26px;background:#2E1F17;border-radius:14px;z-index:40}
+.phone-screen{position:relative;width:100%;height:100%;background:var(--cream);border-radius:46px;overflow:hidden}
+@media (max-width:520px){.phone-frame{transform:scale(.8);transform-origin:top center;height:688px}}
+
+/* ---------- 启动场景 ---------- */
+.scene{position:absolute;inset:0;overflow:hidden;
+  background:radial-gradient(460px 340px at 50% 26%,var(--primary-soft),transparent 72%),linear-gradient(180deg,#FFF6DC,#FFF8F0 88%)}
+.scene .blob{position:absolute;border-radius:50%;opacity:.45;animation:drift calc(10s/var(--s)) ease-in-out infinite}
+.b1{width:120px;height:120px;left:-30px;top:16%;background:radial-gradient(circle at 35% 35%,#FFEFBC,#FFE38A)}
+.b2{width:70px;height:70px;right:8%;top:28%;background:radial-gradient(circle at 35% 35%,#DFF1FB,#C9E6F7);animation-delay:-3s}
+.b3{width:90px;height:90px;left:10%;bottom:20%;background:radial-gradient(circle at 35% 35%,#FFE7EE,#FFD3E0);animation-delay:-6s}
+
+/* ① 池塘 + 涟漪 */
+.pond{position:absolute;left:50%;top:52%;width:280px;height:64px;transform:translate(-50%,-50%) scale(.2);border-radius:50%;
+  background:radial-gradient(ellipse at 50% 45%,rgba(111,189,224,.35),rgba(111,189,224,.16));
+  border:2.5px solid rgba(111,189,224,.55);opacity:0;z-index:3}
+.ph-ripple .pond{animation:pondIn calc(.6s/var(--s)) var(--spring) both}
+@keyframes pondIn{0%{opacity:0;transform:translate(-50%,-50%) scale(.2)}60%{opacity:1}100%{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+.ripple{position:absolute;left:50%;top:52%;z-index:4}
+.ripple i{position:absolute;border:3px solid var(--water);border-radius:50%;opacity:0;transform:translate(-50%,-50%) scale(.1)}
+.ripple i:nth-child(1),.ripple i:nth-child(2),.ripple i:nth-child(3){width:130px;height:44px}
+.ph-ripple .ripple i{animation:rip calc(.85s/var(--s)) var(--smooth) forwards}
+.ph-ripple .ripple i:nth-child(2){animation-delay:calc(.16s/var(--s))}
+.ph-ripple .ripple i:nth-child(3){animation-delay:calc(.32s/var(--s))}
+@keyframes rip{0%{transform:translate(-50%,-50%) scale(.2);opacity:.85}100%{transform:translate(-50%,-50%) scale(2);opacity:0}}
+
+/* ② 小鸭破水弹出 */
+.mascot{position:absolute;left:50%;top:40%;width:212px;height:212px;opacity:0;transform:translate(-50%,-50%) translateY(90px) scale(.4);z-index:2}
+.mascot svg{width:100%;height:100%;filter:drop-shadow(0 14px 26px rgba(217,145,27,.28))}
+.ph-duck .mascot{animation:duckPop calc(.75s/var(--s)) var(--spring) forwards}
+@keyframes duckPop{
+  0%{opacity:0;transform:translate(-50%,-50%) translateY(90px) scale(.4) rotate(-8deg)}
+  55%{opacity:1}
+  100%{opacity:1;transform:translate(-50%,-50%) translateY(0) scale(1) rotate(0)}
+}
+.mascot .tuft{transform-box:fill-box;transform-origin:30% 90%}
+.ph-duck .tuft{animation:tuftSway calc(.6s/var(--s)) var(--spring) calc(.5s/var(--s)) both}
+@keyframes tuftSway{0%{transform:rotate(0)}30%{transform:rotate(22deg)}65%{transform:rotate(-8deg)}100%{transform:rotate(0)}}
+.mascot .eyes{transform-box:fill-box;transform-origin:center}
+.ph-blink .eyes{animation:blink calc(.42s/var(--s)) ease calc(.08s/var(--s)) both}
+@keyframes blink{0%,100%{transform:scaleY(1)}45%{transform:scaleY(.08)}}
+/* 水珠 */
+.splash-drops{position:absolute;left:50%;top:50%;width:0;height:0;z-index:5}
+.splash-drops i{position:absolute;opacity:0}
+.splash-drops i svg{display:block}
+.ph-duck .splash-drops i{animation:dropFly calc(.6s/var(--s)) ease-out calc(.28s/var(--s) + var(--dl)) forwards}
+@keyframes dropFly{0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}25%{opacity:1}100%{opacity:0;transform:translate(calc(-50% + var(--tx)),calc(-50% + var(--ty))) scale(.8)}}
+
+/* ③ 嘎嘎叫 + 声波 */
+.mascot .bill{transform-box:fill-box;transform-origin:50% 15%}
+.ph-quack .bill{animation:quack calc(.5s/var(--s)) ease both}
+@keyframes quack{0%,100%{transform:scaleY(1)}35%{transform:scaleY(.55) translateY(2px)}70%{transform:scaleY(1.12)}}
+.snd{position:absolute;left:calc(50% + 78px);top:44%;z-index:5}
+.snd i{position:absolute;width:26px;height:26px;border:3px solid var(--primary);border-left-color:transparent;border-bottom-color:transparent;border-radius:50%;transform:rotate(-45deg) scale(.3);opacity:0}
+.ph-quack .snd i{animation:sndRip calc(.5s/var(--s)) var(--smooth) both}
+.ph-quack .snd i:nth-child(2){animation-delay:calc(.12s/var(--s))}
+@keyframes sndRip{0%{opacity:0;transform:rotate(-45deg) scale(.3)}30%{opacity:.9}100%{opacity:0;transform:rotate(-45deg) scale(1.5) translateX(14px)}}
+
+/* ④ LOGO */
+.logo{position:absolute;left:50%;top:62%;transform:translate(-50%,-50%);text-align:center;white-space:nowrap;z-index:6}
+.logo .lg{display:inline-block;font-family:var(--font-display);font-size:52px;font-weight:900;letter-spacing:6px;color:var(--ink);opacity:0;transform:scale(0)}
+.ph-logo .lg1{animation:charPop calc(.5s/var(--s)) var(--spring) both}
+.ph-logo .lg2{animation:charPop calc(.5s/var(--s)) var(--spring) calc(.12s/var(--s)) both}
+@keyframes charPop{0%{opacity:0;transform:scale(0) rotate(8deg)}55%{opacity:1;transform:scale(1.22) rotate(-3deg)}100%{opacity:1;transform:scale(1) rotate(0)}}
+.logo .uline{display:block;margin:2px auto 0}
+.logo .uline path{stroke-dasharray:150;stroke-dashoffset:150}
+.ph-logo .uline path{animation:draw calc(.6s/var(--s)) var(--smooth) calc(.28s/var(--s)) both}
+@keyframes draw{to{stroke-dashoffset:0}}
+.tagline{position:absolute;left:50%;top:calc(62% + 58px);transform:translate(-50%,10px);font-size:14px;letter-spacing:4px;color:var(--sub);opacity:0;font-weight:700;z-index:6}
+.ph-logo .tagline{animation:fadeUp calc(.55s/var(--s)) var(--smooth) calc(.4s/var(--s)) both}
+@keyframes fadeUp{to{opacity:1;transform:translate(-50%,0)}}
+
+/* ⑤ 气泡粒子 */
+.fx{position:absolute;left:50%;top:40%;width:0;height:0;z-index:5}
+.fx i{position:absolute;left:0;top:0;opacity:0;transform:translate(-50%,-50%) scale(.2)}
+.fx i svg{display:block}
+.ph-burst .fx i{animation:burst calc(1s/var(--s)) var(--smooth) calc(var(--dl)/var(--s)) forwards}
+@keyframes burst{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.2)}
+  18%{opacity:1}
+  100%{opacity:0;transform:translate(calc(-50% + var(--tx)),calc(-50% + var(--ty))) scale(var(--sc)) rotate(var(--rot))}
+}
+
+/* ⑥ 彩蛋加载 */
+.loader{position:absolute;left:50%;top:75%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:10px;opacity:0;z-index:6}
+.loader .dots{display:flex;gap:10px}
+.loader .dots i{width:13px;height:16px;border-radius:50% 50% 50% 50%/60% 60% 40% 40%;background:var(--duck-body);border:2.5px solid var(--duck-line);transform:scale(.6);opacity:.4}
+.loader .lt{font-size:11.5px;color:var(--faint);letter-spacing:2px}
+.ph-load .loader{animation:fadeUp calc(.4s/var(--s)) var(--smooth) both}
+.ph-load .dots i{animation:eggPulse calc(.9s/var(--s)) ease calc(var(--pd)/var(--s)) 3 both}
+@keyframes eggPulse{0%,100%{transform:scale(.6) rotate(0);opacity:.4}50%{transform:scale(1.15) rotate(-8deg);opacity:1}}
+
+/* ⑦ 飞走收束 → 首页交接 */
+.ph-exit .mascot{animation:flyAway calc(.6s/var(--s)) var(--smooth) forwards}
+@keyframes flyAway{
+  0%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}
+  40%{transform:translate(-30%,-72%) scale(.95) rotate(-10deg)}
+  100%{opacity:0;transform:translate(120%,-120%) scale(.7) rotate(16deg)}
+}
+.ph-exit .pond,.ph-exit .ripple,.ph-exit .logo,.ph-exit .tagline,.ph-exit .loader,.ph-exit .snd{animation:fadeOut calc(.4s/var(--s)) ease both}
+@keyframes fadeOut{to{opacity:0}}
+.trail{position:absolute;left:50%;top:40%;width:0;height:0;z-index:5}
+.trail i{position:absolute;opacity:0}
+.trail i svg{display:block}
+.ph-exit .trail i{animation:trailPop calc(.5s/var(--s)) ease-out calc(.1s/var(--s) + var(--dl)) both}
+@keyframes trailPop{0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}40%{opacity:.9}100%{opacity:0;transform:translate(calc(-50% + var(--tx)),calc(-50% + var(--ty))) scale(1)}}
+.home{position:absolute;inset:0;background:var(--cream);opacity:0;pointer-events:none;display:flex;flex-direction:column;padding:44px 16px 0;z-index:8}
+.ph-home .home{animation:homeIn calc(.5s/var(--s)) var(--smooth) forwards}
+@keyframes homeIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.h-status{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);padding:0 6px}
+.h-hero{display:flex;align-items:center;gap:14px;margin-top:22px;background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);padding:14px 18px;box-shadow:var(--sh-sm)}
+.h-hero svg{width:56px;height:56px;flex:none}
+.h-hero b{font-family:var(--font-display);font-size:17px;display:block}
+.h-hero s{text-decoration:none;font-size:12px;color:var(--sub)}
+.h-chips{display:flex;gap:10px;margin-top:14px}
+.h-chips span{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;background:#fff;border:1px solid var(--line);border-radius:var(--r-pill);padding:7px 14px;box-shadow:var(--sh-sm)}
+.h-chips i{width:10px;height:10px;border-radius:50%}
+.h-card{margin-top:14px;background:#fff;border:1px solid var(--line);border-radius:var(--r-md);padding:14px 16px;box-shadow:var(--sh-sm)}
+.h-card b{font-size:13px}
+.h-card svg{width:100%;height:64px}
+.h-tabs{margin-top:auto;display:flex;justify-content:space-around;padding:12px 0 26px;border-top:1px solid var(--line);background:#fff;border-radius:0 0 46px 46px}
+.h-tab{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;color:var(--sub)}
+.h-tab svg{width:22px;height:22px}
+.h-tab.on{color:var(--primary-deep);font-weight:700}
+.h-tab.on .tb{background:var(--primary);border-radius:12px;padding:5px 12px;color:#fff}
+
+/* ---------- 控制条 ---------- */
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:18px}
+.btn{font-family:inherit;font-size:13.5px;font-weight:700;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:var(--r-pill);padding:9px 20px;cursor:pointer;box-shadow:var(--sh-sm);transition:transform .2s var(--spring),background .2s}
+.btn:hover{transform:translateY(-2px) scale(1.03)}
+.btn.primary{background:var(--primary);color:#fff;border-color:var(--primary);box-shadow:0 6px 16px rgba(245,179,44,.35)}
+.spd{display:inline-flex;gap:4px;background:#fff;border:1px solid var(--line);border-radius:var(--r-pill);padding:4px;box-shadow:var(--sh-sm)}
+.spd button{font-size:12.5px;font-weight:700;color:var(--sub);border-radius:var(--r-pill);padding:5px 12px;cursor:pointer;background:none;border:none}
+.spd button.on{background:var(--primary);color:#fff}
+.loop-lb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--sub);font-weight:700;cursor:pointer}
+.t-label{margin-left:auto;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+
+/* ---------- 分镜 ---------- */
+.sec-title{font-family:var(--font-display);font-size:24px;font-weight:900;display:flex;align-items:center;gap:12px;margin:48px 0 8px}
+.sec-num{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:11px;background:var(--primary);color:#fff;font-size:15px;box-shadow:0 6px 14px rgba(245,179,44,.35)}
+.sec-desc{color:var(--sub);font-size:14px;margin-bottom:22px;max-width:820px}
+.frames-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:18px}
+.mini-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:14px;box-shadow:var(--sh-sm);transition:transform .25s var(--spring)}
+.mini-card:hover{transform:translateY(-5px) rotate(-.5deg);box-shadow:var(--sh-md)}
+.mini{position:relative;width:100%;aspect-ratio:390/700;background:radial-gradient(200px 150px at 50% 24%,var(--primary-soft),transparent 72%),linear-gradient(180deg,#FFF6DC,#FFF8F0);border:5px solid #4A3226;border-radius:26px;overflow:hidden}
+.mini .m-tag{position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:10px;color:var(--faint);padding:4px 0 8px;letter-spacing:1px}
+.mini .m-mascot{position:absolute;left:50%;top:38%;width:58%;transform:translate(-50%,-50%)}
+.mini .m-mascot svg{width:100%;display:block}
+.mini .m-pond{position:absolute;left:50%;top:52%;width:72%;height:16px;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(ellipse at 50% 45%,rgba(111,189,224,.35),rgba(111,189,224,.16));border:2px solid rgba(111,189,224,.55)}
+.mini .m-ring{position:absolute;left:50%;top:52%;width:60%;height:14px;transform:translate(-50%,-50%);border:2px solid var(--water);border-radius:50%;opacity:.6}
+.mini .m-ring.r2{width:82%;opacity:.3}
+.mini .m-logo{position:absolute;left:0;right:0;top:60%;text-align:center;font-family:var(--font-display);font-size:22px;font-weight:900;letter-spacing:3px;color:var(--ink)}
+.mini .m-logo u{text-decoration:none;display:block;height:3px;width:52px;margin:2px auto 0;border-radius:2px;background:var(--primary)}
+.mini .m-snd{position:absolute;right:16%;top:34%;width:18px;height:18px;border:2.5px solid var(--primary);border-left-color:transparent;border-bottom-color:transparent;border-radius:50%;transform:rotate(-45deg);opacity:.8}
+.mini .m-dot{position:absolute;width:12px;height:12px}
+.mini .m-dot svg{width:100%;display:block}
+.mini .m-load{position:absolute;left:0;right:0;top:72%;display:flex;justify-content:center;gap:7px}
+.mini .m-load i{width:9px;height:11px;border-radius:50% 50% 50% 50%/60% 60% 40% 40%;background:var(--duck-body);border:2px solid var(--duck-line)}
+.mini .m-home{position:absolute;inset:0;background:var(--cream);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:18px}
+.mini .m-home svg{width:44px;height:44px}
+.mini .m-home b{font-family:var(--font-display);font-size:13px}
+.mini .m-home .bar{width:70%;height:8px;border-radius:4px;background:var(--primary-soft)}
+.mini .m-home .bar.s{width:50%}
+.mini-card p{font-size:12px;color:var(--sub);margin-top:10px;font-weight:700;text-align:center}
+.mini-card p code{font-size:10.5px;color:var(--primary-deep);background:rgba(245,179,44,.14);padding:1px 6px;border-radius:6px;margin-left:4px}
+
+/* ---------- 规格表 ---------- */
+.spec{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--sh-sm);font-size:13.5px}
+.spec th{background:var(--primary-soft);color:var(--primary-deep);font-family:var(--font-display);text-align:left;padding:12px 16px;font-size:13px}
+.spec td{padding:11px 16px;border-top:1px solid var(--line);vertical-align:top;color:var(--ink)}
+.spec td:first-child{white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--primary-deep);font-weight:700}
+.spec tr:hover td{background:#FFFCF4}
+.note{margin-top:26px;font-size:13px;color:var(--sub);background:#fff;border:1px dashed var(--primary);border-radius:var(--r-md);padding:16px 20px}
+.note b{color:var(--primary-deep)}
+@media (prefers-reduced-motion:reduce){
+  .ph-ripple .pond,.ph-ripple .ripple i,.ph-duck .mascot,.ph-duck .tuft,.ph-blink .eyes,.ph-quack .bill,.ph-quack .snd i,
+  .ph-logo .lg1,.ph-logo .lg2,.ph-logo .uline path,.ph-logo .tagline,.ph-burst .fx i,.ph-load .loader,.ph-load .dots i,
+  .ph-exit .mascot,.ph-home .home{animation:none}
+  .ph-duck .mascot,.ph-ripple .pond,.ph-logo .lg,.ph-home .home{opacity:1;transform:translate(-50%,-50%) scale(1)}
+}
+</style>
+</head>
+<body>
+<div class="bg-deco" aria-hidden="true"><span class="deco d1"></span><span class="deco d2"></span><span class="deco d3"></span><span class="deco d4"></span></div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="sym-heart" viewBox="0 0 24 24"><path d="M12 21s-8-5.6-8-11a4.6 4.6 0 0 1 8-3.1A4.6 4.6 0 0 1 20 10c0 5.4-8 11-8 11z" fill="#FF8FAB" stroke="#E86FA0" stroke-width="1.6"/></symbol>
+    <symbol id="sym-star" viewBox="0 0 24 24"><path d="M12 2.6l2.7 6.1 6.6.6-5 4.4 1.4 6.5L12 16.8 6.3 20.2l1.4-6.5-5-4.4 6.6-.6z" fill="#F5B32C" stroke="#D9911B" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+    <symbol id="sym-drop" viewBox="0 0 24 30"><path d="M12 1C7 8 4 13 4 18a8 8 0 0 0 16 0C20 13 17 8 12 1z" fill="#6FBDE0" stroke="#4A9CC6" stroke-width="2"/><circle cx="9" cy="17" r="2.2" fill="#DFF1FB"/></symbol>
+    <symbol id="sym-bubble" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="rgba(111,189,224,.25)" stroke="#6FBDE0" stroke-width="2"/><circle cx="9" cy="9" r="2" fill="#fff"/></symbol>
+    <symbol id="sym-duck" viewBox="0 0 140 140">
+      <path class="tuft" d="M62 34 q4 -16 16 -18 q-4 10 2 16" fill="#FFD85C" stroke="#D98E1F" stroke-width="5" stroke-linecap="round"/>
+      <circle cx="70" cy="80" r="46" fill="#FFD85C" stroke="#D98E1F" stroke-width="5"/>
+      <g class="eyes"><circle cx="54" cy="72" r="5.5" fill="#4A3226"/><circle cx="86" cy="72" r="5.5" fill="#4A3226"/></g>
+      <path class="bill" d="M52 86 q18 -10 36 0 q-4 14 -18 14 q-14 0 -18 -14Z" fill="#FF9E4A" stroke="#D98E1F" stroke-width="4" stroke-linejoin="round"/>
+      <ellipse cx="38" cy="84" rx="8" ry="5" fill="#F9A8B8" opacity=".85"/>
+      <ellipse cx="102" cy="84" rx="8" ry="5" fill="#F9A8B8" opacity=".85"/>
+    </symbol>
+    <symbol id="sym-house" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+    <symbol id="sym-growth" viewBox="0 0 24 24"><path d="M4 18l5-6 4 3 7-9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 6h5v5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="sym-family" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17" cy="9" r="2.6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3.5 19c.6-3.4 2.8-5 5.5-5s4.9 1.6 5.5 5M14.5 19c.4-2.6 1.6-4 3.5-4s3 1.3 3.4 3.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="sym-me" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 20c.8-4 3.5-6 7-6s6.2 2 7 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  </defs>
+</svg>
+
+<div class="page">
+  <span class="kicker">🐤 岁记 · App 启动动效 · 方案 B</span>
+  <h1>小鸭「叽叽」 <em>池塘破水</em></h1>
+  <p class="lead">奶油黄的池塘泛起涟漪，叽叽"哗"地破水弹出、抖了抖呆毛，张嘴"嘎"了一声 —— LOGO 随声波落版，气泡与水花迸发，最后叽叽振翅飞过屏幕，把首页交到你手上。全程复用 suiji-ui-v2 鸭主题奶油明黄 × 池水蓝配色。</p>
+  <div class="meta-chips">
+    <span class="mc">总时长 <b>≈ 4.2s</b>（含首页交接）</span>
+    <span class="mc">主色 <b>#F5B32C</b></span>
+    <span class="mc">点缀 <b>#6FBDE0 池水蓝</b></span>
+    <span class="mc">缓动 <b>spring / smooth</b></span>
+    <span class="mc">循环演示 <b>5.2s</b></span>
+  </div>
+
+  <div class="layout">
+    <div class="phone-col">
+      <div class="phone-frame">
+        <div class="phone-notch"></div>
+        <div class="phone-screen">
+          <div class="scene" id="scene">
+            <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span>
+
+            <div class="pond"></div>
+            <div class="ripple"><i></i><i></i><i></i></div>
+
+            <div class="mascot">
+              <svg viewBox="0 0 140 140" aria-label="吉祥物小鸭叽叽">
+                <g class="m-float">
+                  <path class="tuft" d="M62 34 q4 -16 16 -18 q-4 10 2 16" fill="#FFD85C" stroke="#D98E1F" stroke-width="5" stroke-linecap="round"/>
+                  <circle cx="70" cy="80" r="46" fill="#FFD85C" stroke="#D98E1F" stroke-width="5"/>
+                  <g class="eyes"><circle cx="54" cy="72" r="5.5" fill="#4A3226"/><circle cx="86" cy="72" r="5.5" fill="#4A3226"/></g>
+                  <path class="bill" d="M52 86 q18 -10 36 0 q-4 14 -18 14 q-14 0 -18 -14Z" fill="#FF9E4A" stroke="#D98E1F" stroke-width="4" stroke-linejoin="round"/>
+                  <ellipse cx="38" cy="84" rx="8" ry="5" fill="#F9A8B8" opacity=".85"/>
+                  <ellipse cx="102" cy="84" rx="8" ry="5" fill="#F9A8B8" opacity=".85"/>
+                </g>
+              </svg>
+            </div>
+
+            <div class="splash-drops">
+              <i style="--tx:-70px;--ty:-46px;--dl:0s"><svg width="14" height="18"><use href="#sym-drop"/></svg></i>
+              <i style="--tx:74px;--ty:-40px;--dl:.08s"><svg width="12" height="15"><use href="#sym-drop"/></svg></i>
+              <i style="--tx:-96px;--ty:-14px;--dl:.14s"><svg width="10" height="13"><use href="#sym-drop"/></svg></i>
+              <i style="--tx:98px;--ty:-12px;--dl:.1s"><svg width="11" height="14"><use href="#sym-drop"/></svg></i>
+            </div>
+
+            <div class="snd"><i></i><i></i></div>
+
+            <div class="fx">
+              <i style="--tx:-104px;--ty:-70px;--rot:0deg;--sc:1;--dl:0s"><svg width="24" height="24"><use href="#sym-bubble"/></svg></i>
+              <i style="--tx:108px;--ty:-74px;--rot:0deg;--sc:1;--dl:.05s"><svg width="20" height="20"><use href="#sym-bubble"/></svg></i>
+              <i style="--tx:-130px;--ty:-6px;--rot:0deg;--sc:.9;--dl:.1s"><svg width="22" height="22"><use href="#sym-star"/></svg></i>
+              <i style="--tx:128px;--ty:-2px;--rot:16deg;--sc:.9;--dl:.15s"><svg width="20" height="20"><use href="#sym-heart"/></svg></i>
+              <i style="--tx:-80px;--ty:50px;--rot:0deg;--sc:.7;--dl:.2s"><svg width="16" height="16"><use href="#sym-bubble"/></svg></i>
+              <i style="--tx:0px;--ty:-128px;--rot:0deg;--sc:1;--dl:.08s"><svg width="26" height="26"><use href="#sym-bubble"/></svg></i>
+              <i style="--tx:-48px;--ty:-114px;--rot:-12deg;--sc:.8;--dl:.18s"><svg width="18" height="18"><use href="#sym-star"/></svg></i>
+              <i style="--tx:46px;--ty:-118px;--rot:10deg;--sc:.85;--dl:.12s"><svg width="18" height="22"><use href="#sym-drop"/></svg></i>
+              <i style="--tx:-120px;--ty:40px;--rot:0deg;--sc:.6;--dl:.24s"><svg width="14" height="14"><use href="#sym-heart"/></svg></i>
+              <i style="--tx:122px;--ty:44px;--rot:0deg;--sc:.7;--dl:.26s"><svg width="16" height="16"><use href="#sym-bubble"/></svg></i>
+              <i style="--tx:12px;--ty:-142px;--rot:8deg;--sc:.7;--dl:.2s"><svg width="16" height="16"><use href="#sym-star"/></svg></i>
+              <i style="--tx:-14px;--ty:62px;--rot:0deg;--sc:.6;--dl:.3s"><svg width="14" height="14"><use href="#sym-bubble"/></svg></i>
+            </div>
+
+            <div class="trail">
+              <i style="--tx:60px;--ty:-30px;--dl:0s"><svg width="16" height="16"><use href="#sym-bubble"/></svg></i>
+              <i style="--tx:30px;--ty:-10px;--dl:.08s"><svg width="12" height="12"><use href="#sym-bubble"/></svg></i>
+              <i style="--tx:0px;--ty:8px;--dl:.16s"><svg width="9" height="9"><use href="#sym-bubble"/></svg></i>
+            </div>
+
+            <div class="logo">
+              <span class="lg lg1">岁</span><span class="lg lg2">记</span>
+              <svg class="uline" width="150" height="14" viewBox="0 0 150 14"><path d="M6 9 q36 -8 68 -3 t70 -1" fill="none" stroke="#F5B32C" stroke-width="5" stroke-linecap="round"/></svg>
+            </div>
+            <div class="tagline">记录成长的每一岁</div>
+
+            <div class="loader">
+              <div class="dots"><i style="--pd:0s"></i><i style="--pd:.14s"></i><i style="--pd:.28s"></i></div>
+              <span class="lt">正在准备今天的记录…</span>
+            </div>
+
+            <div class="home">
+              <div class="h-status"><span>9:41</span><span>●●● ⌁ ▮</span></div>
+              <div class="h-hero">
+                <svg viewBox="0 0 140 140"><use href="#sym-duck"/></svg>
+                <div><b>叽叽，早上好呀</b><s>2026年10月26日 · 已陪伴宝宝 128 天</s></div>
+              </div>
+              <div class="h-chips">
+                <span><i style="background:#F7A15C"></i>喂奶</span>
+                <span><i style="background:#8FA8DC"></i>睡眠</span>
+                <span><i style="background:#F5B32C"></i>里程碑</span>
+                <span><i style="background:#FF8FAB"></i>照片</span>
+              </div>
+              <div class="h-card">
+                <b>📈 本月成长曲线</b>
+                <svg viewBox="0 0 300 64" preserveAspectRatio="none">
+                  <path d="M4 52 C60 48 90 30 140 26 S240 14 296 8" fill="none" stroke="#F5B32C" stroke-width="4" stroke-linecap="round"/>
+                  <path d="M4 52 C60 48 90 30 140 26 S240 14 296 8 V64 H4 Z" fill="rgba(245,179,44,.15)" stroke="none"/>
+                  <circle cx="296" cy="8" r="5" fill="#fff" stroke="#F5B32C" stroke-width="3"/>
+                </svg>
+              </div>
+              <div class="h-tabs">
+                <span class="h-tab on"><span class="tb"><svg width="22" height="22" style="color:#fff"><use href="#sym-house"/></svg></span>首页</span>
+                <span class="h-tab"><svg width="22" height="22"><use href="#sym-growth"/></svg>成长</span>
+                <span class="h-tab"><svg width="22" height="22"><use href="#sym-family"/></svg>家庭</span>
+                <span class="h-tab"><svg width="22" height="22"><use href="#sym-me"/></svg>我的</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="controls">
+        <button class="btn primary" id="replay">↻ 重播</button>
+        <div class="spd" role="group" aria-label="播放速度">
+          <button data-spd="0.5">0.5×</button>
+          <button data-spd="1" class="on">1×</button>
+          <button data-spd="2">2×</button>
+        </div>
+        <label class="loop-lb"><input type="checkbox" id="loop" checked> 循环</label>
+        <span class="t-label" id="tlabel">0.00s</span>
+      </div>
+    </div>
+
+    <div>
+      <h2 class="sec-title" style="margin-top:0"><span class="sec-num">01</span>分镜关键帧</h2>
+      <p class="sec-desc">六个关键帧对应实际时间轴（1× 速度）。动效叙事：涟漪泛起 → 破水弹出 → 嘎嘎叫 → 品牌落版 → 气泡绽放 → 振翅飞屏交接首页。</p>
+      <div class="frames-row">
+        <div class="mini-card"><div class="mini">
+          <span class="m-pond"></span><span class="m-ring"></span><span class="m-ring r2"></span>
+          <span class="m-tag">F1 · 0.00s</span></div>
+          <p>池塘涟漪泛起<code>smooth</code></p></div>
+        <div class="mini-card"><div class="mini">
+          <span class="m-pond"></span>
+          <span class="m-mascot" style="width:50%;top:36%"><svg viewBox="0 0 140 140"><use href="#sym-duck"/></svg></span>
+          <span class="m-dot" style="left:20%;top:28%"><svg viewBox="0 0 24 30"><use href="#sym-drop"/></svg></span>
+          <span class="m-dot" style="right:18%;top:32%"><svg viewBox="0 0 24 30"><use href="#sym-drop"/></svg></span>
+          <span class="m-tag">F2 · 0.30s</span></div>
+          <p>破水弹出 · 水花四溅<code>spring</code></p></div>
+        <div class="mini-card"><div class="mini">
+          <span class="m-pond"></span>
+          <span class="m-mascot" style="width:54%;top:36%"><svg viewBox="0 0 140 140"><use href="#sym-duck"/></svg></span>
+          <span class="m-snd"></span>
+          <span class="m-tag">F3 · 1.15s</span></div>
+          <p>呆毛摇摆 · 张嘴"嘎"</p></div>
+        <div class="mini-card"><div class="mini">
+          <span class="m-mascot" style="width:40%;top:28%"><svg viewBox="0 0 140 140"><use href="#sym-duck"/></svg></span>
+          <span class="m-logo">岁记<u></u></span>
+          <span class="m-tag">F4 · 1.30s</span></div>
+          <p>LOGO 逐字弹入 · 下划线描出</p></div>
+        <div class="mini-card"><div class="mini">
+          <span class="m-mascot" style="width:42%;top:34%"><svg viewBox="0 0 140 140"><use href="#sym-duck"/></svg></span>
+          <span class="m-dot" style="left:16%;top:20%"><svg><use href="#sym-bubble"/></svg></span>
+          <span class="m-dot" style="right:14%;top:24%"><svg><use href="#sym-star"/></svg></span>
+          <span class="m-dot" style="left:22%;top:52%"><svg><use href="#sym-heart"/></svg></span>
+          <span class="m-dot" style="right:20%;top:56%"><svg><use href="#sym-bubble"/></svg></span>
+          <span class="m-load"><i></i><i></i><i></i></span>
+          <span class="m-tag">F5 · 1.75s</span></div>
+          <p>气泡粒子绽放 · 彩蛋加载</p></div>
+        <div class="mini-card"><div class="mini">
+          <div class="m-home">
+            <svg viewBox="0 0 140 140"><use href="#sym-duck"/></svg>
+            <b>叽叽，早上好呀</b>
+            <span class="bar"></span><span class="bar s"></span>
+          </div>
+          <span class="m-tag">F6 · 3.70s</span></div>
+          <p>振翅飞过 → 首页交接</p></div>
+      </div>
+
+      <h2 class="sec-title"><span class="sec-num">02</span>时间轴规格</h2>
+      <table class="spec">
+        <tr><th>时间</th><th>阶段</th><th>内容</th><th>缓动 / 参数</th></tr>
+        <tr><td>0.00–0.60s</td><td>池塘泛起</td><td>椭圆水面 scale .2→1 弹入，3 圈水蓝涟漪错峰扩散</td><td>spring / smooth，间隔 0.16s</td></tr>
+        <tr><td>0.30–1.05s</td><td>叽叽破水</td><td>头部自水面下 translateY 90→0 弹出并带 -8° 回正；4 颗水珠迸溅</td><td>spring (.34,1.56,.64,1)</td></tr>
+        <tr><td>0.80–1.40s</td><td>呆毛摇摆</td><td>头顶呆毛 rotate 22°→-8°→0 回弹</td><td>spring，延迟 0.5s</td></tr>
+        <tr><td>1.05–1.47s</td><td>眨眼卖萌</td><td>眼睛 scaleY 闭合一次</td><td>ease，0.42s</td></tr>
+        <tr><td>1.15–1.65s</td><td>嘎一声</td><td>喙部 scaleY 开合，右侧 2 道声波弧扩散</td><td>ease / smooth</td></tr>
+        <tr><td>1.30–2.00s</td><td>品牌落版</td><td>「岁」「记」逐字弹入（间隔 0.12s），明黄下划线描出，标语上浮</td><td>spring / draw</td></tr>
+        <tr><td>1.75–2.75s</td><td>气泡绽放</td><td>气泡·星星·爱心·水珠 12 颗错峰迸出上浮</td><td>smooth，1s，--dl 错峰</td></tr>
+        <tr><td>2.30–3.30s</td><td>彩蛋加载</td><td>3 枚蛋形点脉冲 ×3（带 -8° 歪头），提示文案淡入</td><td>ease，间隔 0.14s</td></tr>
+        <tr><td>3.30–3.90s</td><td>振翅飞屏</td><td>叽叽先下沉蓄力再斜飞右上角消失，身后 3 颗气泡尾迹</td><td>smooth，translate 120%</td></tr>
+        <tr><td>3.70–4.20s</td><td>首页交接</td><td>首页（问候卡+类别胶囊+Tab）上浮淡入</td><td>spring 收尾</td></tr>
+      </table>
+
+      <div class="note">
+        <b>落地建议：</b>与熊方案共用同一套骨架，仅替换 IP 图层与粒子主题，便于 A/B 上线：默认跟随 App 主题（熊=蜂蜜苏醒 / 鸭=池塘破水）。破水瞬间可加一声轻"噗通"音效（≤300ms，可被系统静音联动关闭）。实际启动建议压缩至 <b>2.2s</b>；Lottie 导出时把池塘/涟漪做背景层，叽叽与粒子为前景层，方便运营替换节日主题（如生日蛋糕粒子）。
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const scene = document.getElementById('scene');
+const STEPS = [
+  [0,'ph-ripple'],[300,'ph-duck'],[1050,'ph-blink'],[1150,'ph-quack'],
+  [1300,'ph-logo'],[1750,'ph-burst'],[2300,'ph-load'],[3300,'ph-exit'],[3700,'ph-home']
+];
+const TOTAL = 5200;
+let spd = 1, timers = [], raf = null, t0 = 0;
+
+function stop(){
+  timers.forEach(clearTimeout); timers = [];
+  cancelAnimationFrame(raf);
+  STEPS.forEach(([,c]) => scene.classList.remove(c));
+  void scene.offsetWidth;
+}
+function play(){
+  stop();
+  t0 = performance.now();
+  STEPS.forEach(([t,c]) => timers.push(setTimeout(() => scene.classList.add(c), t / spd)));
+  timers.push(setTimeout(() => { if (document.getElementById('loop').checked) play(); else tick(true); }, TOTAL / spd));
+  tick();
+}
+function tick(freeze){
+  const el = document.getElementById('tlabel');
+  if (freeze){ el.textContent = (TOTAL/1000).toFixed(2) + 's'; return; }
+  el.textContent = Math.min(TOTAL/1000, (performance.now() - t0) / 1000 / spd).toFixed(2) + 's';
+  raf = requestAnimationFrame(() => tick());
+}
+document.getElementById('replay').addEventListener('click', play);
+document.querySelectorAll('.spd button').forEach(b => b.addEventListener('click', () => {
+  spd = +b.dataset.spd;
+  document.documentElement.style.setProperty('--s', spd);
+  document.querySelectorAll('.spd button').forEach(x => x.classList.toggle('on', x === b));
+  play();
+}));
+play();
+</script>
+</body>
+</html>

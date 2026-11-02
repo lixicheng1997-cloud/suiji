@@ -1,0 +1,14 @@
+# 本地运行覆盖文件（Compose 会自动合并，docker-compose.yml 保持不变）
+#
+# 原因：本机配置的镜像加速器无法拉取 minio/minio 与 minio/mc（403），
+# 但数据仓库内已有等价镜像，故做如下两处覆盖：
+#   1. minio 服务改用本地已有的 pgsty/minio（与官方同构，含 sh/curl，compose 的 healthcheck 可用）；
+#   2. minio-init（mc 建桶）镜像同样拉不到，放入 init profile，默认不启动（桶由 api 侧自动创建）。
+# 恢复官方镜像：删除本文件即可；需要手动建桶时执行
+#   docker compose --profile init up minio-init
+services:
+  minio:
+    image: pgsty/minio:RELEASE.2026-03-25T00-00-00Z
+
+  minio-init:
+    profiles: ["init"]

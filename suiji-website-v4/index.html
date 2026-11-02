@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="bear">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>岁记 · 宝宝成长记录 App — 把宝宝的第一年，记成一本书</title>
+<meta name="description" content="岁记：0–1 岁宝宝成长记录 App。15 秒记一条、WHO 标准生长曲线、里程碑清单、全家协同记录、AI 成长日记、PDF/CSV 数据随时带走。无广告、无第三方统计 SDK。支持 Android 与 iOS。">
+<meta name="theme-color" content="#FFF8F0">
+<meta property="og:type" content="website">
+<meta property="og:title" content="岁记 · 宝宝成长记录 App">
+<meta property="og:description" content="喂奶、哄睡、翻身、第一声「妈妈」——点一下就记下来，周岁还你一本成长书。">
+<meta property="og:image" content="assets/icon-512.png">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="assets/css/phone.css">
+<link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+
+<!-- 鼠标光晕（桌面端） -->
+<div class="sj-cursor-glow" id="sjCursorGlow" aria-hidden="true"></div>
+
+<!-- 背景漂浮装饰 -->
+<div class="sj-bg-deco" aria-hidden="true">
+  <span class="sj-blob sj-b1"></span><span class="sj-blob sj-b2"></span>
+  <span class="sj-blob sj-b3"></span><span class="sj-blob sj-b4"></span>
+</div>
+
+<!-- 滚动进度 -->
+<div class="sj-progress" aria-hidden="true"><i id="sjProgress"></i></div>
+
+<!-- ============ 顶部导航 ============ -->
+<header class="sj-nav" id="sjNav">
+  <div class="sj-nav-inner">
+    <a class="sj-brand" href="#top" aria-label="岁记首页">
+      <img src="assets/logo-192-rounded.png" alt="岁记">
+      <span>岁记<em>Baby Growth Log</em></span>
+    </a>
+    <nav class="sj-nav-links" aria-label="官网导航">
+      <a href="#demo">真机体验</a>
+      <a href="#features">功能亮点</a>
+      <a href="#guard">隐私安全</a>
+      <a href="#faq">常见问题</a>
+    </nav>
+    <div class="sj-nav-acts">
+      <button class="sj-theme-btn sj-theme-btn-nav" id="sjThemeBtn" data-set-theme="bear" aria-label="切换主题" title="切换小熊 / 小鸭主题">
+        <span class="sj-theme-dot sj-dot-bear"></span>
+        <span class="sj-theme-dot sj-dot-duck"></span>
+      </button>
+      <a href="#download" class="sj-btn sj-btn-primary sj-btn-sm">立即下载</a>
+      <button class="sj-burger" id="sjBurger" aria-label="打开菜单" aria-expanded="false" aria-controls="sjDrawer">
+        <i></i><i></i><i></i>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- 移动端抽屉 -->
+<div class="sj-drawer" id="sjDrawer" aria-hidden="true">
+  <div class="sj-drawer-mask" id="sjDrawerMask"></div>
+  <nav class="sj-drawer-panel">
+    <a href="#demo">真机体验</a>
+    <a href="#features">功能亮点</a>
+    <a href="#flow">记录流程</a>
+    <a href="#guard">隐私安全</a>
+    <a href="#faq">常见问题</a>
+    <a href="#download" class="sj-drawer-cta">下载 App</a>
+  </nav>
+</div>
+
+<main id="top">
+
+<!-- ============ 主视觉 ============ -->
+<section class="sj-hero">
+  <div class="sj-wrap sj-hero-grid">
+
+    <div class="sj-hero-copy">
+      <p class="sj-pill"><span class="sj-dot"></span>0–1 岁 · 全家协同记录</p>
+
+      <h1 class="sj-h1" id="sjHeadline">把宝宝的<span class="sj-hl">第一次</span>，<br>记成一辈子的珍藏</h1>
+
+      <p class="sj-lead">喂奶、哄睡、翻身、第一声「妈妈」——点一下就记下来。</p>
+
+      <div class="sj-cta-row">
+        <button class="sj-btn sj-btn-primary sj-btn-lg" data-store="android">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 9v9a1 1 0 0 0 1 1h1v3a1.5 1.5 0 0 0 3 0v-3h2v3a1.5 1.5 0 0 0 3 0v-3h1a1 1 0 0 0 1-1V9H6zM3 9a1.5 1.5 0 0 1 3 0v5a1.5 1.5 0 0 1-3 0V9zm18 0a1.5 1.5 0 0 0-3 0v5a1.5 1.5 0 0 0 3 0V9zM7.5 3.7 6.2 2.4a.4.4 0 0 1 0-.6.4.4 0 0 1 .6 0L8.4 3.1A6.9 6.9 0 0 1 12 2.2c1.3 0 2.5.3 3.6.9l1.6-1.3a.4.4 0 0 1 .6 0 .4.4 0 0 1 .6 0l.3.4A5.8 5.8 0 0 1 19 8H5a5.8 5.8 0 0 1 2.5-4.3zM9.5 6a.8.8 0 1 0 0-1.6.8.8 0 0 0 0 1.6zm5 0a.8.8 0 1 0 0-1.6.8.8 0 0 0 0 1.6z"/></svg>
+          <span>Android 下载</span>
+          <i class="sj-ver">v1.0.0</i>
+        </button>
+        <button class="sj-btn sj-btn-ghost sj-btn-lg" data-store="ios">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9C6.9 6.7 5.3 7.9 4.5 9.6c-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.4 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.2 0 2-1.1 2.8-2.3.9-1.3 1.2-2.6 1.3-2.6-.1 0-2.4-1-2.4-3.8zM15 6.1c.6-.8 1-1.8.9-2.9-.9 0-2 .6-2.6 1.4-.6.6-1 1.7-.9 2.7 1 .1 2-.5 2.6-1.2z"/></svg>
+          <span>iOS 下载</span>
+        </button>
+      </div>
+
+      <ul class="sj-trust">
+        <li><i></i>免费 · 无广告</li>
+        <li><i></i>换机不丢</li>
+        <li><i></i>数据可导出</li>
+        <li><i></i>无第三方统计 SDK</li>
+      </ul>
+
+      <div class="sj-theme-switch" role="group" aria-label="主题切换">
+        <button class="sj-theme-btn active" data-set-theme="bear"><span class="sj-theme-dot sj-dot-bear"></span>小熊 · 蜂蜜暖棕</button>
+        <button class="sj-theme-btn" data-set-theme="duck"><span class="sj-theme-dot sj-dot-duck"></span>小鸭 · 奶油明黄</button>
+      </div>
+    </div>
+
+    <div class="sj-hero-visual">
+      <!-- 吉祥物 -->
+      <div class="sj-mascots" id="sjMascots">
+        <svg class="sj-mascot sj-mascot-bear" viewBox="0 0 140 140" role="img" aria-label="吉祥物小熊岁岁">
+          <g class="sj-float">
+            <g class="sj-ear"><circle cx="34" cy="38" r="20" fill="#D99E63" stroke="#6B4A3A" stroke-width="5"/><circle cx="34" cy="38" r="9" fill="#F7B8C4"/></g>
+            <g class="sj-ear"><circle cx="106" cy="38" r="20" fill="#D99E63" stroke="#6B4A3A" stroke-width="5"/><circle cx="106" cy="38" r="9" fill="#F7B8C4"/></g>
+            <circle cx="70" cy="80" r="47" fill="#D99E63" stroke="#6B4A3A" stroke-width="5"/>
+            <ellipse cx="70" cy="94" rx="22" ry="16" fill="#F7E3C8"/>
+            <g class="sj-eye-track"><g class="sj-eyes"><circle cx="52" cy="72" r="5.5" fill="#4A3226"/><circle cx="88" cy="72" r="5.5" fill="#4A3226"/></g></g>
+            <ellipse cx="70" cy="88" rx="7" ry="5" fill="#6B4A3A"/>
+            <path d="M70 93 q0 6 -7 7 M70 93 q0 6 7 7" stroke="#6B4A3A" stroke-width="3" fill="none" stroke-linecap="round"/>
+            <ellipse cx="38" cy="86" rx="8" ry="5" fill="#F9A8B8" opacity=".85"/>
+            <ellipse cx="102" cy="86" rx="8" ry="5" fill="#F9A8B8" opacity=".85"/>
+          </g>
+        </svg>
+        <svg class="sj-mascot sj-mascot-duck" viewBox="0 0 140 140" role="img" aria-label="吉祥物小鸭叽叽">
+          <g class="sj-float">
+            <path class="sj-tuft" d="M62 34 q4 -16 16 -18 q-4 10 2 16" fill="#FFD85C" stroke="#D98E1F" stroke-width="5" stroke-linecap="round"/>
+            <circle cx="70" cy="80" r="46" fill="#FFD85C" stroke="#D98E1F" stroke-width="5"/>
+            <g class="sj-eye-track"><g class="sj-eyes"><circle cx="54" cy="72" r="5.5" fill="#4A3226"/><circle cx="86" cy="72" r="5.5" fill="#4A3226"/></g></g>
+            <path d="M52 86 q18 -10 36 0 q-4 14 -18 14 q-14 0 -18 -14Z" fill="#FF9E4A" stroke="#D98E1F" stroke-width="4" stroke-linejoin="round"/>
+            <ellipse cx="38" cy="84" rx="8" ry="5" fill="#F9A8B8" opacity=".85"/>
+            <ellipse cx="102" cy="84" rx="8" ry="5" fill="#F9A8B8" opacity=".85"/>
+          </g>
+        </svg>
+      </div>
+
+      <!-- Hero 手机（轻量演示） -->
+      <div class="sj-hero-phone" id="sjHeroPhone">
+        <div class="sj-hp-frame">
+          <div class="sj-hp-notch"></div>
+          <div class="sj-hp-screen">
+            <div class="sj-hp-status"><span id="sjHeroClock">9:41</span><span class="sj-hp-sig"><i></i><i></i><i></i></span></div>
+            <div class="sj-hp-body">
+              <div class="sj-hp-head">
+                <span class="sj-hp-ava"><img data-ic="29-fn-babies" src="assets/icons/bear/29-fn-babies.png" alt=""></span>
+                <span><b>安安</b><small>8 个月 12 天</small></span>
+                <span class="sj-hp-chip" id="sjHeroCount">今日 3 条</span>
+              </div>
+              <div class="sj-hp-timeline" id="sjHeroTimeline">
+                <div class="sj-hp-row"><img data-ic="02-sleep" src="assets/icons/bear/02-sleep.png" alt=""><span><b>夜间安睡</b><small>昨晚 21:30</small></span><i>爸爸记</i></div>
+                <div class="sj-hp-row"><img data-ic="01-feeding" src="assets/icons/bear/01-feeding.png" alt=""><span><b>母乳 15 分钟</b><small>今天 09:10</small></span><i>妈妈记</i></div>
+                <div class="sj-hp-row"><img data-ic="03-milestone" src="assets/icons/bear/03-milestone.png" alt=""><span><b>会独坐了</b><small>今天 10:20</small></span><i>已达成</i></div>
+              </div>
+            </div>
+            <button class="sj-hp-fab" id="sjHeroFab" aria-label="快速记录">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14M12 5v14"/></svg>
+            </button>
+          </div>
+        </div>
+        <!-- 漂浮小卡 -->
+        <div class="sj-hp-chip-float sj-hf1"><img data-ic="03-milestone" src="assets/icons/bear/03-milestone.png" alt=""><span>会独坐了</span></div>
+        <div class="sj-hp-chip-float sj-hf2"><img data-ic="02-sleep" src="assets/icons/bear/02-sleep.png" alt=""><span>睡 11 小时</span></div>
+        <div class="sj-hp-chip-float sj-hf3"><img data-ic="05-measure" src="assets/icons/bear/05-measure.png" alt=""><span>体重 P58</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 记录类型走马灯 ============ -->
+<section class="sj-marquee" aria-label="支持的记录类型">
+  <div class="sj-marquee-track" id="sjMarquee">
+    <div class="sj-mq-group">
+      <span class="sj-mq-item"><img data-ic="01-feeding" src="assets/icons/bear/01-feeding.png" alt="">喂养</span>
+      <span class="sj-mq-item"><img data-ic="02-sleep" src="assets/icons/bear/02-sleep.png" alt="">睡眠</span>
+      <span class="sj-mq-item"><img data-ic="03-milestone" src="assets/icons/bear/03-milestone.png" alt="">里程碑</span>
+      <span class="sj-mq-item"><img data-ic="04-photo" src="assets/icons/bear/04-photo.png" alt="">照片视频</span>
+      <span class="sj-mq-item"><img data-ic="05-measure" src="assets/icons/bear/05-measure.png" alt="">身高体重</span>
+      <span class="sj-mq-item"><img data-ic="09-voice" src="assets/icons/bear/09-voice.png" alt="">语音记录</span>
+      <span class="sj-mq-item"><img data-ic="20-fn-diary" src="assets/icons/bear/20-fn-diary.png" alt="">成长日记</span>
+      <span class="sj-mq-item"><img data-ic="21-fn-remind" src="assets/icons/bear/21-fn-remind.png" alt="">疫苗提醒</span>
+      <span class="sj-mq-item"><img data-ic="28-fn-invite" src="assets/icons/bear/28-fn-invite.png" alt="">全家邀请</span>
+      <span class="sj-mq-item"><img data-ic="26-fn-export" src="assets/icons/bear/26-fn-export.png" alt="">数据导出</span>
+    </div>
+    <div class="sj-mq-group" aria-hidden="true">
+      <span class="sj-mq-item"><img data-ic="01-feeding" src="assets/icons/bear/01-feeding.png" alt="">喂养</span>
+      <span class="sj-mq-item"><img data-ic="02-sleep" src="assets/icons/bear/02-sleep.png" alt="">睡眠</span>
+      <span class="sj-mq-item"><img data-ic="03-milestone" src="assets/icons/bear/03-milestone.png" alt="">里程碑</span>
+      <span class="sj-mq-item"><img data-ic="04-photo" src="assets/icons/bear/04-photo.png" alt="">照片视频</span>
+      <span class="sj-mq-item"><img data-ic="05-measure" src="assets/icons/bear/05-measure.png" alt="">身高体重</span>
+      <span class="sj-mq-item"><img data-ic="09-voice" src="assets/icons/bear/09-voice.png" alt="">语音记录</span>
+      <span class="sj-mq-item"><img data-ic="20-fn-diary" src="assets/icons/bear/20-fn-diary.png" alt="">成长日记</span>
+      <span class="sj-mq-item"><img data-ic="21-fn-remind" src="assets/icons/bear/21-fn-remind.png" alt="">疫苗提醒</span>
+      <span class="sj-mq-item"><img data-ic="28-fn-invite" src="assets/icons/bear/28-fn-invite.png" alt="">全家邀请</span>
+      <span class="sj-mq-item"><img data-ic="26-fn-export" src="assets/icons/bear/26-fn-export.png" alt="">数据导出</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 真机体验 ============ -->
+<section class="sj-sec" id="demo">
+  <div class="sj-wrap">
+    <header class="sj-sec-head sj-reveal">
+      <h2>这是一台<span class="sj-hl">真的</span>手机</h2>
+      <p>不是截图，可以随便点。</p>
+    </header>
+
+    <div class="sj-demo">
+      <div class="sj-demo-stage" id="sjDemoStage">
+        <div class="sj-demo-scale" id="sjDemoScale">
+          <div class="phone-frame">
+            <div class="phone-notch"></div>
+            <div class="phone-screen" id="phoneScreen">
+
+              <div class="statusbar"><span id="sbClock">9:41</span><span class="sb-right"><i></i><i></i><i></i></span></div>
+
+              <!-- P01 时光轴 -->
+              <section class="scr scr-active" data-scr="home">
+                <header class="appbar">
+                  <div class="baby-wrap">
+                    <button class="baby-chip" id="babyChip">
+                      <span class="baby-avatar"><img data-ic="29-fn-babies" src="assets/icons/bear/29-fn-babies.png" alt=""></span>
+                      <span class="baby-name" id="babyName">安安<b>8 个月 12 天</b></span>
+                      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </button>
+                    <div class="baby-menu" id="babyMenu">
+                      <button class="bm-item bm-on" data-baby="安安" data-age="8 个月 12 天" data-short="8月12天"><span class="bm-ava"><img data-ic="29-fn-babies" src="assets/icons/bear/29-fn-babies.png" alt=""></span>安安<em>8月12天</em></button>
+                      <button class="bm-item" data-baby="朵朵" data-age="3 个月 5 天" data-short="3月5天"><span class="bm-ava"><img data-ic="29-fn-babies" src="assets/icons/bear/29-fn-babies.png" alt=""></span>朵朵<em>3月5天</em></button>
+                      <button class="bm-item bm-add" data-baby="__add"><span class="bm-ava bm-plus">+</span>添加宝宝</button>
+                    </div>
+                  </div>
+                  <button class="sync-chip" id="syncChip" title="云端同步">
+                    <svg class="ic ic-sync" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><path d="M12 12v6"/><path d="m9.5 14.5 2.5-2.5 2.5 2.5"/></svg>
+                    <span id="syncTxt">已同步</span>
+                  </button>
+                </header>
+
+                <div class="today-strip">
+                  <div class="today-txt"><b>下午好，安安妈妈</b><span>今天已记录 <b class="cnt" id="recCount">24</b> 条 · 继续加油鸭</span></div>
+                  <svg class="peek-mascot" viewBox="0 0 60 60" aria-hidden="true"><circle cx="18" cy="16" r="8" fill="#D99E63" stroke="#6B4A3A" stroke-width="3"/><circle cx="42" cy="16" r="8" fill="#D99E63" stroke="#6B4A3A" stroke-width="3"/><circle cx="30" cy="34" r="20" fill="#D99E63" stroke="#6B4A3A" stroke-width="3"/><circle cx="24" cy="31" r="2.6" fill="#4A3226"/><circle cx="36" cy="31" r="2.6" fill="#4A3226"/><ellipse cx="30" cy="38" rx="6" ry="4.5" fill="#F7E3C8"/><ellipse cx="30" cy="37" rx="2.4" ry="1.8" fill="#6B4A3A"/></svg>
+                </div>
+
+                <div class="day-summary">
+                  <span class="ds-chip" style="--cc:#F7A15C"><img data-ic="01-feeding" src="assets/icons/bear/01-feeding.png" alt="">6 次喂奶</span>
+                  <span class="ds-chip" style="--cc:#8FA8DC"><img data-ic="02-sleep" src="assets/icons/bear/02-sleep.png" alt="">11h23m 睡眠</span>
+                  <span class="ds-chip" style="--cc:#5FC08C"><img data-ic="05-measure" src="assets/icons/bear/05-measure.png" alt="">8.2kg</span>
+                </div>
+
+                <div class="date-row"><i></i><span>今天 · 10 月 26 日 周日</span><i></i></div>
+
+                <div class="timeline" id="timeline">
+                  <div class="rec-card" style="--rc:#F7A15C;--rs:#FFEBD8">
+                    <img class="rec-ic" data-ic="01-feeding" src="assets/icons/bear/01-feeding.png" alt="">
+                    <div class="rec-info"><b>母乳亲喂</b><span>左乳 · 15 分钟 · 计时结束</span></div>
+                    <time>08:20</time>
+                  </div>
+                  <div class="rec-card" style="--rc:#8FA8DC;--rs:#E9EEFB">
+                    <img class="rec-ic" data-ic="02-sleep" src="assets/icons/bear/02-sleep.png" alt="">
+                    <div class="rec-info"><b>小睡</b><span>09:10 – 10:35 · 质量不错</span></div>
+                    <time>09:10</time>
+                  </div>
+                  <div class="rec-card" style="--rc:#C49066;--rs:#F5E9DC">
+                    <img class="rec-ic" data-ic="06-poop" src="assets/icons/bear/06-poop.png" alt="">
+                    <div class="rec-info"><b>便便</b><span>金黄色糊状 · 性状正常</span></div>
+                    <time>11:02</time>
+                  </div>
+                  <div class="rec-card" style="--rc:#FF7B6B;--rs:#FFE7E2">
+                    <img class="rec-ic" data-ic="07-temp" src="assets/icons/bear/07-temp.png" alt="">
+                    <div class="rec-info"><b>体温</b><span>36.8 ℃ · 腋温 · 正常</span></div>
+                    <time>12:15</time>
+                  </div>
+                  <div class="rec-card rec-milestone" id="milestoneCard" style="--rc:#F5B32C;--rs:#FFF3C4" title="点我庆祝">
+                    <img class="rec-ic" data-ic="03-milestone" src="assets/icons/bear/03-milestone.png" alt="">
+                    <div class="rec-info"><b>人生第一次爬行！</b><span>里程碑 · 连续爬过整个客厅</span></div>
+                    <span class="ms-badge">14:00 · 点击庆祝</span>
+                  </div>
+                  <div class="rec-card rec-ongoing" style="--rc:#8FA8DC;--rs:#E9EEFB">
+                    <img class="rec-ic" data-ic="02-sleep" src="assets/icons/bear/02-sleep.png" alt="">
+                    <div class="rec-info"><b>午睡中<span class="zzz"><i>z</i><i>z</i><i>z</i></span></b><span class="ongoing-dot">进行中 <b id="sleepTimer">00:42:15</b></span></div>
+                    <time>15:30</time>
+                  </div>
+                  <div class="rec-card" id="voiceCard" style="--rc:#6FBDE0;--rs:#E4F3FB" title="点我播放">
+                    <img class="rec-ic" data-ic="09-voice" src="assets/icons/bear/09-voice.png" alt="">
+                    <div class="rec-info"><b>语音速记</b><span>「咿呀呀」叫了 8 秒 · 0:08 <span class="wave"><i></i><i></i><i></i><i></i><i></i></span></span></div>
+                    <time>16:05</time>
+                  </div>
+                </div>
+              </section>
+
+              <!-- P02 成长中心 -->
+              <section class="scr" data-scr="growth">
+                <header class="appbar appbar-plain"><h2>成长中心</h2></header>
+                <div class="grow-card gc-curve">
+                  <div class="gc-head"><b>体重曲线</b><span>对照 WHO P3–P97</span></div>
+                  <svg class="curve" viewBox="0 0 320 150" aria-label="体重生长曲线">
+                    <defs><linearGradient id="bandG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7A15C" stop-opacity=".22"/><stop offset="1" stop-color="#F7A15C" stop-opacity=".08"/></linearGradient></defs>
+                    <path d="M10 128 C 90 118 190 92 310 58 L310 18 C 190 44 90 74 10 96 Z" fill="url(#bandG)"/>
+                    <path d="M10 112 C 90 100 190 72 310 40" fill="none" stroke="#F7A15C" stroke-width="2" stroke-dasharray="5 5" opacity=".6"/>
+                    <polyline class="curve-line" points="18,118 66,104 114,94 162,84 210,76 258,68 300,60" fill="none" stroke="#E07E33" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <g class="curve-dots"><circle cx="18" cy="118" r="4"/><circle cx="66" cy="104" r="4"/><circle cx="114" cy="94" r="4"/><circle cx="162" cy="84" r="4"/><circle cx="210" cy="76" r="4"/><circle cx="258" cy="68" r="4"/></g>
+                    <circle class="curve-now" cx="300" cy="60" r="6"/>
+                    <text x="300" y="46" text-anchor="middle" class="curve-tag">8.2kg</text>
+                  </svg>
+                  <div class="gc-foot"><span>3月龄</span><span>6月龄</span><span>9月龄</span></div>
+                </div>
+
+                <div class="grow-card gc-ms">
+                  <div class="gc-head"><b>里程碑历程</b><span>已达成 6 项</span></div>
+                  <div class="ms-grid">
+                    <span class="ms-chip done"><img data-ic="03-milestone" src="assets/icons/bear/03-milestone.png" alt="">翻身 · 4月</span>
+                    <span class="ms-chip done"><img data-ic="03-milestone" src="assets/icons/bear/03-milestone.png" alt="">独坐 · 6月</span>
+                    <span class="ms-chip new" id="msCrawl"><img data-ic="03-milestone" src="assets/icons/bear/03-milestone.png" alt="">爬行 · 本月</span>
+                    <span class="ms-chip todo"><img data-ic="03-milestone" src="assets/icons/bear/03-milestone.png" alt="">扶站 · 待解锁</span>
+                  </div>
+                </div>
+
+                <div class="entry-grid">
+                  <button class="entry-card" style="--ec:#E86FA0" data-goto="diary"><img data-ic="20-fn-diary" src="assets/icons/bear/20-fn-diary.png" alt=""><b>成长日记</b><span>AI 帮写 · 3 篇草稿</span></button>
+                  <button class="entry-card" style="--ec:#F5B32C" data-goto="milestone"><img data-ic="03-milestone" src="assets/icons/bear/03-milestone.png" alt=""><b>里程碑清单</b><span>5 领域 · 8/23 达成</span></button>
+                  <button class="entry-card" style="--ec:#6FBDE0" data-goto="curve"><img data-ic="05-measure" src="assets/icons/bear/05-measure.png" alt=""><b>生长曲线</b><span>身高 P62 · 体重 P58</span></button>
+                  <button class="entry-card" style="--ec:#5FC08C" data-goto="vaccine"><img data-ic="34-fn-vaccine" src="assets/icons/bear/34-fn-vaccine.png" alt=""><b>疫苗时间表</b><span>本周 1 剂到龄</span></button>
+                </div>
+              </section>
+
+              <!-- P03 家庭中心 -->
+              <section class="scr" data-scr="family">
+                <header class="appbar appbar-plain"><h2>家庭中心</h2><span class="fam-tag">安安的小家 · 4 人</span></header>
+
+                <div class="member-grid">
+                  <div class="member-card" style="--mc:#F7A15C">
+                    <svg class="avatar" viewBox="0 0 56 56"><circle cx="15" cy="15" r="7" fill="#D99E63" stroke="#6B4A3A" stroke-width="2.5"/><circle cx="41" cy="15" r="7" fill="#D99E63" stroke="#6B4A3A" stroke-width="2.5"/><circle cx="28" cy="31" r="18" fill="#D99E63" stroke="#6B4A3A" stroke-width="2.5"/><circle cx="22" cy="28" r="2.2" fill="#4A3226"/><circle cx="34" cy="28" r="2.2" fill="#4A3226"/><ellipse cx="28" cy="36" rx="5" ry="3.6" fill="#F7E3C8"/><ellipse cx="28" cy="35" rx="2" ry="1.4" fill="#6B4A3A"/></svg>
+                    <b>妈妈</b><span class="role role-owner">创建者</span>
+                  </div>
+                  <div class="member-card" style="--mc:#F5B32C">
+                    <svg class="avatar" viewBox="0 0 56 56"><path d="M25 12 q2 -7 8 -8 q-2 5 1 8" fill="#FFD85C" stroke="#D98E1F" stroke-width="2.5" stroke-linecap="round"/><circle cx="28" cy="31" r="18" fill="#FFD85C" stroke="#D98E1F" stroke-width="2.5"/><circle cx="22" cy="27" r="2.2" fill="#4A3226"/><circle cx="34" cy="27" r="2.2" fill="#4A3226"/><path d="M21 34 q7 -4 14 0 q-2 6 -7 6 q-5 0 -7 -6Z" fill="#FF9E4A" stroke="#D98E1F" stroke-width="2"/></svg>
+                    <b>爸爸</b><span class="role role-edit">成员</span>
+                  </div>
+                  <div class="member-card" style="--mc:#FF8FAB">
+                    <svg class="avatar" viewBox="0 0 56 56"><ellipse cx="20" cy="12" rx="5" ry="11" fill="#FFF" stroke="#B98A96" stroke-width="2.5"/><ellipse cx="36" cy="12" rx="5" ry="11" fill="#FFF" stroke="#B98A96" stroke-width="2.5"/><circle cx="28" cy="33" r="17" fill="#FFF" stroke="#B98A96" stroke-width="2.5"/><circle cx="22" cy="30" r="2.2" fill="#4A3226"/><circle cx="34" cy="30" r="2.2" fill="#4A3226"/><ellipse cx="28" cy="37" rx="3" ry="2" fill="#F9A8B8"/></svg>
+                    <b>外婆</b><span class="role role-view">只读</span>
+                  </div>
+                  <div class="member-card member-add" style="--mc:#5FC08C">
+                    <span class="add-plus"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h14M12 5v14"/></svg></span>
+                    <b>邀请家人</b><span class="role role-invite">链接 / 二维码</span>
+                  </div>
+                </div>
+
+                <div class="fam-feed">
+                  <h3>家庭动态</h3>
+                  <div class="feed-item"><img data-ic="04-photo" src="assets/icons/bear/04-photo.png" alt=""><p><b>爸爸</b> 上传了 6 张「公园散步」照片</p><time>10 分钟前</time></div>
+                  <div class="feed-item"><img data-ic="08-med" src="assets/icons/bear/08-med.png" alt=""><p><b>妈妈</b> 记录了维生素 D 400IU</p><time>1 小时前</time></div>
+                  <div class="feed-item"><img data-ic="34-fn-vaccine" src="assets/icons/bear/34-fn-vaccine.png" alt=""><p><b>岁记</b> 提醒：下周二手足口疫苗第 1 针</p><time>今天 08:00</time></div>
+                </div>
+
+                <div class="fam-entries">
+                  <button class="entry-card" style="--ec:#A994D8" data-goto="privacy"><img data-ic="35-fn-audit" src="assets/icons/bear/35-fn-audit.png" alt=""><b>操作留痕</b><span>谁记的 · 谁改的</span></button>
+                  <button class="entry-card" style="--ec:#FF8FAB" data-goto="privacy"><img data-ic="28-fn-invite" src="assets/icons/bear/28-fn-invite.png" alt=""><b>健康日志可见性</b><span>按成员单独开关</span></button>
+                </div>
+              </section>
+
+              <!-- P04 我的 -->
+              <section class="scr" data-scr="me">
+                <header class="appbar appbar-plain"><h2>我的</h2></header>
+                <div class="me-profile">
+                  <span class="me-avatar"><img data-ic="29-fn-babies" src="assets/icons/bear/29-fn-babies.png" alt=""></span>
+                  <div class="me-txt"><b>安安 &amp; 妹妹朵朵</b><span>2 个宝宝档案 · 云端家庭版</span></div>
+                  <span class="me-vip">家庭版</span>
+                </div>
+                <div class="set-group">
+                  <h3>记录与提醒</h3>
+                  <button class="set-row" data-goto="vaccine"><img data-ic="21-fn-remind" src="assets/icons/bear/21-fn-remind.png" alt=""><span>喂养 / 用药 / 疫苗提醒</span><svg class="ic chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+                  <button class="set-row" data-goto="vaccine"><img data-ic="34-fn-vaccine" src="assets/icons/bear/34-fn-vaccine.png" alt=""><span>疫苗接种计划</span><em class="set-tag warn">3 天后</em><svg class="ic chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+                  <button class="set-row" data-goto="diary"><img data-ic="20-fn-diary" src="assets/icons/bear/20-fn-diary.png" alt=""><span>AI 成长日记</span><em class="set-tag">3 篇草稿</em><svg class="ic chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+                </div>
+                <div class="set-group">
+                  <h3>数据与安全</h3>
+                  <button class="set-row" data-goto="privacy"><img data-ic="22-fn-backup" src="assets/icons/bear/22-fn-backup.png" alt=""><span>云端备份</span><em class="set-tag ok">已同步</em><svg class="ic chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+                  <button class="set-row" data-goto="privacy"><img data-ic="26-fn-export" src="assets/icons/bear/26-fn-export.png" alt=""><span>导出成长档案 PDF</span><svg class="ic chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+                  <button class="set-row" data-goto="privacy"><img data-ic="23-fn-privacy" src="assets/icons/bear/23-fn-privacy.png" alt=""><span>隐私与安全</span><svg class="ic chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+                  <button class="set-row"><img data-ic="27-fn-trash" src="assets/icons/bear/27-fn-trash.png" alt=""><span>回收站</span><em class="set-tag">2 条</em><svg class="ic chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+                </div>
+                <div class="set-group">
+                  <h3>贴心功能</h3>
+                  <button class="set-row" id="elderEntry"><img data-ic="30-fn-elder" src="assets/icons/bear/30-fn-elder.png" alt=""><span>长辈模式（大字版）</span><em class="set-tag ok">点我体验</em><svg class="ic chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+                  <button class="set-row"><img data-ic="24-fn-search" src="assets/icons/bear/24-fn-search.png" alt=""><span>搜索全部记录</span><svg class="ic chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+                </div>
+              </section>
+
+              <!-- P09 记录录入 -->
+              <section class="scr" data-scr="record">
+                <div class="pg-back"><span class="bk" data-goto="home"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></span><h2>添加记录</h2><span style="font-size:11px;color:var(--sub)">安安 · 8月12天</span></div>
+                <div class="pg-chips" id="pgTypes">
+                  <i class="pg-type on" data-t="feeding">喂奶</i><i class="pg-type" data-t="sleep">睡眠</i><i class="pg-type" data-t="milestone">里程碑</i><i class="pg-type" data-t="measure">测量</i><i class="pg-type" data-t="poop">便便</i><i class="pg-type" data-t="temp">体温</i><i class="pg-type" data-t="med">用药</i><i class="pg-type" data-t="photo">照片</i><i class="pg-type" data-t="mood">心情</i><i class="pg-type" data-t="voice">语音</i>
+                </div>
+                <div class="pg-form on" data-f="feeding">
+                  <div class="pg-seg"><i class="on">亲喂</i><i>瓶喂</i><i>辅食</i></div>
+                  <div class="grow-card" style="text-align:center">
+                    <b style="font-family:var(--font-display);font-size:34px;color:var(--primary-deep)" id="feedTimer">12:45</b>
+                    <div style="font-size:11px;color:var(--sub);margin:2px 0 12px">亲喂计时中 · 退出页面自动保存</div>
+                    <span class="pg-btn ghost" style="width:auto;display:inline-block;padding:9px 30px;font-size:12.5px" data-cutoast="喂奶结束，已记入时光轴">结束喂奶</span>
+                  </div>
+                  <div class="pg-chips"><i class="on">左侧</i><i>右侧</i><i>双侧</i></div>
+                  <div class="pg-hint">瓶喂默认带入上次奶量 120ml，可修改</div>
+                </div>
+                <div class="pg-form" data-f="sleep">
+                  <div class="pg-field"><label>入睡</label><span class="val">20:32</span><span class="unit">点击修改</span></div>
+                  <div class="pg-field"><label>醒来</label><span class="val" style="color:var(--c-sleep)">进行中…</span><span class="pg-sw on"></span></div>
+                  <div class="pg-hint">支持手动录入或计时；跨日睡眠按日切分统计</div>
+                </div>
+                <div class="pg-form" data-f="milestone">
+                  <div class="pg-field"><label>标题</label><span class="val">第一次独坐</span></div>
+                  <div class="pg-sec">发育领域</div>
+                  <div class="pg-chips"><i class="on">大运动</i><i>精细动作</i><i>语言</i><i>认知</i><i>社交</i></div>
+                  <div class="pg-hint ok">参考月龄 6–9 个月 · 保存后触发全屏庆祝与纪念卡</div>
+                </div>
+                <div class="pg-form" data-f="measure">
+                  <div class="pg-field"><label>身高</label><span class="val">68.5</span><span class="unit">cm</span></div>
+                  <div class="pg-field"><label>体重</label><span class="val" style="color:var(--bad)">15.2</span><span class="unit">kg</span></div>
+                  <div class="pg-hint bad">体重超出 8 月龄常见范围（4.9–10.5kg），请复核后再保存</div>
+                  <div class="pg-field"><label>头围</label><span class="val">43.0</span><span class="unit">cm</span></div>
+                  <div class="pg-field"><label>关联体检</label><span class="val" style="font-size:12px">社区卫生服务中心 · 9 月体检</span></div>
+                </div>
+                <div class="pg-form" data-f="poop">
+                  <div class="pg-sec">颜色</div>
+                  <div class="pg-chips"><i class="on">金黄</i><i>绿色</i><i>棕色</i><i>其他</i></div>
+                  <div class="pg-sec">性状</div>
+                  <div class="pg-chips"><i class="on">糊状</i><i>水样</i><i>蛋花汤样</i><i>干硬</i></div>
+                  <div class="pg-field"><span class="pg-ck">+</span><span class="val ph" style="font-size:12.5px">标记为异常（仅记录，不做医学解读）</span></div>
+                </div>
+                <div class="pg-form" data-f="temp">
+                  <div class="pg-field"><label>腋温</label><span class="val">36.8</span><span class="unit">℃</span></div>
+                  <div class="pg-hint ok">正常 · 36.0–37.3℃ 显示绿色徽章</div>
+                  <div class="pg-hint">≥38℃ 时仅显示固定文案「建议咨询医生」，不做诊断</div>
+                </div>
+                <div class="pg-form" data-f="med">
+                  <div class="pg-field"><label>药品</label><span class="val">维生素 D3</span></div>
+                  <div class="pg-field"><label>剂量</label><span class="val">400 IU</span></div>
+                  <div class="pg-field"><label>时间</label><span class="val">09:00</span></div>
+                  <div class="pg-field"><label>原因</label><span class="val ph">备注（可选）</span></div>
+                  <div class="pg-hint">自动关联既往用药记录，方便查看疗程</div>
+                </div>
+                <div class="pg-form" data-f="photo">
+                  <div class="pg-grid3">
+                    <span class="pg-photo pgf1">10-25 草地<img data-ic="04-photo" src="assets/icons/bear/04-photo.png" alt=""></span>
+                    <span class="pg-photo pgf4">10-24 洗澡<img data-ic="04-photo" src="assets/icons/bear/04-photo.png" alt=""></span>
+                    <span class="pg-photo" style="border:2px dashed var(--line);background:var(--cream);color:var(--faint);font-size:22px">+</span>
+                  </div>
+                  <div class="pg-hint">单条 ≤9 图或 ≤3 视频 · 原图是否上云由你决定（P25）</div>
+                </div>
+                <div class="pg-form" data-f="mood">
+                  <div class="grow-card" style="min-height:96px">
+                    <b style="font-size:13.5px;line-height:1.6">安安今天对着岁岁玩偶咧嘴笑了很久。</b>
+                    <div style="font-size:10.5px;color:var(--faint);margin-top:8px;text-align:right">0 / 200 字</div>
+                  </div>
+                  <div class="pg-chips"><i>开心</i><i class="on">惊喜</i><i>平静</i><i>担忧</i></div>
+                </div>
+                <div class="pg-form" data-f="voice">
+                  <div class="vi-timer" style="font-size:26px;margin-top:12px">0:07</div>
+                  <div class="vi-wave live" style="height:40px;margin:6px 0 10px">
+                    <i style="height:10px;animation-delay:0s"></i><i style="height:20px;animation-delay:.1s"></i><i style="height:14px;animation-delay:.2s"></i><i style="height:30px;animation-delay:.05s"></i><i style="height:18px;animation-delay:.25s"></i><i style="height:36px;animation-delay:.15s"></i><i style="height:14px;animation-delay:.3s"></i><i style="height:26px;animation-delay:.08s"></i><i style="height:10px;animation-delay:.22s"></i><i style="height:32px;animation-delay:.12s"></i><i style="height:16px;animation-delay:.28s"></i><i style="height:22px;animation-delay:.04s"></i>
+                  </div>
+                  <div class="vi-live"><span class="vi-tag">实时转写</span>安安对着岁岁玩偶「咿呀呀」叫了 3 声<span class="vi-caret"></span></div>
+                  <div class="pg-hint" style="margin-top:14px">三态闭环：待机 → 录音（计时 + 波形 + 实时转写）→ 预览（试听 / 改文字 / 打标签）</div>
+                </div>
+                <div class="pg-field" id="pgBackfill"><label>补录</label><span class="val" style="font-size:12px;color:var(--sub)">改历史时间后自动加「补记」角标</span><span class="pg-sw"></span></div>
+                <button class="pg-btn" id="pgSave">保存记录</button>
+              </section>
+
+              <!-- P12 里程碑清单 -->
+              <section class="scr" data-scr="milestone">
+                <div class="pg-back"><span class="bk" data-goto="growth"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></span><h2>里程碑清单</h2><span style="font-size:11px;color:var(--sub)">8/23 已达成</span></div>
+                <div class="pg-sec">大运动</div>
+                <div class="ms-grid">
+                  <span class="ms-chip done"><img data-ic="03-milestone" src="assets/icons/bear/03-milestone.png" alt="">翻身<span style="margin-left:auto;font-size:9px;opacity:.75">4–6月</span></span>
+                  <span class="ms-chip done"><img data-ic="03-milestone" src="assets/icons/bear/03-milestone.png" alt="">独坐<span style="margin-left:auto;font-size:9px;opacity:.75">6–9月</span></span>
+                  <span class="ms-chip new"><img data-ic="03-milestone" src="assets/icons/bear/03-milestone.png" alt="">爬行<span style="margin-left:auto;font-size:9px">7–10月</span></span>
+                  <span class="ms-chip todo"><img data-ic="03-milestone" src="assets/icons/bear/03-milestone.png" alt="">扶站<span style="margin-left:auto;font-size:9px;opacity:.75">9–12月</span></span>
+                </div>
+                <div class="pg-sec">精细动作</div>
+                <div class="ms-grid">
+                  <span class="ms-chip done"><img data-ic="03-milestone" src="assets/icons/bear/03-milestone.png" alt="">抓握<span style="margin-left:auto;font-size:9px;opacity:.75">3–5月</span></span>
+                  <span class="ms-chip todo"><img data-ic="03-milestone" src="assets/icons/bear/03-milestone.png" alt="">捏取<span style="margin-left:auto;font-size:9px;opacity:.75">8–11月</span></span>
+                </div>
+                <div class="pg-sec">语言 · 认知 · 社交</div>
+                <div class="ms-grid">
+                  <span class="ms-chip done"><img data-ic="03-milestone" src="assets/icons/bear/03-milestone.png" alt="">咿呀发声</span>
+                  <span class="ms-chip new"><img data-ic="03-milestone" src="assets/icons/bear/03-milestone.png" alt="">认生</span>
+                  <span class="ms-chip todo"><img data-ic="03-milestone" src="assets/icons/bear/03-milestone.png" alt="">叫妈妈</span>
+                  <span class="ms-chip todo"><img data-ic="03-milestone" src="assets/icons/bear/03-milestone.png" alt="">躲猫猫</span>
+                </div>
+                <div class="pg-hint">同一里程碑被多位家人记录时，自动合并为同一事件</div>
+              </section>
+
+              <!-- P13 生长曲线 -->
+              <section class="scr" data-scr="curve">
+                <div class="pg-back"><span class="bk" data-goto="growth"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></span><h2>生长曲线</h2><span class="ms-badge" data-cutoast="已进入测量录入（演示）">+ 测量</span></div>
+                <div class="pg-chips"><i class="on">体重</i><i>身高</i><i>头围</i></div>
+                <div class="grow-card">
+                  <div class="gc-head"><b>WHO 儿童生长标准</b><span>P3–P97 参考带</span></div>
+                  <svg class="curve" viewBox="0 0 340 170" aria-label="体重百分位曲线">
+                    <rect x="0" y="34" width="340" height="98" fill="#FFEBD8" opacity=".55"/>
+                    <rect x="0" y="60" width="340" height="48" fill="#FFD9B5" opacity=".6"/>
+                    <path d="M0 42 C110 36 230 28 340 20" stroke="#F5D888" fill="none" stroke-width="1.6" stroke-dasharray="5 4"/>
+                    <path d="M0 130 C110 124 230 116 340 108" stroke="#F5D888" fill="none" stroke-width="1.6" stroke-dasharray="5 4"/>
+                    <path d="M0 86 C110 80 230 73 340 65" stroke="#C7B6A8" fill="none" stroke-width="1.6" stroke-dasharray="5 4"/>
+                    <path class="curve-line" d="M24 100 C90 92 160 82 244 72 L300 66" stroke="var(--primary-deep)" fill="none" stroke-width="3.2" stroke-linecap="round"/>
+                    <g class="curve-dots"><circle cx="24" cy="100" r="4"/><circle cx="96" cy="91" r="4"/><circle cx="170" cy="81" r="4"/><circle cx="244" cy="72" r="4"/></g>
+                    <circle class="curve-now" cx="300" cy="66" r="6"/>
+                    <text class="curve-tag" x="252" y="54">P50 附近</text>
+                  </svg>
+                  <div class="gc-foot"><span>0 月</span><span>3 月</span><span>6 月</span><span>9 月</span><span>12 月</span></div>
+                </div>
+                <div class="pg-chips"><i class="on">矫正年龄 7月28天 · 35 周早产</i></div>
+                <div class="grow-card">
+                  <b style="font-size:13px">趋势解读</b>
+                  <p style="font-size:12px;color:var(--sub);margin-top:4px">近 3 个月曲线沿 P50 带平稳上升，未出现跨越主百分位的波动。</p>
+                </div>
+                <div class="pg-hint">标准：WHO 儿童生长标准 2006 · 解读仅供参考，不构成医学诊断</div>
+              </section>
+
+              <!-- P16 AI 成长日记 -->
+              <section class="scr" data-scr="diary">
+                <div class="pg-back"><span class="bk" data-goto="growth"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></span><h2>AI 成长日记</h2><span class="set-tag">AI 生成</span></div>
+                <div class="grow-card">
+                  <b style="font-size:14px">10 月第 4 周 ·「会爬的小探险家」</b>
+                  <p style="font-size:12.5px;color:var(--sub);margin-top:8px;line-height:1.7">这一周，安安学会了用手膝爬行，客厅的地毯成了她新的游乐场。体重沿 P50 稳步上升，辅食接受了南瓜泥和米粉……</p>
+                  <div style="margin-top:10px"><span class="ms-badge" style="margin-right:6px">溯源 · 爬行里程碑</span><span class="ms-badge" style="margin-right:6px">溯源 · 3 条测量</span><span class="ms-badge">溯源 · 12 张照片</span></div>
+                  <div style="font-size:10.5px;color:var(--faint);margin-top:8px">点击引用可跳转原始记录 · 内容仅基于本家庭数据</div>
+                </div>
+                <div class="pg-grid2"><button class="pg-btn ghost" data-cutoast="草稿已保留，可继续编辑">继续编辑</button><button class="pg-btn" data-cutoast="已归档到成长时间轴">确认归档</button></div>
+                <div class="pg-sec">归档列表</div>
+                <div class="fam-feed">
+                  <div class="feed-item"><img data-ic="20-fn-diary" src="assets/icons/bear/20-fn-diary.png" alt=""><p><b>10 月第 3 周</b> · 已归档</p><time>09-20</time></div>
+                  <div class="feed-item"><img data-ic="20-fn-diary" src="assets/icons/bear/20-fn-diary.png" alt=""><p><b>9 月整月</b> · 已归档</p><time>09-30</time></div>
+                  <div class="feed-item"><img data-ic="20-fn-diary" src="assets/icons/bear/20-fn-diary.png" alt=""><p><b>百日纪念稿</b> · 已归档</p><time>05-24</time></div>
+                </div>
+                <div class="pg-hint">每周日自动生成草稿；AI 只写草稿，归档必须由你确认</div>
+              </section>
+
+              <!-- P21 疫苗时间表 -->
+              <section class="scr" data-scr="vaccine">
+                <div class="pg-back"><span class="bk" data-goto="me"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></span><h2>疫苗时间表</h2><span class="ms-badge" data-cutoast="已进入接种登记（演示）">登记</span></div>
+                <div class="pg-vrow"><img data-ic="34-fn-vaccine" src="assets/icons/bear/34-fn-vaccine.png" alt="" style="width:30px;height:30px"><b>乙肝疫苗 第 2 剂</b><span style="font-size:10.5px;color:var(--faint)">2 月龄</span><span class="st st-done">已接种</span></div>
+                <div class="pg-vrow"><img data-ic="34-fn-vaccine" src="assets/icons/bear/34-fn-vaccine.png" alt="" style="width:30px;height:30px"><b>脊灰 IPV 第 2 剂</b><span style="font-size:10.5px;color:var(--faint)">4 月龄</span><span class="st st-done">已接种</span></div>
+                <div class="pg-vrow" style="border-color:#F5D888;background:#FFFBEF"><img data-ic="34-fn-vaccine" src="assets/icons/bear/34-fn-vaccine.png" alt="" style="width:30px;height:30px"><b>乙脑减毒 第 1 剂</b><span style="font-size:10.5px;color:var(--faint)">8 月龄</span><span class="st st-now">本周到龄</span></div>
+                <div class="pg-vrow"><img data-ic="34-fn-vaccine" src="assets/icons/bear/34-fn-vaccine.png" alt="" style="width:30px;height:30px"><b>流脑 A 群 第 1 剂</b><span style="font-size:10.5px;color:var(--faint)">9 月龄</span><span class="st st-soon">即将</span></div>
+                <div class="pg-vrow"><img data-ic="34-fn-vaccine" src="assets/icons/bear/34-fn-vaccine.png" alt="" style="width:30px;height:30px"><b>麻腮风 第 1 剂</b><span style="font-size:10.5px;color:var(--faint)">8 月龄</span><span class="st st-soon">即将</span></div>
+                <div class="pg-hint">按国家免疫规划程序生成 · 到龄提醒可分类开关 · 不构成医学建议</div>
+              </section>
+
+              <!-- P26 我的数据 -->
+              <section class="scr" data-scr="privacy">
+                <div class="pg-back"><span class="bk" data-goto="me"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></span><h2>我的数据</h2><span class="fam-tag">隐私看板</span></div>
+                <div class="pg-sec">已采集类别与占用</div>
+                <div class="pg-field"><span class="val" style="font-size:12.5px">照片 / 视频</span><span class="pg-prog" style="flex:1;margin:0"><i style="width:82%"></i></span><span class="unit">1.8GB</span></div>
+                <div class="pg-field"><span class="val" style="font-size:12.5px">照护记录</span><span class="pg-prog" style="flex:1;margin:0"><i style="width:12%"></i></span><span class="unit">8MB</span></div>
+                <div class="pg-field"><span class="val" style="font-size:12.5px">健康日志</span><span class="pg-prog" style="flex:1;margin:0"><i style="width:6%"></i></span><span class="unit">2MB</span></div>
+                <div class="pg-sec">共享范围</div>
+                <div class="pg-hint ok">照护记录：全家可见 · 健康日志：可按成员关闭 · 照片：全家（不含原图）</div>
+                <div class="set-row"><img data-ic="26-fn-export" src="assets/icons/bear/26-fn-export.png" alt=""><span>导出全部数据（CSV / JSON）</span><span class="chev">›</span></div>
+                <div class="set-row"><img data-ic="23-fn-privacy" src="assets/icons/bear/23-fn-privacy.png" alt=""><span>撤回单项同意</span><span class="chev">›</span></div>
+                <div class="set-row"><img data-ic="27-fn-trash" src="assets/icons/bear/27-fn-trash.png" alt=""><span style="color:var(--bad);font-weight:800">注销账号并彻底删除</span><span class="chev">›</span></div>
+                <div class="pg-hint">注销需二次验证，30 天内可撤销；期满含备份彻底删除</div>
+              </section>
+
+              <!-- 全局 FAB -->
+              <button class="fab" id="fab" aria-label="新增记录">
+                <span class="fab-ring"></span>
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14M12 5v14"/></svg>
+              </button>
+
+              <!-- 底部导航 -->
+              <nav class="tabbar" id="tabbar">
+                <button class="tab tab-active" data-tab="home"><img data-ic="10-tab-home" src="assets/icons/bear/10-tab-home.png" alt=""><span>时光轴</span></button>
+                <button class="tab" data-tab="growth"><img data-ic="11-tab-growth" src="assets/icons/bear/11-tab-growth.png" alt=""><span>成长</span></button>
+                <button class="tab" data-tab="family"><img data-ic="12-tab-family" src="assets/icons/bear/12-tab-family.png" alt=""><span>家庭</span></button>
+                <button class="tab" data-tab="me"><img data-ic="13-tab-me" src="assets/icons/bear/13-tab-me.png" alt=""><span>我的</span></button>
+              </nav>
+
+              <!-- P08 记录类型面板 -->
+              <div class="sheet-mask" id="sheetMask"></div>
+              <div class="sheet" id="sheet">
+                <div class="sheet-handle"></div>
+                <h3>记录此刻 <span>安安 · 8月12天</span></h3>
+                <div class="sheet-grid">
+                  <button class="tile" style="--tc:#F7A15C;--tcs:#FFEBD8" data-name="喂奶"><img data-ic="01-feeding" src="assets/icons/bear/01-feeding.png" alt=""><span>喂奶</span></button>
+                  <button class="tile" style="--tc:#8FA8DC;--tcs:#E9EEFB" data-name="睡眠"><img data-ic="02-sleep" src="assets/icons/bear/02-sleep.png" alt=""><span>睡眠</span></button>
+                  <button class="tile" style="--tc:#FF8FAB;--tcs:#FFE7EE" data-name="照片"><img data-ic="04-photo" src="assets/icons/bear/04-photo.png" alt=""><span>照片</span></button>
+                  <button class="tile" style="--tc:#5FC08C;--tcs:#E2F5EA" data-name="测量"><img data-ic="05-measure" src="assets/icons/bear/05-measure.png" alt=""><span>测量</span></button>
+                  <button class="tile" style="--tc:#C49066;--tcs:#F5E9DC" data-name="便便"><img data-ic="06-poop" src="assets/icons/bear/06-poop.png" alt=""><span>便便</span></button>
+                  <button class="tile" style="--tc:#FF7B6B;--tcs:#FFE7E2" data-name="体温"><img data-ic="07-temp" src="assets/icons/bear/07-temp.png" alt=""><span>体温</span></button>
+                </div>
+                <div class="sheet-more">
+                  <span>更多</span>
+                  <button class="tile tile-sm" style="--tc:#F5B32C;--tcs:#FFF3C4" data-name="里程碑"><img data-ic="03-milestone" src="assets/icons/bear/03-milestone.png" alt="">里程碑</button>
+                  <button class="tile tile-sm" style="--tc:#A994D8;--tcs:#F0EAFB" data-name="用药"><img data-ic="08-med" src="assets/icons/bear/08-med.png" alt="">用药</button>
+                  <button class="tile tile-sm" style="--tc:#E86FA0;--tcs:#FDE9F2" data-name="文字心情"><img data-ic="09-text-mood" src="assets/icons/bear/09-text-mood.png" alt="">心情</button>
+                  <button class="tile tile-sm" style="--tc:#6FBDE0;--tcs:#E4F3FB" data-name="语音"><img data-ic="09-voice" src="assets/icons/bear/09-voice.png" alt="">语音</button>
+                </div>
+                <button class="sheet-close" id="sheetClose">取消</button>
+              </div>
+
+              <!-- P08b 语音输入面板 -->
+              <div class="sheet-mask" id="vMask"></div>
+              <div class="sheet vinput" id="vinput" data-state="idle">
+                <div class="sheet-handle"></div>
+                <h3>语音速记 <span>安安 · 8月12天</span></h3>
+                <div class="vi-stage vi-idle">
+                  <button class="vi-mic" id="viMic" aria-label="开始录音">
+                    <span class="vi-pulse"></span><span class="vi-pulse vp2"></span>
+                    <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><path d="M12 19v3"/></svg>
+                  </button>
+                  <p class="vi-tip">点击麦克风，说句悄悄话</p>
+                  <p class="vi-sub">最长 60s · 实时转文字 · 语音仅家庭内可听</p>
+                </div>
+                <div class="vi-stage vi-rec">
+                  <div class="vi-timer" id="viTimer">0:00</div>
+                  <div class="vi-wave" id="viWave"></div>
+                  <div class="vi-live"><span class="vi-tag">实时转写</span><span id="viLiveTxt"></span><span class="vi-caret"></span></div>
+                  <div class="vi-acts">
+                    <button class="vi-btn vi-ghost" id="viCancel">取消</button>
+                    <button class="vi-mic vi-mic-sm" id="viStop" aria-label="停止录音"><svg class="ic" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="3" fill="currentColor"/></svg></button>
+                    <button class="vi-btn vi-primary" id="viFinish">完成</button>
+                  </div>
+                  <p class="vi-hint">点方块立即结束 · 达 60s 自动停止</p>
+                </div>
+                <div class="vi-stage vi-done">
+                  <div class="vi-play" id="viPlayRow">
+                    <button class="vi-playbtn" id="viPlay" aria-label="试听"><svg class="ic" viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5Z" fill="currentColor"/></svg></button>
+                    <div class="vi-wave thumb" id="viThumb"></div>
+                    <span class="vi-dur" id="viDur">0:08</span>
+                  </div>
+                  <div class="vi-trans"><small>转文字 · 可编辑</small><span id="viTrans">「咿呀呀」叫了 8 秒，还跟着拍拍手</span></div>
+                  <div class="pg-chips" style="margin-top:12px;justify-content:center"><i class="on">可爱</i><i>语言</i><i>日常</i></div>
+                  <div class="vi-acts">
+                    <button class="vi-btn vi-ghost" id="viRedo">重录</button>
+                    <button class="vi-btn vi-primary" id="viSave">存入时光轴</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="toast" id="toast"></div>
+              <div class="confetti-layer" id="confetti"></div>
+
+              <!-- 里程碑全屏庆祝 -->
+              <div class="celebrate" id="celebrate">
+                <div class="confetti-layer" id="celConfetti"></div>
+                <div class="cel-card">
+                  <div class="cel-trophy"><img data-ic="03-milestone" src="assets/icons/bear/03-milestone.png" alt=""></div>
+                  <h3 id="celTitle">人生第一次爬行</h3>
+                  <p id="celSub">2026.10.26 · 安安 8 个月 12 天</p>
+                  <div class="cel-btns">
+                    <button class="cel-main" id="celCard">生成纪念卡</button>
+                    <button class="cel-ghost" id="celClose">收下啦</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 机内长辈模式 -->
+              <div class="elder-mode" id="elderMode">
+                <button class="elder-exit" id="elderExit"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>返回普通模式</button>
+                <h3>安安今天怎么样？</h3>
+                <div class="elder-row"><img data-ic="01-feeding" src="assets/icons/bear/01-feeding.png" alt=""><span>喝奶 6 次</span><b>正常</b></div>
+                <div class="elder-row"><img data-ic="02-sleep" src="assets/icons/bear/02-sleep.png" alt=""><span>睡 11 小时</span><b>正常</b></div>
+                <div class="elder-row"><img data-ic="07-temp" src="assets/icons/bear/07-temp.png" alt=""><span>体温 36.8</span><b>正常</b></div>
+                <div class="elder-row"><img data-ic="34-fn-vaccine" src="assets/icons/bear/34-fn-vaccine.png" alt=""><span>周二打疫苗</span><b class="elder-warn">别忘了</b></div>
+                <button class="elder-call" id="elderCall"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92Z"/></svg>打电话给妈妈</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="sj-demo-side sj-reveal">
+        <p class="sj-demo-label" id="sjPhoneLabel">P01 · 时光轴首页</p>
+
+        <div class="sj-demo-nav" id="sjDemoNav" role="group" aria-label="手机内页面切换">
+          <button data-goto="home" class="on">时光轴</button>
+          <button data-goto="record">记录录入</button>
+          <button data-goto="growth">成长中心</button>
+          <button data-goto="curve">生长曲线</button>
+          <button data-goto="milestone">里程碑</button>
+          <button data-goto="diary">AI 日记</button>
+          <button data-goto="family">家庭中心</button>
+          <button data-goto="vaccine">疫苗表</button>
+          <button data-goto="me">我的</button>
+          <button data-goto="privacy">我的数据</button>
+        </div>
+
+        <div class="sj-demo-tips">
+          <p>可以试试</p>
+          <ul>
+            <li>点右下角 <b>+</b> → 选「喂奶」，看它实时插进时光轴</li>
+            <li>点黄色「人生第一次爬行」卡 → 全屏庆祝 + 彩带</li>
+            <li>点 <b>+</b> → 语音 → 点麦克风 → 实时转写逐字浮现</li>
+            <li>点顶部宝宝名字 → 切换到二宝「朵朵」</li>
+          </ul>
+        </div>
+
+        <div class="sj-demo-acts">
+          <button class="sj-btn sj-btn-ghost sj-btn-sm" id="sjReplay">重播首页动效</button>
+          <button class="sj-btn sj-btn-ghost sj-btn-sm" id="sjCelebrate">庆祝一下</button>
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 功能亮点 ============ -->
+<section class="sj-sec" id="features">
+  <div class="sj-wrap">
+    <header class="sj-sec-head sj-reveal">
+      <h2>四件真正重要的事</h2>
+      <p>点卡片，上方手机会跟着切画面。</p>
+    </header>
+
+    <div class="sj-feat-grid">
+      <button class="sj-feat sj-reveal" data-goto="record">
+        <span class="sj-feat-ic"><img data-ic="01-feeding" src="assets/icons/bear/01-feeding.png" alt=""></span>
+        <h3>15 秒记一条</h3>
+        <p>悬浮按钮一点即记，10 类记录常驻。</p>
+        <span class="sj-feat-go">看记录录入 →</span>
+      </button>
+      <button class="sj-feat sj-reveal" data-goto="curve">
+        <span class="sj-feat-ic"><img data-ic="05-measure" src="assets/icons/bear/05-measure.png" alt=""></span>
+        <h3>WHO 标准曲线</h3>
+        <p>P3–P97 参考带，不跟别人家比。</p>
+        <span class="sj-feat-go">看生长曲线 →</span>
+      </button>
+      <button class="sj-feat sj-reveal" data-goto="milestone">
+        <span class="sj-feat-ic"><img data-ic="03-milestone" src="assets/icons/bear/03-milestone.png" alt=""></span>
+        <h3>第一次值得庆祝</h3>
+        <p>达成全屏庆祝 + 纪念卡。</p>
+        <span class="sj-feat-go">看里程碑 →</span>
+      </button>
+      <button class="sj-feat sj-reveal" data-goto="family">
+        <span class="sj-feat-ic"><img data-ic="28-fn-invite" src="assets/icons/bear/28-fn-invite.png" alt=""></span>
+        <h3>全家一起记</h3>
+        <p>谁喂的奶、谁量的身高，都留痕。</p>
+        <span class="sj-feat-go">看家庭中心 →</span>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 记录流程 ============ -->
+<section class="sj-sec" id="flow">
+  <div class="sj-wrap">
+    <header class="sj-sec-head sj-reveal">
+      <h2>三步记下一条</h2>
+    </header>
+    <div class="sj-flow">
+      <div class="sj-step sj-reveal"><span class="sj-step-n">1</span><h3>点「+」</h3><p>单手可及，不打断照护。</p></div>
+      <div class="sj-step sj-reveal"><span class="sj-step-n">2</span><h3>选类型</h3><p>喂养、睡眠、语音等 10 类。</p></div>
+      <div class="sj-step sj-reveal"><span class="sj-step-n">3</span><h3>自动归档</h3><p>家人同步可见，随时回看。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 隐私保障 ============ -->
+<section class="sj-sec" id="guard">
+  <div class="sj-wrap">
+    <header class="sj-sec-head sj-reveal">
+      <h2>孩子的数据，值得被认真对待</h2>
+    </header>
+    <div class="sj-guard">
+      <div class="sj-guard-item sj-reveal">
+        <img data-ic="23-fn-privacy" src="assets/icons/bear/23-fn-privacy.png" alt="">
+        <span><b>合规设计</b><small>监护人同意后才采集</small></span>
+      </div>
+      <div class="sj-guard-item sj-reveal">
+        <img data-ic="22-fn-backup" src="assets/icons/bear/22-fn-backup.png" alt="">
+        <span><b>云端加密备份</b><small>换机不丢，多端查看</small></span>
+      </div>
+      <div class="sj-guard-item sj-reveal">
+        <img data-ic="26-fn-export" src="assets/icons/bear/26-fn-export.png" alt="">
+        <span><b>数据随时带走</b><small>PDF 档案 / CSV 导出</small></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 下载 ============ -->
+<section class="sj-sec" id="download">
+  <div class="sj-wrap">
+    <div class="sj-dl-band sj-reveal">
+      <img class="sj-dl-icon" src="assets/logo-192-rounded.png" alt="岁记 App 图标">
+      <h2>现在开始记录今天</h2>
+      <p class="sj-dl-sub">双端同步 · 无内购 · 无广告</p>
+
+      <div class="sj-dl-grid">
+        <div class="sj-dl-card">
+          <button class="sj-btn sj-btn-primary sj-btn-xl" data-store="android">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 9v9a1 1 0 0 0 1 1h1v3a1.5 1.5 0 0 0 3 0v-3h2v3a1.5 1.5 0 0 0 3 0v-3h1a1 1 0 0 0 1-1V9H6zM3 9a1.5 1.5 0 0 1 3 0v5a1.5 1.5 0 0 1-3 0V9zm18 0a1.5 1.5 0 0 0-3 0v5a1.5 1.5 0 0 0 3 0V9zM7.5 3.7 6.2 2.4a.4.4 0 0 1 0-.6.4.4 0 0 1 .6 0L8.4 3.1A6.9 6.9 0 0 1 12 2.2c1.3 0 2.5.3 3.6.9l1.6-1.3a.4.4 0 0 1 .6 0 .4.4 0 0 1 .6 0l.3.4A5.8 5.8 0 0 1 19 8H5a5.8 5.8 0 0 1 2.5-4.3zM9.5 6a.8.8 0 1 0 0-1.6.8.8 0 0 0 0 1.6zm5 0a.8.8 0 1 0 0-1.6.8.8 0 0 0 0 1.6z"/></svg>
+            <span><em>Android</em><b>直接下载安装</b></span>
+          </button>
+          <button class="sj-qr" data-qr="android" aria-label="查看 Android 下载二维码">
+            <img src="assets/qr/android.png" alt="Android 下载二维码">
+          </button>
+          <p class="sj-dl-meta" id="sjMetaAndroid">Android 10+ · 15.6 MB</p>
+          <button class="sj-copy" data-copy="android">复制下载链接</button>
+        </div>
+
+        <div class="sj-dl-card">
+          <button class="sj-btn sj-btn-ghost sj-btn-xl" data-store="ios">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9C6.9 6.7 5.3 7.9 4.5 9.6c-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.4 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.2 0 2-1.1 2.8-2.3.9-1.3 1.2-2.6 1.3-2.6-.1 0-2.4-1-2.4-3.8zM15 6.1c.6-.8 1-1.8.9-2.9-.9 0-2 .6-2.6 1.4-.6.6-1 1.7-.9 2.7 1 .1 2-.5 2.6-1.2z"/></svg>
+            <span><em>iOS</em><b id="sjIosBtnText">App Store 下载</b></span>
+          </button>
+          <button class="sj-qr" data-qr="ios" aria-label="查看 iOS 下载二维码">
+            <img src="assets/qr/ios.png" alt="iOS 下载二维码">
+          </button>
+          <p class="sj-dl-meta" id="sjMetaIos">iOS 14+ · 上架中</p>
+          <button class="sj-copy" data-copy="ios">复制下载链接</button>
+        </div>
+      </div>
+
+      <p class="sj-dl-note">iOS 版正在上架中，二维码可扫码获取上架通知。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section class="sj-sec" id="faq">
+  <div class="sj-wrap">
+    <header class="sj-sec-head sj-reveal">
+      <h2>常见问题</h2>
+    </header>
+    <div class="sj-faq sj-reveal">
+      <details>
+        <summary>iOS 什么时候能下载？</summary>
+        <p>iOS 版正在上架 App Store，审核通过后本页按钮会自动指向商店地址。也可以扫码订阅上架通知。</p>
+      </details>
+      <details>
+        <summary>记录的数据会丢吗？</summary>
+        <p>数据存在你的云端家庭空间，用同一账号登录即可恢复全部记录；同时支持导出 PDF / CSV 随时带走。</p>
+      </details>
+      <details>
+        <summary>家里老人能用吗？</summary>
+        <p>可以。邀请链接加入后进入长辈模式，字号更大、入口更少；也支持家庭级只读开关。</p>
+      </details>
+      <details>
+        <summary>完全免费吗？有广告吗？</summary>
+        <p>记录与时光轴永久免费，无广告，无第三方统计 SDK 采集儿童数据。</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ============ 页脚 ============ -->
+<footer class="sj-foot">
+  <div class="sj-wrap">
+    <div class="sj-foot-top">
+      <div class="sj-foot-brand">
+        <img src="assets/logo-192-rounded.png" alt="">
+        <div><strong>岁记 · Baby Growth Log</strong><small>把宝宝的第一年，记成一本书。</small></div>
+      </div>
+      <nav class="sj-foot-links" aria-label="页脚导航">
+        <a href="#demo">真机体验</a>
+        <a href="#features">功能亮点</a>
+        <a href="#guard">隐私安全</a>
+        <a href="#download">下载 App</a>
+      </nav>
+    </div>
+    <p class="sj-foot-disc" id="sjDisclaimer"></p>
+    <div class="sj-foot-bottom">
+      <span>© 2026 岁记</span>
+      <span>本站未接入任何第三方广告与统计脚本</span>
+      <span>ICP 备案号：预留</span>
+    </div>
+  </div>
+</footer>
+
+<!-- 移动端常驻下载条 -->
+<div class="sj-mobile-dl" id="sjMobileDl">
+  <span><b>岁记</b><i>15 秒记一条成长</i></span>
+  <button class="sj-btn sj-btn-primary sj-btn-sm" data-store="auto">免费下载</button>
+</div>
+
+<!-- 回到顶部 -->
+<button class="sj-top-btn" id="sjTopBtn" aria-label="回到顶部">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+</button>
+
+<!-- 二维码放大 -->
+<div class="sj-modal" id="sjModal" aria-hidden="true" role="dialog" aria-modal="true" aria-label="下载二维码">
+  <div class="sj-modal-mask" id="sjModalMask"></div>
+  <div class="sj-modal-panel">
+    <img id="sjModalImg" src="" alt="下载二维码">
+    <p id="sjModalTitle">扫码下载</p>
+    <button class="sj-modal-close" id="sjModalClose" aria-label="关闭">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+</div>
+
+<div class="sj-toast" id="sjToast" role="status" aria-live="polite"></div>
+<div class="sj-confetti" id="sjConfetti" aria-hidden="true"></div>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/phone.js"></script>
+<script src="assets/js/site.js"></script>
+</body>
+</html>

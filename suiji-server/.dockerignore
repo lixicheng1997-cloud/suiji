@@ -1,0 +1,19 @@
+# 避免把本地开发产物打进构建上下文（否则 .venv 等会让 build 上下文数百 MB）
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.git
+.gitignore
+.idea
+.env
+data
+tests
+scripts
+smoke_test.py
+pytest.ini
+API-CONTRACT.md
+docker-compose.yml
+Dockerfile
