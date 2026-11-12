@@ -371,7 +371,7 @@ FastAPI 默认 `{detail: string}`；客户端 http 层按 status 映射提示文
 
 ## 17. 部署
 
-- `docker-compose.yml`：postgres:16（卷持久化，端口 `POSTGRES_PORT`:5432，默认 5433 避免冲突）+ redis:7-alpine（端口 `REDIS_PORT`，默认 6379）+ minio（非结构化文件对象存储，`MINIO_PORT` API / `MINIO_CONSOLE_PORT` 控制台，默认 9000/9001，卷持久化）+ api（构建镜像，`API_PORT`:8000，默认 8000:8000，依赖 db/redis/minio）+ nginx（统一入口，`NGINX_PORT`:`NGINX_LISTEN_PORT`，默认 80:80，依赖 api）。所有端口、凭据与后端参数均通过环境变量配置，见 `.env.example`（复制为 `.env` 后修改）。
+- 编排分三层：`docker-compose.yml`（公共底座：postgres:16 + redis:7-alpine + minio + api + nginx），`docker-compose.dev.yml`（开发覆盖：源码卷热重载、`./data-dev` 数据目录、放开 CORS/文档白名单、允许降级），`docker-compose.prod.yml`（生产覆盖：代码冻结、关闭降级、收紧文档白名单与 CORS、单 worker）。端口、凭据与后端参数均通过环境变量配置：开发复制 `.env.dev.example` 为 `.env.dev`，生产复制 `.env.prod.example` 为 `.env.prod`。
 - 反向代理（nginx，配置见 `nginx/nginx.conf` 与模板 `nginx/templates/default.conf.template`，启动时由镜像 envsubst 渲染为 `/etc/nginx/conf.d/default.conf`）：`/api/`→api:8000（关闭缓冲以支持 `/files/{id}/download`、`/media/{id}` 流式传输与 200MB 上传直透，`client_max_body_size` 与 `FILE_MAX_BYTES` 对齐）、`/docs`+`/redoc`+`/openapi.json`+`/static-offline-docs`→api:8000（离线文档资源）、`/healthz` 为 nginx 自身探测。客户端服务器地址填 `http://<host>/api/v1`。nginx 不转发 MinIO：api 经 compose 内网 `minio:9000` 直连取回字节后由服务端代理回源下发；MinIO 控制台仅可直连 `http://<host>:9001`（`MINIO_CONSOLE_PORT`，只绑 127.0.0.1）。
 - api 容器 `DATABASE_URL=postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}`（由 db 服务凭据自动拼装）、`REDIS_URL=redis://redis:6379/0`、`JWT_SECRET`、`MEDIA_DIR=/app/data/media`。
 - 非结构化文件（图片/附件）存储后端由 `MEDIA_BACKEND` 决定：`minio`（默认，对象存储，`MINIO_ENDPOINT=minio:9000`、`MINIO_BUCKET=suiji`，桶不存在时自动创建）或 `local`（本地卷 `MEDIA_DIR`）。两种后端目录结构一致：`{family_id}/{YYYY-MM-DD}/{文件名}`，桶/目录内按家庭隔离、按天归档，便于按家庭备份与清理。

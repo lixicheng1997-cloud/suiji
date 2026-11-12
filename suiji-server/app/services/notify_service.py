@@ -21,6 +21,7 @@ FEED_TEXT = {
     "milestone": "记录了里程碑",
     "sleep": "记录了一次睡眠",
     "photo": "上传了照片",
+    "video": "拍了一段视频",
     "feeding": "记录了一次喂养",
     "measure": "记录了一次测量",
     "poop": "记录了一次照护情况",

@@ -389,7 +389,7 @@ export default {
   flex: none;
 }
 .bk:active { transform: scale(0.92); }
-.bk-ic { width: 36rpx; height: 36rpx; }
+.bk-ic { width: 40rpx; height: 40rpx; }
 .pg-title {
   flex: 1;
   min-width: 0;

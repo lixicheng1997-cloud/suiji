@@ -535,7 +535,8 @@ export const ALLOWED_UPLOAD_EXT = /\.(jpe?g|png|gif|webp|bmp|heic|heif|avif|tiff
  * 非结构化文件上传：multipart POST /files（契约 §7.5），uni.uploadFile 走同一套鉴权与错误映射。
  * 字节统一入对象存储，业务行只保存返回的文件 URL；挂载点可上传后再经 PATCH /files/{id} 补挂。
  * @param {string} filePath 本地临时文件路径
- * @param {{businessType?: string, businessId?: string, babyId?: string}} [opts] 业务挂载参数
+ * @param {{businessType?: string, businessId?: string, babyId?: string, formData?: object}} [opts]
+ *        formData 透传额外字段（如视频 duration=12.5）
  * @returns {Promise<{id, url, ...}>} 文件行（url 为 /api/v1/files/{id}/download 相对路径）
  */
 export function uploadFile(filePath, opts) {
@@ -557,12 +558,12 @@ export function uploadFile(filePath, opts) {
       url: baseUrl() + '/files',
       filePath,
       name: 'file',
-      formData: {
+      formData: Object.assign({
         business_type: o.businessType || '',
         business_id: o.businessId || '',
         baby_id: o.babyId || ''
-      },
-      timeout: 120000,
+      }, o.formData || {}),
+      timeout: 180000,
       header: token ? { Authorization: 'Bearer ' + token } : {},
       success: res => {
         let body = {}

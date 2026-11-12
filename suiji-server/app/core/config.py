@@ -63,6 +63,10 @@ class Settings:
         self.media_download_mode = os.getenv("MEDIA_DOWNLOAD_MODE", "auto").strip().lower()
         # 单文件最大字节（/files 通用非结构化文件接口）
         self.file_max_bytes = int(os.getenv("FILE_MAX_BYTES", str(200 * 1024 * 1024)) or 200 * 1024 * 1024)
+        # 视频记录：单段时长上限（秒）与单文件字节上限。
+        # 30s@1080p H.264 高码率约 30-50MB，留余量到 100MB；超出由客户端先拦，服务端兜底。
+        self.video_max_seconds = int(os.getenv("VIDEO_MAX_SECONDS", "30") or 30)
+        self.video_max_bytes = int(os.getenv("VIDEO_MAX_BYTES", str(100 * 1024 * 1024)) or 100 * 1024 * 1024)
         self.llm_api_base = os.getenv("LLM_API_BASE", "").strip()
         self.llm_api_key = os.getenv("LLM_API_KEY", "").strip()
         self.llm_model = os.getenv("LLM_MODEL", "").strip()
@@ -90,6 +94,9 @@ class Settings:
         self.rl_join_window = int(os.getenv("RL_JOIN_WINDOW", "300") or 300)
         self.rl_upload = int(os.getenv("RL_UPLOAD", "60") or 60)
         self.rl_upload_window = int(os.getenv("RL_UPLOAD_WINDOW", "300") or 300)
+        # 天气：首页每次 onShow 拉一次，按 IP 限到较宽松配额（外部定位/天气接口本身有额度）
+        self.rl_weather = int(os.getenv("RL_WEATHER", "30") or 30)
+        self.rl_weather_window = int(os.getenv("RL_WEATHER_WINDOW", "300") or 300)
         # 密码最小长度（注册/改密共用）
         self.password_min_length = int(os.getenv("PASSWORD_MIN_LENGTH", "8") or 8)
         # ---- 应用层传输加密（见 core/crypto.py 的长注释）----

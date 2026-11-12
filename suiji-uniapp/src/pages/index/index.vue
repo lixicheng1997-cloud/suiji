@@ -9,7 +9,7 @@
         <view class="baby-chip" hover-class="hover-press" @click="babyModalShow = true">
           <image class="baby-avatar" :src="avatar || ('/static/icons/ctl/' + __theme + '/128/45-ctl-avatar.png')" :mode="avatar ? 'aspectFill' : 'aspectFit'" />
           <view class="baby-name">
-            <text>{{ baby.name }}</text>
+            <text class="baby-nick">{{ baby.name }}</text>
             <text class="baby-age">{{ baby.age }}</text>
           </view>
           <image class="chev" src="/static/icons/chevron-down.svg" />
@@ -25,11 +25,15 @@
         </view>
       </view>
 
-      <!-- 今日问候条：吉祥物探头 + 陪伴记录数 -->
+      <!-- 今日问候条：吉祥物探头 + 天气与陪伴鼓励语（天气拉取失败时整段隐藏） -->
       <view class="today-strip">
+        <!-- 天气大图标作为背景层：置于文字/吉祥物下层，放大后允许溢出面板被裁切，形成半遮挡 -->
+        <view v-if="weatherText" class="wx-bg">
+          <sj-weather :text="weather.text" :size="256" />
+        </view>
         <view class="today-txt">
           <text class="tt-hello">{{ greeting }}，{{ baby.name }}</text>
-          <text class="tt-sub">今天已记录 <text class="cnt">{{ todayCount }}</text> 条 · {{ cheerText }}</text>
+          <text v-if="weatherText" class="tt-sub">{{ weatherText }} · {{ cheerText }}</text>
         </view>
         <view class="peek-wrap">
           <sj-mascot :size="104" />
@@ -38,7 +42,7 @@
 
       <!-- 当日统计胶囊行 -->
       <view class="day-summary">
-        <view class="ds-chip" v-for="s in todayStats" :key="s.label">
+        <view class="ds-chip" v-for="s in chipStats" :key="s.label">
           <view class="ds-ic" :style="{ background: TYPES[s.type].color }">
             <sj-icon :name="TYPES[s.type].png" :size="40" />
           </view>
@@ -105,7 +109,34 @@
               </view>
               <text v-if="e.note" class="rec-note">{{ e.note }}</text>
             </view>
-            <image v-if="e.photo" class="rec-photo" :src="e.photo" mode="aspectFill" lazy-load />
+            <!-- 视频记录：真实首帧封面 + 播放按钮（点击直接全屏播放，不进详情） -->
+            <view v-if="e.type === 'video'" class="rec-video" @click.stop="previewEntry(e)">
+              <video
+                v-if="e.videos && e.videos[0]"
+                class="rec-video-bg"
+                :src="e.videos[0].url"
+                :poster="e.videos[0].thumb"
+                :controls="false"
+                :autoplay="false"
+                :show-center-play-btn="false"
+                :show-play-btn="false"
+                :object-fit="'cover'"
+              />
+              <view class="rec-video-mask" />
+              <view class="rec-video-play">
+                <view class="rvp-tri" />
+              </view>
+              <text v-if="e.videos && e.videos.length" class="rec-video-count">{{ e.videos.length }} 段</text>
+            </view>
+            <!-- 照片记录：缩略图，点击直接全屏预览 -->
+            <image
+              v-else-if="e.photo"
+              class="rec-photo"
+              :src="e.photo"
+              mode="aspectFill"
+              lazy-load
+              @click.stop="previewEntry(e)"
+            />
             <!-- 里程碑右侧：时间与"庆祝一下"按钮上下错行；点按钮只弹庆祝，点卡片其余区域进详情 -->
             <view v-if="e.type === 'milestone'" class="ms-side">
               <text class="rec-time">{{ e.time }}</text>
@@ -136,8 +167,13 @@
     <view class="sheet" :class="{ open: sheetOpen }">
       <view class="sheet-handle" />
       <view class="sheet-head">
-        <text class="sh-title">记录此刻</text>
-        <text class="sh-sub">{{ baby.name }} · {{ baby.age }}</text>
+        <view class="sh-titles">
+          <text class="sh-title">记录此刻</text>
+          <text class="sh-sub">{{ baby.name }} · {{ baby.age }}</text>
+        </view>
+        <view class="sh-close" hover-class="hover-press" :hover-stay-time="80" @click="closeSheet">
+          <image class="sh-close-ic" :src="'/static/icons/ctl/' + __theme + '/48/48-ctl-clear.png'" mode="aspectFit" />
+        </view>
       </view>
       <view class="sheet-grid">
         <view
@@ -152,17 +188,21 @@
           <text class="t-label">{{ TYPES[k].label }}</text>
         </view>
       </view>
-      <view class="sheet-more">
-        <view
-          class="tile-sm"
-          v-for="k in moreTypes"
-          :key="k"
-          :style="{ background: TYPES[k].tint }"
-          hover-class="hover-press"
-          @click="pickType(k)"
-        >
-          <sj-icon :name="TYPES[k].png" :size="52" />
-          <text>{{ TYPES[k].label }}</text>
+      <view v-if="moreTypes.length" class="sheet-more">
+        <text class="sm-label">更多记录</text>
+        <view class="more-row">
+          <view
+            class="more-chip"
+            v-for="k in moreTypes"
+            :key="k"
+            hover-class="hover-press"
+            @click="pickType(k)"
+          >
+            <view class="mc-ic" :style="{ background: TYPES[k].tint }">
+              <sj-icon :name="TYPES[k].png" :size="44" />
+            </view>
+            <text class="mc-txt">{{ TYPES[k].label }}</text>
+          </view>
         </view>
       </view>
     </view>
@@ -215,6 +255,9 @@
     <!-- v2 悬浮底部导航（自动隐藏原生 tabBar） -->
     <sj-tabbar active="home" />
     <sj-ui-host />
+
+    <!-- 全屏媒体预览（图片/视频共用） -->
+    <sj-media-preview v-model:show="previewShow" :items="previewItems" />
   </view>
 </template>
 
@@ -261,6 +304,9 @@ export default {
       sheetOpen: false,
       /* 宝宝切换对话框显隐 */
       babyModalShow: false,
+      /* 全屏媒体预览：图片/视频共用 */
+      previewShow: false,
+      previewItems: [],
       statusBarHeight: 20,
       /* 同步状态 chip：refresh 期间为 syncing */
       syncing: false,
@@ -272,7 +318,12 @@ export default {
       /* 时光轴左滑删除状态：同一时刻只有一张卡处于拖拽/展开态 */
       swipe: { id: '', x: 0, openId: '', sx: 0, sy: 0, moved: false },
       /* 家长信息勾选的常用记录类别（onShow 刷新时重读，驱动快速记录面板排序，见 computed sortedTypes） */
-      parentCats: []
+      parentCats: [],
+      /* 首页天气：{ text, temp, city }；拉取失败/无天气时 text 为空，副行天气段隐藏 */
+      weather: { text: '', temp: null, city: '' },
+      /* 主行问候 / 副行尾缀轮换索引：每次回到主页 onShow 往后顺一句，不按天固定 */
+      helloIdx: 0,
+      cheerIdx: 0
     }
   },
 
@@ -315,22 +366,39 @@ export default {
         '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><path d="M12 12v6"/><path d="m9.5 14.5 2.5-2.5 2.5 2.5"/></svg>'
       return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
     },
-    /* 按时段问候（v2 today-strip 文案） */
+    /* 主行问候文案库：按当前主题 IP 分组，前缀式短句（后接「，宝宝名」） */
+    helloList() {
+      return this.__theme === 'duck'
+        ? ['冲鸭', '嘎嘎来啦', '溜达溜达', '鸭力飞走咯', '棒棒哒', '出门玩耍咯', '嘎嘎加油', '摇摇摆摆', '今天顶呱呱', '戏水小能手', '快活似神仙', '小鸭报个到']
+        : ['熊熊来陪你', '吃饱饱长高高', '元气满满', '抱抱小可爱', '小可爱你好呀', '今天超可爱的', '蜂蜜备好咯', '软软糯糯', '小小冒险家', '今天也要开心', '萌力全开', '暖乎乎的一天']
+    },
+    /* 副行鼓励尾缀库：贴当前主题 IP，与天气段拼成「天气 · 尾缀」 */
+    cheerList() {
+      return this.__theme === 'duck'
+        ? ['继续加油鸭', '嘎嘎给力', '鸭鸭陪你长大', '快乐加倍鸭', '勇往直前鸭', '摇摇摆摆长高高', '今日份开心鸭', '游向快乐鸭', '勇敢小鸭子', '福气满满鸭']
+        : ['今天也甜甜的', '蜂蜜管够哦', '被爱包围着', '每天都在长大', '软萌无敌', '慢慢长大别着急', '甜份已加满', '抱一抱就长大', '快乐不打烊', '小奶娃超乖的']
+    },
+    /* 主行问候：取当前索引对应主题句，索引在 onShow 顺移 */
     greeting() {
-      const h = new Date().getHours()
-      if (h < 6) return '夜深了'
-      if (h < 11) return '早上好'
-      if (h < 13) return '中午好'
-      if (h < 18) return '下午好'
-      return '晚上好'
+      const arr = this.helloList
+      return arr[this.helloIdx % arr.length]
     },
-    /* 问候尾缀贴当前主题 IP：小熊→蜂蜜梗；小鸭→"鸭"谐音梗 */
+    /* 副行尾缀：取当前索引对应主题句 */
     cheerText() {
-      return this.__theme === 'duck' ? '继续加油鸭' : '今天也甜甜的'
+      const arr = this.cheerList
+      return arr[this.cheerIdx % arr.length]
     },
-    /* 今日记录总条数（bootstrap 缓存派生） */
-    todayCount() {
-      return api.getTodayCount()
+    /* 副行天气文案：有描述带温度，如「晴 26℃」；缺温度只显示描述；都为空则隐藏 */
+    weatherText() {
+      const w = this.weather || {}
+      const text = String(w.text || '').trim()
+      if (!text) return ''
+      return w.temp === null || w.temp === undefined || w.temp === '' ? text : text + ' ' + w.temp + '℃'
+    },
+    /* 顶部统计胶囊：共享 stats.js 文案只在主页做俏皮化映射，不影响 elder 页复用 */
+    chipStats() {
+      const map = { feeding: '今日吃奶', sleep: '近一天觉觉', milestone: '今日小记' }
+      return this.todayStats.map(s => ({ ...s, label: map[s.type] || s.label }))
     },
     /* 已加载记录按日分组（服务端返回 occurred_at 倒序：新日在前、日内最新在前）。
        date-row 条数：优先取服务端 day_totals（该日全天真实条数，跨页天也准确），
@@ -375,6 +443,9 @@ export default {
   },
 
   onShow() {
+    /* 每次回到主页，主行/副行各顺一句，文案常换常新（不按天固定） */
+    this.helloIdx = (this.helloIdx + 1) % this.helloList.length
+    this.cheerIdx = (this.cheerIdx + 1) % this.cheerList.length
     this.refresh()
   },
 
@@ -400,6 +471,8 @@ export default {
       this.parentCats = (api.getParentInfo().cats || []).slice()
       /* 铃铛角标：消息中心未读通知数（待办不计入） */
       this.unread = api.getUnreadTotal()
+      /* 天气：按服务端 IP 粗判城市，失败静默留空（副行天气段隐藏），不阻断列表刷新 */
+      api.getWeather().then(w => { this.weather = w || { text: '', temp: null, city: '' } })
       try {
         /* 专用分页接口拉第一页（服务端游标分页，不读全量缓存） */
         const p = await api.fetchTimeline({ limit: this.pageSize })
@@ -541,6 +614,20 @@ export default {
       uni.navigateTo({ url: '/pages/detail/detail?id=' + e.id })
     },
 
+    /* 点缩略图直接全屏预览：图片走 photo_full，视频走 e.videos[0] */
+    previewEntry(e) {
+      if (e.type === 'video' && e.videos && e.videos.length) {
+        this.previewItems = e.videos.map(v => ({ type: 'video', url: v.url, thumb: v.thumb }))
+      } else if (e.photo_full) {
+        this.previewItems = [{ type: 'image', url: e.photo_full }]
+      } else if (e.photo) {
+        this.previewItems = [{ type: 'image', url: e.photo }]
+      } else {
+        return
+      }
+      this.previewShow = true
+    },
+
     /* ---------- 时光轴左滑删除 ---------- */
     /* 当前应展示的横向位移（px）：拖拽中卡实时跟手，展开卡固定露出删除块 */
     swipeX(e) {
@@ -660,8 +747,8 @@ export default {
   flex: none;
 }
 .baby-name { display: flex; flex-direction: column; }
-.baby-name text:first-child { font-size: 28rpx; font-weight: 800; line-height: 1.15; color: var(--sj-ink); }
-.baby-age { font-size: 20rpx; font-weight: 600; color: var(--sj-sub); margin-top: 2rpx; }
+.baby-nick { font-family: var(--sj-font-display); font-size: 28rpx; font-weight: 900; line-height: 1.15; color: var(--sj-ink); }
+.baby-age { font-family: var(--sj-font-display); font-size: 20rpx; font-weight: 700; color: var(--sj-sub); margin-top: 2rpx; }
 
 /* ---------- 宝宝切换对话框列表（sj-modal 默认 slot） ---------- */
 .baby-switch-list { max-height: 520rpx; width: 100%; }
@@ -737,6 +824,8 @@ export default {
 
 /* ---------- 今日问候条 ---------- */
 .today-strip {
+  position: relative;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -746,11 +835,23 @@ export default {
   padding: 28rpx 32rpx;
   margin-bottom: 24rpx;
 }
-.today-txt { display: flex; flex-direction: column; gap: 6rpx; }
-.tt-hello { font-size: 30rpx; font-weight: 800; color: var(--sj-ink); }
-.tt-sub { font-size: 24rpx; color: var(--sj-sub); }
-.cnt { font-weight: 900; color: var(--sj-primary-deep); }
-.peek-wrap { flex: none; animation: peek 3s ease-in-out infinite; transform-origin: bottom center; }
+/* 天气大图标背景层：置于右半背景，放大后上下/右侧溢出被面板裁切；左侧文字区保持干净，吉祥物压在其右缘 */
+.wx-bg {
+  position: absolute;
+  right: 48rpx;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  width: 256rpx;
+  height: 256rpx;
+}
+.wx-bg image { width: 100%; height: 100%; }
+.today-txt { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 6rpx; min-width: 0; }
+.tt-hello { font-family: var(--sj-font-display); font-size: 32rpx; font-weight: 900; letter-spacing: 2rpx; color: var(--sj-ink); }
+.tt-sub { font-family: var(--sj-font-display); font-size: 24rpx; font-weight: 600; color: var(--sj-sub); }
+.peek-wrap { position: relative; z-index: 1; flex: none; animation: peek 3s ease-in-out infinite; transform-origin: bottom center; }
 @keyframes peek {
   0%, 100% { transform: translateY(0) rotate(0); }
   50% { transform: translateY(-6px) rotate(4deg); }
@@ -781,7 +882,7 @@ export default {
 }
 /* 图标图片圆角与外圈曲线平行（同心）：外半径 24 - 内边距 4 = 20rpx（即图片整圆） */
 .ds-ic .sj-icon { border-radius: 50%; }
-.ds-txt { font-size: 23rpx; font-weight: 700; color: var(--sj-ink); }
+.ds-txt { font-family: var(--sj-font-display); font-size: 23rpx; font-weight: 700; color: var(--sj-ink); }
 
 /* ---------- 时光轴 ---------- */
 .timeline { display: flex; flex-direction: column; padding-bottom: 300rpx; }
@@ -880,6 +981,61 @@ export default {
   flex: none;
   border: 4rpx solid #fff;
   box-shadow: var(--sj-sh-sm);
+}
+/* 视频记录：与照片同尺寸的占位卡，深色遮罩 + 居中播放三角 */
+.rec-video {
+  position: relative;
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 20rpx;
+  flex: none;
+  border: 4rpx solid #fff;
+  box-shadow: var(--sj-sh-sm);
+  overflow: hidden;
+  background: #2a2a2a;
+}
+.rec-video-bg { width: 100%; height: 100%; }
+.rec-video-bg-ph {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #5FB0A8, #3F8F84);
+  color: #fff;
+  opacity: 0.85;
+}
+.rec-video-mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+}
+.rec-video-play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transform: translate(-50%, -50%);
+}
+.rvp-tri {
+  width: 0;
+  height: 0;
+  border-left: 16rpx solid #fff;
+  border-top: 10rpx solid transparent;
+  border-bottom: 10rpx solid transparent;
+  margin-left: 4rpx;
+}
+.rec-video-count {
+  position: absolute;
+  right: 6rpx;
+  bottom: 4rpx;
+  padding: 0 8rpx;
+  border-radius: 8rpx;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 18rpx;
+  font-weight: 700;
 }
 .rec-time { font-size: 23rpx; font-weight: 700; color: var(--sj-faint); flex: none; }
 
@@ -989,9 +1145,17 @@ export default {
 }
 .sheet.open { transform: translateY(0); }
 .sheet-handle { width: 88rpx; height: 10rpx; border-radius: 6rpx; background: var(--sj-line); margin: 4rpx auto 24rpx; }
-.sheet-head { display: flex; align-items: baseline; gap: 16rpx; margin-bottom: 28rpx; }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; margin-bottom: 28rpx; }
+.sh-titles { display: flex; align-items: baseline; gap: 16rpx; }
 .sh-title { font-family: var(--sj-font-display); font-size: 34rpx; font-weight: 900; color: var(--sj-ink); }
 .sh-sub { font-size: 22rpx; font-weight: 600; color: var(--sj-sub); }
+.sh-close {
+  width: 56rpx; height: 56rpx; border-radius: 50%;
+  background: var(--sj-cream);
+  display: flex; align-items: center; justify-content: center; flex: none;
+}
+.sh-close:active { transform: scale(0.92); }
+.sh-close-ic { width: 36rpx; height: 36rpx; }
 .sheet-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20rpx; }
 .tile {
   border-radius: var(--sj-r-md);
@@ -1009,23 +1173,35 @@ export default {
   from { opacity: 0; transform: scale(0.5) translateY(8px); }
   to { opacity: 1; transform: none; }
 }
-.sheet-more { display: flex; align-items: center; gap: 16rpx; margin-top: 24rpx; }
-.sm-label { font-size: 22rpx; font-weight: 800; color: var(--sj-faint); flex: none; letter-spacing: 2rpx; }
-.tile-sm {
-  flex: 1;
+/* 更多记录：分区小标题 + 横向滚动标签行（图标浅圆底 + 文字），避免等宽胶囊挤在一行 */
+.sheet-more { margin-top: 28rpx; }
+.sm-label { display: block; font-size: 22rpx; font-weight: 800; color: var(--sj-faint); letter-spacing: 2rpx; margin-bottom: 16rpx; }
+/* 每行固定 5 个：grid 五列均分，不足一行靠左排列 */
+.more-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16rpx; }
+.more-chip {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
+  align-items: center;
+  gap: 10rpx;
+  background: var(--sj-surface);
+  border: 2rpx solid var(--sj-line);
+  border-radius: var(--sj-r-md);
+  padding: 18rpx 8rpx;
+}
+.more-chip:active { transform: scale(0.95); }
+.mc-ic {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 50%;
+  padding: 6rpx;
+  box-sizing: border-box;
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10rpx;
-  border-radius: var(--sj-r-pill);
-  padding: 16rpx 8rpx;
-  font-size: 23rpx;
-  font-weight: 700;
-  color: var(--sj-ink);
+  flex: none;
 }
-.tile-sm:active { transform: scale(0.92); }
-.tile-sm text { line-height: 1; }
+.mc-ic .sj-icon { border-radius: 50%; }
+.mc-txt { font-size: 23rpx; font-weight: 700; color: var(--sj-ink); line-height: 1; }
 /* 取消按钮：外观由 sj-button ghost 提供，这里只留面板内的位置 */
 .sheet-close { margin-top: 28rpx; }
 

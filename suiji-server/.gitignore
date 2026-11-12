@@ -24,8 +24,10 @@ ENV/
 .python-version
 
 # ---------- 环境变量 / 密钥 ----------
-# .env 含真实凭据，不入库（开源约定）；模板为 .env.example，只含占位符。
+# .env / .env.dev / .env.prod 含真实凭据，不入库；模板为 *.env.example，只含占位符。
 .env
+.env.dev
+.env.prod
 .env.local
 .env.*.local
 *.pem

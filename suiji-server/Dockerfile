@@ -23,7 +23,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # 以非 root 运行：默认 root 起进程时，任何一个 RCE/任意文件读都会直接拿到容器内的
 # root 权限（可读 .env、可改代码卷）。这里建专用用户并只给它数据目录的写权限。
 RUN useradd --create-home --shell /bin/bash suiji \
-    && mkdir -p /app/data /app/data/media \
+    && mkdir -p /app/data /app/data/media /app/data/crypto \
     && chown -R suiji:suiji /app/data
 
 COPY --chown=suiji:suiji app ./app

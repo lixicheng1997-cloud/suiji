@@ -65,6 +65,15 @@ export function summarize(type, payload = {}, occurredAt = '', extra = {}) {
       const n = (p.photos || []).length
       return { title: p.caption || '照片', meta: (n ? n + ' 张照片' : '') + (p.video ? ' · 1 段视频' : '') }
     }
+    case 'video': {
+      const list = (p.videos || [])
+      const n = list.length
+      const total = list.reduce((s, v) => s + (Number(v.duration) || 0), 0)
+      return {
+        title: '成长视频',
+        meta: (n ? n + ' 段 · 共 ' + secText(total) : '')
+      }
+    }
     case 'measure': {
       const parts = []
       if (p.height) parts.push('身高 ' + p.height + 'cm')

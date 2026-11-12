@@ -1,0 +1,204 @@
+{
+  "directions": [
+    {
+      "key": "soft_pop",
+      "name": "软胶泡泡拟物",
+      "desc": "按压软胶 + 泡泡纸捏破的材质瞬态，几乎无明确音高",
+      "fit": "高频点击、想要俏皮手感的产品",
+      "caution": "低频偏闷，夜间需压低音量"
+    },
+    {
+      "key": "paper",
+      "name": "纸沙翻动",
+      "desc": "纸张摩擦的细沙颗粒噪声，柔和沙沙",
+      "fit": "记录 / 备忘录质感、轻量反馈",
+      "caution": "音高感弱，成就情绪撑不起来"
+    },
+    {
+      "key": "glass",
+      "name": "玻璃冰晶",
+      "desc": "高频脆裂泛音 + 清亮尾韵，通透闪亮",
+      "fit": "收藏点亮、成就高光时刻",
+      "caution": "高频偏多，夜间和低端机要收着用"
+    },
+    {
+      "key": "chip",
+      "name": "8-bit 芯片音",
+      "desc": "方波复古电子音，短促数字跳变感",
+      "fit": "儿童向、轻快俏皮、带游戏感",
+      "caution": "风格化强，需权衡是否贴合温馨育儿调性"
+    },
+    {
+      "key": "water",
+      "name": "水波氛围",
+      "desc": "水滴 + 水纹环境铺底，治愈安静",
+      "fit": "纪念场景、安静陪伴感",
+      "caution": "点击音偏轻，辨识度一般"
+    },
+    {
+      "key": "sweep",
+      "name": "滤波扫频",
+      "desc": "频段扫过的动态“嗖”，靠滤波而非音高表意",
+      "fit": "面板开合、步进、转场反馈",
+      "caution": "单独做确认音不够落定，需配落定音"
+    }
+  ],
+  "items": [
+    {
+      "dir": "soft_pop",
+      "role": "tap",
+      "file": "novel_soft_pop_tap.wav",
+      "title": "软胶泡泡拟物",
+      "desc": "按压软胶 + 泡泡纸捏破的材质瞬态，几乎无明确音高",
+      "fit": "高频点击、想要俏皮手感的产品",
+      "caution": "低频偏闷，夜间需压低音量",
+      "role_label": "点击代表",
+      "duration_ms": 130.0,
+      "peak_dbfs": -7.0,
+      "lufs": -17.8
+    },
+    {
+      "dir": "soft_pop",
+      "role": "win",
+      "file": "novel_soft_pop_win.wav",
+      "title": "软胶泡泡拟物",
+      "desc": "按压软胶 + 泡泡纸捏破的材质瞬态，几乎无明确音高",
+      "fit": "高频点击、想要俏皮手感的产品",
+      "caution": "低频偏闷，夜间需压低音量",
+      "role_label": "成就代表",
+      "duration_ms": 620.0,
+      "peak_dbfs": -3.0,
+      "lufs": -16.3
+    },
+    {
+      "dir": "paper",
+      "role": "tap",
+      "file": "novel_paper_tap.wav",
+      "title": "纸沙翻动",
+      "desc": "纸张摩擦的细沙颗粒噪声，柔和沙沙",
+      "fit": "记录 / 备忘录质感、轻量反馈",
+      "caution": "音高感弱，成就情绪撑不起来",
+      "role_label": "点击代表",
+      "duration_ms": 150.0,
+      "peak_dbfs": -1.5,
+      "lufs": -17.8
+    },
+    {
+      "dir": "paper",
+      "role": "win",
+      "file": "novel_paper_win.wav",
+      "title": "纸沙翻动",
+      "desc": "纸张摩擦的细沙颗粒噪声，柔和沙沙",
+      "fit": "记录 / 备忘录质感、轻量反馈",
+      "caution": "音高感弱，成就情绪撑不起来",
+      "role_label": "成就代表",
+      "duration_ms": 550.0,
+      "peak_dbfs": -0.6,
+      "lufs": -16.3
+    },
+    {
+      "dir": "glass",
+      "role": "tap",
+      "file": "novel_glass_tap.wav",
+      "title": "玻璃冰晶",
+      "desc": "高频脆裂泛音 + 清亮尾韵，通透闪亮",
+      "fit": "收藏点亮、成就高光时刻",
+      "caution": "高频偏多，夜间和低端机要收着用",
+      "role_label": "点击代表",
+      "duration_ms": 200.0,
+      "peak_dbfs": -1.6,
+      "lufs": -17.8
+    },
+    {
+      "dir": "glass",
+      "role": "win",
+      "file": "novel_glass_win.wav",
+      "title": "玻璃冰晶",
+      "desc": "高频脆裂泛音 + 清亮尾韵，通透闪亮",
+      "fit": "收藏点亮、成就高光时刻",
+      "caution": "高频偏多，夜间和低端机要收着用",
+      "role_label": "成就代表",
+      "duration_ms": 720.0,
+      "peak_dbfs": -0.7,
+      "lufs": -16.3
+    },
+    {
+      "dir": "chip",
+      "role": "tap",
+      "file": "novel_chip_tap.wav",
+      "title": "8-bit 芯片音",
+      "desc": "方波复古电子音，短促数字跳变感",
+      "fit": "儿童向、轻快俏皮、带游戏感",
+      "caution": "风格化强，需权衡是否贴合温馨育儿调性",
+      "role_label": "点击代表",
+      "duration_ms": 120.0,
+      "peak_dbfs": -11.1,
+      "lufs": -17.8
+    },
+    {
+      "dir": "chip",
+      "role": "win",
+      "file": "novel_chip_win.wav",
+      "title": "8-bit 芯片音",
+      "desc": "方波复古电子音，短促数字跳变感",
+      "fit": "儿童向、轻快俏皮、带游戏感",
+      "caution": "风格化强，需权衡是否贴合温馨育儿调性",
+      "role_label": "成就代表",
+      "duration_ms": 600.0,
+      "peak_dbfs": -6.5,
+      "lufs": -16.3
+    },
+    {
+      "dir": "water",
+      "role": "tap",
+      "file": "novel_water_tap.wav",
+      "title": "水波氛围",
+      "desc": "水滴 + 水纹环境铺底，治愈安静",
+      "fit": "纪念场景、安静陪伴感",
+      "caution": "点击音偏轻，辨识度一般",
+      "role_label": "点击代表",
+      "duration_ms": 180.0,
+      "peak_dbfs": -11.9,
+      "lufs": -17.8
+    },
+    {
+      "dir": "water",
+      "role": "win",
+      "file": "novel_water_win.wav",
+      "title": "水波氛围",
+      "desc": "水滴 + 水纹环境铺底，治愈安静",
+      "fit": "纪念场景、安静陪伴感",
+      "caution": "点击音偏轻，辨识度一般",
+      "role_label": "成就代表",
+      "duration_ms": 1450.0,
+      "peak_dbfs": -2.1,
+      "lufs": -16.3
+    },
+    {
+      "dir": "sweep",
+      "role": "tap",
+      "file": "novel_sweep_tap.wav",
+      "title": "滤波扫频",
+      "desc": "频段扫过的动态“嗖”，靠滤波而非音高表意",
+      "fit": "面板开合、步进、转场反馈",
+      "caution": "单独做确认音不够落定，需配落定音",
+      "role_label": "点击代表",
+      "duration_ms": 130.0,
+      "peak_dbfs": -12.2,
+      "lufs": -17.8
+    },
+    {
+      "dir": "sweep",
+      "role": "win",
+      "file": "novel_sweep_win.wav",
+      "title": "滤波扫频",
+      "desc": "频段扫过的动态“嗖”，靠滤波而非音高表意",
+      "fit": "面板开合、步进、转场反馈",
+      "caution": "单独做确认音不够落定，需配落定音",
+      "role_label": "成就代表",
+      "duration_ms": 550.0,
+      "peak_dbfs": -5.0,
+      "lufs": -16.3
+    }
+  ]
+}

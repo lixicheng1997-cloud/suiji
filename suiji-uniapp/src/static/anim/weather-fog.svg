@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" role="img" aria-label="雾">
+<style>
+  .bob{animation:fbob 3.4s ease-in-out infinite;transform-origin:70px 70px}
+  @keyframes fbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+  .h1{animation:hslide 3.2s ease-in-out infinite}
+  .h2{animation:hslide 3.2s ease-in-out .6s infinite}
+  .h3{animation:hslide 3.2s ease-in-out 1.2s infinite}
+  @keyframes hslide{0%,100%{transform:translateX(-5px);opacity:.55}50%{transform:translateX(5px);opacity:1}}
+</style>
+<g class="bob">
+  <path d="M42 74 a17 17 0 0 1 3-33 22 22 0 0 1 41 5 15 15 0 0 1 7 28 Z" fill="#EDE6DA" stroke="#8A7466" stroke-width="4.5" stroke-linejoin="round"/>
+  <circle cx="60" cy="56" r="4.4" fill="#4A3226"/><circle cx="76" cy="56" r="4.4" fill="#4A3226"/>
+  <path d="M64 63 q4 4 8 0" stroke="#4A3226" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+  <ellipse cx="52" cy="62" rx="5" ry="3" fill="#F9A8B8" opacity=".7"/>
+  <ellipse cx="84" cy="62" rx="5" ry="3" fill="#F9A8B8" opacity=".7"/>
+  <line class="h1" x1="34" y1="92" x2="92" y2="92" stroke="#B9A896" stroke-width="5" stroke-linecap="round"/>
+  <line class="h2" x1="48" y1="104" x2="106" y2="104" stroke="#B9A896" stroke-width="5" stroke-linecap="round"/>
+  <line class="h3" x1="30" y1="116" x2="84" y2="116" stroke="#B9A896" stroke-width="5" stroke-linecap="round"/>
+</g>
+</svg>

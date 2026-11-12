@@ -1,0 +1,101 @@
+# 开发环境覆盖（local dev）：在 docker-compose.yml 底座之上叠加调试友好的配置。
+#
+# 启动：
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file .env.dev up -d
+#
+# 与生产的关键差异：
+#   1. api 挂载源码卷，配合 uvicorn --reload 实现代码改动即时生效（生产镜像内为冻结代码）；
+#   2. 开发数据全部走 Docker 具名卷（见末尾 volumes），不 bind mount 到本地代码目录，
+#      避免数据库 / 对象存储 / 加密密钥落到项目文件夹；彻底清空开发库用 `down -v`；
+#   3. 打开 CORS（H5 开发服务器 5173/5174 跨域调试）、放开 swagger 文档访问；
+#   4. 允许降级（SUIJI_ALLOW_FALLBACK=1），依赖挂掉时可回退 SQLite / 本地磁盘继续调试；
+#   5. minio / minio-init 沿用本机已有镜像（原 override.yml 的加速器 workaround）。
+
+services:
+  db:
+    environment:
+      # 开发库名与生产隔离（值来自 .env.dev 的 POSTGRES_DB）
+      POSTGRES_DB: ${POSTGRES_DB:-suiji_dev}
+    volumes:
+      # 具名卷：PostgreSQL 数据由 Docker 托管，不写进项目目录
+      - suiji-dev-postgres:/var/lib/postgresql/data
+
+  redis:
+    volumes:
+      - suiji-dev-redis:/data
+
+  minio:
+    # 本机镜像加速器拉不到官方 minio/minio 与 minio/mc（403），沿用本地等价镜像；
+    # 恢复官方镜像：删除本文件中两处 image 覆盖即可。
+    image: pgsty/minio:RELEASE.2026-03-25T00-00-00Z
+    volumes:
+      - suiji-dev-minio:/data
+
+  minio-init:
+    image: minio/mc:latest
+
+  # 一次性初始化容器：以 root 把 dev 具名卷（media / crypto）的属主改成镜像内
+  # 非 root 用户 suiji（uid/gid 1000）。
+  # 背景：空具名卷首次挂载时卷根由 Docker 初始化为 root:0，而 api 进程以 1000 运行，
+  # 会写不进 RSA 私钥 / field_key.bin，导致传输加密未启用、/crypto/public-key 返回 404。
+  # 生产用 ./data bind mount，属主由宿主目录兜底，不需要这个容器。
+  dev-init:
+    image: suiji-server-api:latest
+    build: .
+    user: root
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        chown -R 1000:1000 /app/data/media /app/data/crypto
+        chmod -R u+rwX /app/data/media /app/data/crypto
+    volumes:
+      - suiji-dev-media:/app/data/media
+      - suiji-dev-crypto:/app/data/crypto
+    restart: "no"
+
+  api:
+    environment:
+      # 源码热更新：挂载 app/ 到容器内，进程以 --reload 启动
+      RELOAD: "1"
+      # 开发允许回退：Postgres / MinIO 不可用时降级 SQLite / 本地磁盘，便于离线调试
+      SUIJI_ALLOW_FALLBACK: "1"
+      # 放开 H5 开发服务器跨域（值来自 .env.dev 的 CORS_ORIGINS）
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174}
+      # 开发环境迁移自动执行，方便切分支后直接起库
+      RUN_MIGRATIONS: "1"
+      # 开发阶段加密保持 optional：冒烟脚本与旧客户端明文请求不被拦
+      CRYPTO_MODE: ${CRYPTO_MODE:-optional}
+    volumes:
+      # 源码卷：改动本地 app/ 即触发热重载（唯一的本地 bind mount，仅代码不含数据）
+      - "./app:/app/app:ro"
+      # 媒体与加密密钥同样用具名卷，不落到项目目录
+      - suiji-dev-media:/app/data/media
+      - suiji-dev-crypto:/app/data/crypto
+    # 等 dev-init 把数据卷属主改好再启动，避免以 1000 写不进 root 属主的目录
+    depends_on:
+      dev-init:
+        condition: service_completed_successfully
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --reload
+
+  nginx:
+    environment:
+      # 开发环境放开 /docs /openapi.json（容器网桥与私网段已放行，这里追加 all 便于局域网调试）
+      NGINX_ADMIN_ALLOW: ${NGINX_ADMIN_ALLOW:-all}
+
+# 开发环境专用具名卷：数据由 Docker 托管，不进入项目代码目录。
+# 清空全部开发数据：docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file .env.dev down -v
+volumes:
+  suiji-dev-postgres:
+  suiji-dev-redis:
+  suiji-dev-minio:
+  suiji-dev-media:
+  suiji-dev-crypto:

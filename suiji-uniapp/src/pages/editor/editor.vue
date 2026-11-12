@@ -165,12 +165,11 @@
           <sj-button class="custom-add" size="mini" text="添加" @click="addCustomMilestone" />
         </view>
 
-        <view class="pg-sec"><text>达成时间</text></view>
-        <sj-datetime-picker class="pk-wrap" mode="time" :value="times.milestone" @change="onTimeChange('milestone', $event)">
+        <view class="pg-sec"><text>达成日期</text></view>
+        <sj-datetime-picker class="pk-wrap" mode="date" :value="milestoneDate" @change="onMilestoneDate">
           <view class="pg-field pk-field" hover-class="hover-press" :hover-stay-time="80">
-            <text class="pf-label">时间</text>
-            <text class="pf-val">{{ times.milestone }} ▾</text>
-            <!-- <text class="pf-unit">{{ todayLabel }}</text> -->
+            <text class="pf-label">日期</text>
+            <text class="pf-val">{{ milestoneDate }} ▾</text>
           </view>
         </sj-datetime-picker>
         <view class="pg-field">
@@ -203,6 +202,23 @@
 
         <view class="pg-sec"><text>备注</text></view>
         <!-- 备注（sj-textarea：白底描边容器由组件自绘，上限 500 字，超出会被输入框挡在本地） -->
+        <sj-textarea v-model="note" placeholder="写点什么…" :maxlength="500" height="176rpx" />
+      </block>
+
+      <!-- ========== 视频 ========== -->
+      <block v-else-if="type === 'video'">
+        <view class="pg-sec"><text>视频片段</text><text class="hint-chip">单段 ≤30 秒 · 最多 9 段</text></view>
+        <sj-video-picker v-model="videos" :max="9" :max-seconds="30" />
+
+        <view class="pg-sec"><text>拍摄时间</text></view>
+        <sj-datetime-picker class="pk-wrap" mode="time" :value="times.photo" @change="onTimeChange('photo', $event)">
+          <view class="pg-field pk-field" hover-class="hover-press" :hover-stay-time="80">
+            <text class="pf-label">时间</text>
+            <text class="pf-val">{{ times.photo }} ▾</text>
+          </view>
+        </sj-datetime-picker>
+
+        <view class="pg-sec"><text>备注</text></view>
         <sj-textarea v-model="note" placeholder="写点什么…" :maxlength="500" height="176rpx" />
       </block>
 
@@ -460,10 +476,12 @@ export default {
     return {
       TYPES,
       /* 类型胶囊行顺序（对齐 v2 P09 设计稿） */
-      typeKeys: ['feeding', 'sleep', 'milestone', 'measure', 'poop', 'temp', 'med', 'photo', 'mood', 'voice'],
+      typeKeys: ['feeding', 'sleep', 'milestone', 'measure', 'poop', 'temp', 'med', 'photo', 'video', 'mood', 'voice'],
       type: 'feeding',
       entryId: '',
       photos: [],
+      /* 视频段列表（sj-video-picker v-model）：[{ path, duration, size, thumb }] */
+      videos: [],
       /* 语音录入结果（sj-voice-sheet v-model）：{ duration, wave, segments, url, path, platform } */
       voice: null,
       /* 保存中：照片上传期间禁止重复提交 */
@@ -475,8 +493,12 @@ export default {
       lastMeasure: null,
       /* 测量日期（默认今天；补录可改过去日期，保存时并入 occurred_at） */
       measureDate: todayKeyStr(),
+      /* 里程碑达成日期（默认今天；补录可改过去日期，保存时并入 occurred_at） */
+      milestoneDate: todayKeyStr(),
       /* 编辑模式记下的原 occurred_at：保存时日期未改则沿用原时间戳（保留原始时刻） */
       measureOccurred: '',
+      /* 里程碑编辑模式原 occurred_at：日期未改时沿用原时间戳，保留原始时刻 */
+      milestoneOccurred: '',
       /* 喂养表单"智能带入"数据源：最近一次有奶量的喂养记录（{ amount, occurred_at }），无记录为 null */
       lastFeeding: null,
 
@@ -487,12 +509,12 @@ export default {
       /* 心情爱心评分（sj-rate，0–5；0 表示未评分，保存并入 mood payload 的 rate 字段） */
       moodRate: 0,
 
-      /* 各类型时间行的时间值（picker mode="time" 要求 HH:mm），默认带入当前时间 */
+      /* 各类型时间行的时间值（picker mode="time" 要求 HH:mm），默认带入当前时间；
+         里程碑已改为日期选择，日期值见 milestoneDate，不再占用 times.milestone */
       times: {
         feeding: nowHHmm(),
         sleepStart: nowHHmm(),
         sleepEnd: nowHHmm(30),
-        milestone: nowHHmm(),
         photo: nowHHmm(),
         poop: nowHHmm(),
         temp: nowHHmm(),
@@ -630,6 +652,16 @@ export default {
         }
         /* 已有照片回填（fetchEntry 返回 payload.photos / entry_media 的展示地址） */
         if (Array.isArray(e.photos) && e.photos.length) this.photos = e.photos.slice()
+        /* 已有视频回填：payload.videos 是 [{ url, duration, size }] 云端项；
+         * sj-video-picker 接受 path=云端 url 的项（isCloud 分支内联播放） */
+        if (e.type === 'video' && e.payload && Array.isArray(e.payload.videos)) {
+          this.videos = e.payload.videos.map(v => ({
+            path: v.url || '',
+            duration: Number(v.duration) || 0,
+            size: Number(v.size) || 0,
+            thumb: v.thumb || ''
+          })).filter(v => v.path)
+        }
         /* 语音回填：payload.voice（旧数据）或 type=voice 的顶层语音字段，切到试听态 */
         if (e.type === 'voice') {
           const v = (e.payload && (e.payload.voice || e.payload)) || null
@@ -720,6 +752,10 @@ export default {
     onMeasureDate(e) {
       this.measureDate = e.detail.value
     },
+    /* 里程碑达成日期选择回填（sj-datetime-picker date 模式回传 'YYYY-MM-DD'） */
+    onMilestoneDate(e) {
+      this.milestoneDate = e.detail.value
+    },
     /* 睡眠真实计时：首次点击开始，再次点击结束并回填睡眠区间与时长 */
     onTimer() {
       if (!this.timerStart) {
@@ -784,11 +820,16 @@ export default {
           setTime('sleepEnd', t.sleepEnd || tail(p.end))
           break
         }
-        case 'milestone':
-          setTime('milestone', t.milestone || hm)
+        case 'milestone': {
+          /* 里程碑按日期回填：取原 occurred_at 的日期部分；原完整时间戳记下，保存时日期未改可原样沿用 */
+          this.milestoneOccurred = String(e.occurred_at || '')
+          if (/^\d{4}-\d{2}-\d{2}$/.test(this.milestoneOccurred.slice(0, 10))) {
+            this.milestoneDate = this.milestoneOccurred.slice(0, 10)
+          }
           /* 日期不确定：保存时落 backfill 徽标，回显原路取回 */
           this.switches.dateUncertain = e.badge === 'backfill'
           break
+        }
         case 'photo':
           setTime('photo', t.photo || hm)
           break
@@ -852,6 +893,9 @@ export default {
           return { name: this.single.milestonePick }
         case 'photo':
           return { photos: this.photos, video: 0 }
+        case 'video':
+          /* videos 数组形状由 sj-video-picker 决定；保存时 api.saveEntry 会把本地段传 /files 换云端 url */
+          return { videos: this.videos.map(v => ({ path: v.path, duration: v.duration || 0, size: v.size || 0 })) }
         case 'measure':
           return {
             height: n('height'),
@@ -898,6 +942,12 @@ export default {
         play('S04')
         return
       }
+      /* 视频：至少录/选一段，且每段时长已由 picker 硬限 30s */
+      if (this.type === 'video' && !(this.videos && this.videos.length)) {
+        this.$refs.ntf.show({ type: 'warn', message: '先录制或选择一段视频' })
+        play('S04')
+        return
+      }
       /* 里程碑自定义面板里已输入但没点「添加」的名称：保存时自动落选，
          否则 buildPayload 仍取旧选中值，用户以为已改成自定义、实际保存的还是原选项 */
       if (this.type === 'milestone' && this.msCustomOpen && (this.msCustom || '').trim()) {
@@ -906,6 +956,12 @@ export default {
       /* 测量日期不能晚于今天 */
       if (this.type === 'measure' && this.measureDate > todayKeyStr()) {
         this.$refs.ntf.show({ type: 'warn', message: '测量日期不能晚于今天' })
+        play('S04')
+        return
+      }
+      /* 里程碑达成日期不能晚于今天 */
+      if (this.type === 'milestone' && this.milestoneDate > todayKeyStr()) {
+        this.$refs.ntf.show({ type: 'warn', message: '达成日期不能晚于今天' })
         play('S04')
         return
       }
@@ -928,6 +984,10 @@ export default {
         return
       }
       const localPhotos = this.photos.filter(p => !/^(https?:|\/api\/|data:|blob:)/i.test(String(p || '')))
+      /* 本地视频段：path 不是云端 URL 的都要先传 /files */
+      const localVideos = this.type === 'video'
+        ? (this.videos || []).filter(v => v && !/^(https?:|\/api\/)/i.test(String(v.path || '')))
+        : []
       /* 语音分段同理：blob:/temp 路径都要先传 /files 换云端地址 */
       const localVoice = this.type === 'voice'
         ? (this.voice.segments || []).filter(s => s && !/^(https?:|\/api\/)/i.test(String(s.url || s.path || '')))
@@ -936,15 +996,18 @@ export default {
       /* 串行逐张上传 + 落库，1~15 秒量级：全屏阻断，避免用户以为没响应而重复提交或切页 */
       const busy = localPhotos.length
         ? '正在上传 ' + localPhotos.length + ' 张照片…'
-        : (localVoice.length ? '正在上传 ' + localVoice.length + ' 段语音…' : '正在保存记录…')
-      const ld = ui.loading(busy, { sub: (localPhotos.length || localVoice.length) ? '保持应用打开，勿切后台' : '', timeout: 180000 })
+        : (localVideos.length
+          ? '正在上传 ' + localVideos.length + ' 段视频…'
+          : (localVoice.length ? '正在上传 ' + localVoice.length + ' 段语音…' : '正在保存记录…'))
+      const ld = ui.loading(busy, { sub: (localPhotos.length || localVideos.length || localVoice.length) ? '保持应用打开，勿切后台' : '', timeout: 300000 })
       const entry = {
         type: this.type,
         /* 保存 payload 时一并带上各时间行的当前值 */
         payload: { ...this.buildPayload(), times: this.times },
         /* measure 表单无备注框，体检摘要文本作为记录备注 */
         note: this.type === 'measure' ? (this.summary || this.note) : this.note,
-        photos: this.photos
+        photos: this.photos,
+        videos: this.type === 'video' ? this.videos : []
       }
       if (this.entryId) entry.id = this.entryId
       /* 测量自定义日期：occurred_at = 所选日期 + 当前时刻；编辑时日期未改则沿用原时间戳（保留原始时刻） */
@@ -952,6 +1015,12 @@ export default {
         entry.occurred_at = (this.measureOccurred && String(this.measureOccurred).slice(0, 10) === this.measureDate)
           ? this.measureOccurred
           : this.measureDate + ' ' + nowHHmm()
+      }
+      /* 里程碑达成日期：occurred_at = 所选日期 + 当前时刻；编辑时日期未改则沿用原时间戳（保留原始时刻） */
+      if (this.type === 'milestone') {
+        entry.occurred_at = (this.milestoneOccurred && String(this.milestoneOccurred).slice(0, 10) === this.milestoneDate)
+          ? this.milestoneOccurred
+          : this.milestoneDate + ' ' + nowHHmm()
       }
       if (this.type === 'milestone' && this.switches.dateUncertain) entry.backfill = true
       /* 里程碑首次达成判定：必须在调用 saveEntry 前采样缓存——
@@ -1029,7 +1098,7 @@ export default {
   flex: none;
 }
 .bk:active { transform: scale(0.92); }
-.bk-ic { width: 56rpx; height: 56rpx; }
+.bk-ic { width: 40rpx; height: 40rpx; }
 /* 标题行：标题 + 当前记录类型徽标（整行占位，右侧宝宝标签不受影响） */
 .pg-title-row { flex: 1; display: flex; align-items: center; gap: 14rpx; min-width: 0; }
 .pg-title {

@@ -9,11 +9,16 @@ __pycache__
 .gitignore
 .idea
 .env
+.env.dev
+.env.prod
 data
+data-dev
 tests
 scripts
 smoke_test.py
 pytest.ini
 API-CONTRACT.md
 docker-compose.yml
+docker-compose.dev.yml
+docker-compose.prod.yml
 Dockerfile

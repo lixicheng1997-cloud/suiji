@@ -64,11 +64,12 @@ def test_upload_download_and_meta(client):
 
 
 def test_storage_key_is_family_date_filename(client):
-    """对象路径按 {家庭}/{日期}/{文件名} 归档（MEDIA_BACKEND=local 下同构落盘）。"""
+    """对象路径按 {家庭}/{宝宝}/{用户}/{分类}/{日期}/{文件名} 归档（MEDIA_BACKEND=local 下同构落盘）。"""
     headers = _auth(client)
     f = _upload(client, headers, name="报告.pdf").json()
-    assert re.match(r"^[^/]+/\d{4}-\d{2}-\d{2}/报告\.pdf$", f["storage_key"]), f["storage_key"]
-    assert f["storage_key"].split("/")[1] == datetime.now().strftime("%Y-%m-%d")
+    # 新格式：{family}/{baby=common}/{user}/{category=docs}/{date}/{filename}
+    assert re.match(r"^[^/]+/common/[^/]+/docs/\d{4}-\d{2}-\d{2}/报告\.pdf$", f["storage_key"]), f["storage_key"]
+    assert f["storage_key"].split("/")[4] == datetime.now().strftime("%Y-%m-%d")
 
     # 同一天同名但内容不同：不能互相覆盖，key 追加 sha 短码区分
     g = _upload(client, headers, name="报告.pdf", data=PDF + b"x").json()

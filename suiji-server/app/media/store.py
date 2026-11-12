@@ -62,11 +62,36 @@ def day_dir(when: datetime | None = None) -> str:
     return when.strftime("%Y-%m-%d")
 
 
+def _category_of(content_type: str) -> str:
+    """按 MIME 推断一级分类目录：images / videos / audio / docs / files。"""
+    ct = (content_type or "").lower()
+    if ct.startswith("image/"):
+        return "images"
+    if ct.startswith("video/"):
+        return "videos"
+    if ct.startswith("audio/"):
+        return "audio"
+    if ct.startswith("text/") or ct in ("application/pdf",):
+        return "docs"
+    return "files"
+
+
 def object_key(family_id: str, filename: str = "", suffix: str = "", sha256_hex: str = "",
-               when: datetime | None = None) -> str:
-    """对象路径：{family_id}/{YYYY-MM-DD}/{文件名}。"""
+               when: datetime | None = None, content_type: str = "", baby_id: str = "",
+               user_id: str = "") -> str:
+    """对象路径：{family_id}/{baby_id}/{user_id}/{category}/{YYYY-MM-DD}/{文件名}。
+
+    - family_id：家庭隔离（必须）
+    - baby_id：按宝宝分目录，多宝宝家庭下文件天然分开；无 baby_id 落 common/
+    - user_id：按上传人分目录，便于后续统计「谁拍的」；无 user_id 落 common/
+    - category：images/videos/audio/docs/files，按 MIME 自动分
+    - date：归档日期，按天聚合
+    """
     family = _FAMILY_RE.sub("_", (family_id or "").strip()) or "unknown"
-    return f"{family}/{day_dir(when)}/{_safe_filename(filename, suffix, sha256_hex)}"
+    baby = _FAMILY_RE.sub("_", (baby_id or "").strip()) or "common"
+    user = _FAMILY_RE.sub("_", (user_id or "").strip()) or "common"
+    cat = _category_of(content_type)
+    return f"{family}/{baby}/{user}/{cat}/{day_dir(when)}/{_safe_filename(filename, suffix, sha256_hex)}"
 
 
 def _conflict_key(key: str, sha256_hex: str, n: int) -> str:
@@ -90,7 +115,7 @@ def _unique_key(store: "MediaStore", key: str, sha256_hex: str) -> str:
 class MediaStore(ABC):
     @abstractmethod
     def save(self, data: bytes, sha256_hex: str, suffix: str = "", content_type: str = "",
-             family_id: str = "", filename: str = "") -> str:
+             family_id: str = "", filename: str = "", baby_id: str = "", user_id: str = "") -> str:
         """落盘（或上传）并返回 storage_key。"""
 
     @abstractmethod
@@ -123,13 +148,15 @@ class MediaStore(ABC):
         return None
 
     def save_stream(self, src, size: int, sha256_hex: str, suffix: str = "",
-                    content_type: str = "", family_id: str = "", filename: str = "") -> str:
+                    content_type: str = "", family_id: str = "", filename: str = "",
+                    baby_id: str = "", user_id: str = "") -> str:
         """流式落存储：src 为可读二进制流（会被 seek(0)）。
 
         默认实现读全量到内存，子类可覆写成真正的流式写入，避免大文件吃内存。
         """
         src.seek(0)
-        return self.save(src.read(), sha256_hex, suffix, content_type, family_id, filename)
+        return self.save(src.read(), sha256_hex, suffix, content_type, family_id, filename,
+                         baby_id, user_id)
 
 
 class LocalMediaStore(MediaStore):
@@ -145,9 +172,10 @@ class LocalMediaStore(MediaStore):
         return self.base_dir / safe
 
     def save(self, data: bytes, sha256_hex: str, suffix: str = "", content_type: str = "",
-             family_id: str = "", filename: str = "") -> str:
-        storage_key = _unique_key(self, self._new_key(sha256_hex, suffix, family_id, filename),
-                                  sha256_hex)
+             family_id: str = "", filename: str = "", baby_id: str = "", user_id: str = "") -> str:
+        storage_key = _unique_key(self,
+            self._new_key(sha256_hex, suffix, family_id, filename, content_type, baby_id, user_id),
+            sha256_hex)
         dest = self._resolve(storage_key)
         dest.parent.mkdir(parents=True, exist_ok=True)
         if not dest.exists():
@@ -156,9 +184,11 @@ class LocalMediaStore(MediaStore):
         return storage_key
 
     def save_stream(self, src, size: int, sha256_hex: str, suffix: str = "",
-                    content_type: str = "", family_id: str = "", filename: str = "") -> str:
-        storage_key = _unique_key(self, self._new_key(sha256_hex, suffix, family_id, filename),
-                                  sha256_hex)
+                    content_type: str = "", family_id: str = "", filename: str = "",
+                    baby_id: str = "", user_id: str = "") -> str:
+        storage_key = _unique_key(self,
+            self._new_key(sha256_hex, suffix, family_id, filename, content_type, baby_id, user_id),
+            sha256_hex)
         dest = self._resolve(storage_key)
         if not dest.exists():
             dest.parent.mkdir(parents=True, exist_ok=True)
@@ -184,10 +214,12 @@ class LocalMediaStore(MediaStore):
         return p if p.is_file() else None
 
     @staticmethod
-    def _new_key(sha256_hex: str, suffix: str, family_id: str, filename: str) -> str:
+    def _new_key(sha256_hex: str, suffix: str, family_id: str, filename: str,
+                 content_type: str = "", baby_id: str = "", user_id: str = "") -> str:
         if not family_id and not filename:
             return content_key(sha256_hex, suffix)
-        return object_key(family_id, filename, suffix, sha256_hex)
+        return object_key(family_id, filename, suffix, sha256_hex,
+                          content_type=content_type, baby_id=baby_id, user_id=user_id)
 
     def delete(self, storage_key: str) -> None:
         try:
@@ -261,9 +293,9 @@ class MinioMediaStore(MediaStore):
         logger.warning("%s，将在下次读写时重试", msg)
 
     def save(self, data: bytes, sha256_hex: str, suffix: str = "", content_type: str = "",
-             family_id: str = "", filename: str = "") -> str:
+             family_id: str = "", filename: str = "", baby_id: str = "", user_id: str = "") -> str:
         return self.save_stream(BytesIO(data), len(data), sha256_hex, suffix, content_type,
-                                family_id, filename)
+                                family_id, filename, baby_id, user_id)
 
     def path(self, storage_key: str) -> Path | None:
         return None  # 对象无本地路径，下载走 url() / open_stream()
@@ -276,11 +308,13 @@ class MinioMediaStore(MediaStore):
             return False
 
     def save_stream(self, src, size: int, sha256_hex: str, suffix: str = "",
-                    content_type: str = "", family_id: str = "", filename: str = "") -> str:
+                    content_type: str = "", family_id: str = "", filename: str = "",
+                    baby_id: str = "", user_id: str = "") -> str:
         """流式直传对象存储：不把整份文件读进内存。"""
         self._ensure_bucket()
-        base = object_key(family_id, filename, suffix, sha256_hex) if (family_id or filename) \
-            else content_key(sha256_hex, suffix)
+        base = object_key(family_id, filename, suffix, sha256_hex,
+                          content_type=content_type, baby_id=baby_id, user_id=user_id) \
+            if (family_id or filename) else content_key(sha256_hex, suffix)
         storage_key = _unique_key(self, base, sha256_hex)
         ct = content_type or mimetypes.guess_type(storage_key)[0] or "application/octet-stream"
         src.seek(0)

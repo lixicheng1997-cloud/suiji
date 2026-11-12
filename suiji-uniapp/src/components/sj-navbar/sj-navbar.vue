@@ -116,8 +116,8 @@ export default {
   box-sizing: border-box;
 }
 .sj-nb-bk-ic {
-  width: 56rpx;
-  height: 56rpx;
+  width: 40rpx;
+  height: 40rpx;
 }
 .sj-nb-title {
   min-width: 0;

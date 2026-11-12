@@ -64,10 +64,14 @@ def _inline_ok(row: FileObject) -> bool:
 @router.post("")
 def upload(file: UploadFile = File(...), business_type: str = Form(""),
            business_id: str = Form(""), baby_id: str = Form(""),
+           duration: float = Form(0),
            db: Session = Depends(get_db), auth: AuthContext = Depends(require_family_write),
            _rl=rate_limit("upload", settings.rl_upload, settings.rl_upload_window)):
-    """POST /files：multipart 上传，返回文件行（storage_key 即对象存储路径）。"""
-    return file_service.upload_file(db, auth, file, business_type, business_id, baby_id)
+    """POST /files：multipart 上传，返回文件行（storage_key 即对象存储路径）。
+
+    duration：视频时长（秒，客户端从 chooseVideo/录制结果读到），仅 video/* 时参与校验。
+    """
+    return file_service.upload_file(db, auth, file, business_type, business_id, baby_id, duration)
 
 
 @router.post("/batch")

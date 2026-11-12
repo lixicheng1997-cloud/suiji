@@ -257,7 +257,7 @@ export default {
   align-items: center;
   justify-content: center;
 }
-.ex-ic { width: 36rpx; height: 36rpx; }
+.ex-ic { width: 40rpx; height: 40rpx; }
 
 /* ---------- 跳过（首次引导模式） ---------- */
 .bk-skip {

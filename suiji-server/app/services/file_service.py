@@ -198,16 +198,41 @@ def _insert_row(db: Session, auth: AuthContext, storage_key: str, name: str,
 
 
 def upload_file(db: Session, auth: AuthContext, upload: UploadFile, business_type: str = "",
-                business_id: str = "", baby_id: str = "") -> dict:
-    """上传单个文件：字节入对象存储，数据库只写一行路径台账。"""
+                business_id: str = "", baby_id: str = "", duration: float = 0) -> dict:
+    """上传单个文件：字节入对象存储，数据库只写一行路径台账。
+
+    duration：客户端在选视频/录制后从 tempFile 读到的时长（秒），仅对 video/* 生效。
+    服务端不做容器解析（无 ffmpeg），以客户端上报值为准做硬上限兜底——
+    前端录制时已用 maxDuration 限制，这里是防绕过/选相册长视频的第二道闸。
+    """
     business_type = (business_type or "").strip().lower()
     business_id = (business_id or "").strip()
     baby_id = (baby_id or "").strip()
     _check_owner(db, auth, business_type, business_id, baby_id)
 
     name = upload.filename or ""
+    # read_spool 会按 max_bytes 截断；先按通用上限读，读完再看是否为视频并按视频上限重校
     spool, sha, size = read_spool(upload, settings.file_max_bytes)
     ext, content_type = validate_content(name, head_of(spool))
+
+    is_video = content_type.startswith("video/")
+    if is_video:
+        # 视频单文件大小硬上限（30s@高码率约 30-50MB，给到 100MB 留余量）
+        if size > settings.video_max_bytes:
+            spool.close()
+            raise HTTPException(
+                status_code=422,
+                detail=f"视频超过 {settings.video_max_bytes // (1024 * 1024)}MB 上限，请压缩后再传")
+        # 时长校验：客户端上报 ≤0 时跳过（图片/音频不会传）；>上限直接拒
+        try:
+            dur = float(duration or 0)
+        except (TypeError, ValueError):
+            dur = 0.0
+        if dur > settings.video_max_seconds:
+            spool.close()
+            raise HTTPException(
+                status_code=422,
+                detail=f"视频最长 {settings.video_max_seconds} 秒，请剪辑后再传")
 
     dup = _existing(db, auth.family_id, sha, business_type, business_id)
     if dup is not None:  # 同挂载点已有相同内容：直接返回已有台账行
@@ -272,7 +297,8 @@ def upload_file(db: Session, auth: AuthContext, upload: UploadFile, business_typ
         else:
             storage_key = get_store().save_stream(
                 spool, size, sha, ext, content_type,
-                family_id=auth.family_id, filename=name)
+                family_id=auth.family_id, filename=name,
+                baby_id=baby_id, user_id=auth.user_id)
             # 把缩略图变体也存进对象存储（独立对象，下载时按 variant 参数取）
             if variants:
                 from io import BytesIO
@@ -281,12 +307,14 @@ def upload_file(db: Session, auth: AuthContext, upload: UploadFile, business_typ
                     thumb_key = get_store().save_stream(
                         BytesIO(variants["thumb"]), len(variants["thumb"]),
                         sha, ".jpg", "image/jpeg",
-                        family_id=auth.family_id, filename=stem + ".thumb.jpg")
+                        family_id=auth.family_id, filename=stem + ".thumb.jpg",
+                        baby_id=baby_id, user_id=auth.user_id)
                 if "small" in variants:
                     small_key = get_store().save_stream(
                         BytesIO(variants["small"]), len(variants["small"]),
                         sha, ".jpg", "image/jpeg",
-                        family_id=auth.family_id, filename=stem + ".small.jpg")
+                        family_id=auth.family_id, filename=stem + ".small.jpg",
+                        baby_id=baby_id, user_id=auth.user_id)
     finally:
         spool.close()
 
@@ -295,6 +323,9 @@ def upload_file(db: Session, auth: AuthContext, upload: UploadFile, business_typ
         meta["thumb_key"] = thumb_key
     if small_key:
         meta["small_key"] = small_key
+    # 视频：把客户端上报的时长（秒）写进 meta，详情/列表页直接显示，避免每次播放再 probe
+    if is_video and dur > 0:
+        meta["duration"] = round(dur, 2)
 
     return _insert_row(db, auth, storage_key, name, content_type, ext, sha, size,
                        business_type, business_id, baby_id, meta=meta)

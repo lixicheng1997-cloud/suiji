@@ -42,11 +42,58 @@
             class="detail-photo"
             :src="p"
             mode="aspectFill"
-            @click="previewPhoto(i)"
+            @click="openPhotoPreview(i)"
           />
         </view>
       </scroll-view>
       <view v-if="photoList.length > 1" class="dp-hint"><text>{{ photoList.length }} 张照片 · 左右滑动查看</text></view>
+
+      <!-- 视频（如有）：单一大封面 —— 显示当前段首帧，点击全屏播放；多段有切换按钮 -->
+      <view v-if="videoList.length" class="detail-videos">
+        <!-- 播放态 -->
+        <view v-if="playing" class="dp-video-wrap">
+          <video
+            class="dp-video"
+            :src="videoList[currentIdx].url"
+            :poster="videoList[currentIdx].thumb"
+            :controls="true"
+            :autoplay="true"
+            :show-center-play-btn="true"
+            :enable-progress-gesture="true"
+            :object-fit="'cover'"
+          />
+          <view class="dp-video-collapse" @click="playing = false"><text>收起</text></view>
+        </view>
+        <!-- 封面态：当前段首帧 + 中央播放钮 + 明显切换按钮 -->
+        <view v-else class="dp-video-wrap" hover-class="hover-press" @click="openVideoPreview">
+          <video
+            class="dp-video"
+            :src="videoList[currentIdx].url"
+            :poster="videoList[currentIdx].thumb"
+            :controls="false"
+            :autoplay="false"
+            :show-center-play-btn="false"
+            :show-play-btn="false"
+            :object-fit="'cover'"
+          />
+          <view class="dp-video-mask" />
+          <view class="dp-video-play">
+            <view class="dp-tri" />
+          </view>
+          <text v-if="videoList.length > 1" class="dp-video-num">{{ currentIdx + 1 }} / {{ videoList.length }}</text>
+        </view>
+        <!-- 多段：底部明显切换行 -->
+        <view v-if="videoList.length > 1 && !playing" class="dp-switch-bar">
+          <view class="dp-switch-btn" hover-class="hover-press" :class="{ off: currentIdx === 0 }" @click.stop="prevVideo">
+            <text class="dp-switch-arrow">‹</text>
+            <text class="dp-switch-text">上一段</text>
+          </view>
+          <view class="dp-switch-btn" hover-class="hover-press" :class="{ off: currentIdx === videoList.length - 1 }" @click.stop="nextVideo">
+            <text class="dp-switch-text">下一段</text>
+            <text class="dp-switch-arrow">›</text>
+          </view>
+        </view>
+      </view>
 
       <!-- 备注引用块（如有）：cream 底 + 虚线描边圆角块 -->
       <view v-if="entry.note" class="detail-note"><text>{{ entry.note }}</text></view>
@@ -85,6 +132,9 @@
 
     <sj-notify ref="ntf" />
     <sj-ui-host />
+
+    <!-- 全屏媒体预览（图片/视频共用） -->
+    <sj-media-preview v-model:show="previewShow" :items="previewItems" :current="previewCurrent" />
   </view>
 </template>
 
@@ -102,19 +152,45 @@ export default {
       entry: null,
       day: '',
       entryId: '',
-      statusBarHeight: 20
+      statusBarHeight: 20,
+      /* 视频：currentIdx 指向当前段；playing=true 时展开成内联播放 */
+      playing: false,
+      currentIdx: 0,
+      /* 全屏媒体预览 */
+      previewShow: false,
+      previewItems: [],
+      previewCurrent: 0
     }
   },
 
   computed: {
     /**
      * 照片列表归一：优先 entry.photos（多张），回退 entry.photo（单张）。
+     * video 类型的 entry.photo 是视频封面地址（不是图片），不能塞进 <image>，跳过。
      */
     photoList() {
       const e = this.entry
       if (!e) return []
+      if (e.type === 'video') return []
       if (Array.isArray(e.photos) && e.photos.length) return e.photos
       return e.photo ? [e.photo] : []
+    },
+
+    /**
+     * 视频列表：从 payload.videos 取（saveEntry 上传后落库的形状），
+     * URL 已经在 toViewItem/fetchEntry 里 resolveUrl 过带 token。
+     */
+    videoList() {
+      const e = this.entry
+      if (!e) return []
+      const list = (e.payload && Array.isArray(e.payload.videos)) ? e.payload.videos : []
+      return list
+        .map(v => v && v.url ? {
+          url: v.url,
+          duration: Number(v.duration) || 0,
+          thumb: v.thumb || ''
+        } : null)
+        .filter(Boolean)
     },
 
     /**
@@ -175,8 +251,29 @@ export default {
       if (getCurrentPages().length > 1) uni.navigateBack()
       else uni.reLaunch({ url: '/pages/index/index' })
     },
-    previewPhoto(index) {
-      uni.previewImage({ urls: this.photoList, current: index })
+    openPhotoPreview(i) {
+      this.previewItems = this.photoList.map(u => ({ type: 'image', url: u }))
+      this.previewCurrent = i || 0
+      this.previewShow = true
+    },
+    openVideoPreview() {
+      this.previewItems = this.videoList.map(v => ({ type: 'video', url: v.url, thumb: v.thumb }))
+      this.previewCurrent = this.currentIdx
+      this.previewShow = true
+    },
+    prevVideo() {
+      if (!this.videoList.length || this.currentIdx === 0) return
+      this.currentIdx--
+    },
+    nextVideo() {
+      if (!this.videoList.length || this.currentIdx >= this.videoList.length - 1) return
+      this.currentIdx++
+    },
+    formatDur(s) {
+      s = Math.max(0, Math.round(Number(s) || 0))
+      const m = Math.floor(s / 60)
+      const r = s % 60
+      return m ? m + ':' + (r < 10 ? '0' : '') + r : r + ' 秒'
     },
     onMore() {
       ui.showActionSheet({
@@ -342,6 +439,118 @@ export default {
   text-align: center;
   margin: -16rpx 0 28rpx;
 }
+
+/* 视频：折叠式 —— 默认封面横滑，点击展开播放 */
+.detail-videos { margin-bottom: 28rpx; }
+.dp-video-wrap {
+  position: relative;
+  width: 686rpx;
+  height: 480rpx;
+  border-radius: 32rpx;
+  overflow: hidden;
+  margin-bottom: 20rpx;
+  background: #000;
+}
+.dp-video { width: 100%; height: 100%; display: block; }
+.dp-video-bg { width: 100%; height: 100%; }
+.dp-video-bg-ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #5FB0A8, #3F8F84);
+  color: #fff;
+}
+.dp-video-mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+}
+.dp-video-play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transform: translate(-50%, -50%);
+}
+.dp-tri {
+  width: 0;
+  height: 0;
+  border-left: 36rpx solid #fff;
+  border-top: 24rpx solid transparent;
+  border-bottom: 24rpx solid transparent;
+  margin-left: 8rpx;
+  filter: drop-shadow(0 4rpx 8rpx rgba(0, 0, 0, 0.4));
+}
+.dp-video-collapse {
+  position: absolute;
+  right: 16rpx;
+  top: 16rpx;
+  padding: 6rpx 20rpx;
+  border-radius: 24rpx;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 22rpx;
+  font-weight: 700;
+  z-index: 2;
+}
+/* 多段提示：右下角胶囊 */
+.dp-video-count {
+  position: absolute;
+  right: 16rpx;
+  bottom: 16rpx;
+  padding: 4rpx 16rpx;
+  border-radius: 20rpx;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+/* 段数数字：左上角白色粗字 */
+.dp-video-num {
+  position: absolute;
+  left: 20rpx;
+  top: 16rpx;
+  padding: 4rpx 16rpx;
+  border-radius: 20rpx;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 24rpx;
+  font-weight: 800;
+  z-index: 2;
+}
+/* 切换按钮行：封面下方左右两个实色胶囊 */
+.dp-switch-bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 20rpx;
+  margin-top: 16rpx;
+}
+.dp-switch-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  height: 72rpx;
+  border-radius: 36rpx;
+  background: var(--sj-primary, #FF6B8B);
+  color: #fff;
+  font-size: 26rpx;
+  font-weight: 700;
+  box-shadow: var(--sj-sh-sm);
+}
+.dp-switch-btn.off {
+  background: var(--sj-line, #E8E0DA);
+  color: var(--sj-sub, #999);
+  box-shadow: none;
+}
+.dp-switch-arrow {
+  font-size: 32rpx;
+  font-weight: 800;
+  line-height: 1;
+}
+.dp-switch-text { font-size: 26rpx; font-weight: 700; }
 
 /* 语音回放条：与下方描述/照片拉开间距（与页面其他块 28rpx 节奏一致） */
 .detail-voice { margin-bottom: 28rpx; }

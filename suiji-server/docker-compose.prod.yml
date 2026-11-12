@@ -1,0 +1,46 @@
+# 生产环境覆盖（production）：在 docker-compose.yml 底座之上叠加收紧后的安全与运行配置。
+#
+# 启动：
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod up -d
+#
+# 与开发的关键差异：
+#   1. api 不挂源码卷、不开 reload：镜像内代码冻结，进程以单 worker 稳定运行；
+#   2. 关闭一切降级（SUIJI_ALLOW_FALLBACK=0）：依赖不可用直接报错，不静默写回本地磁盘；
+#   3. 收紧 swagger 文档白名单（NGINX_ADMIN_ALLOW 只放固定 IP/CIDR，默认 127.0.0.1）；
+#   4. 关闭宽松 CORS（CORS_ORIGINS 留空，App / 小程序本就不发起跨域）；
+#   5. 自动迁移开启（RUN_MIGRATIONS=1），建议客户端全量升级后 CRYPTO_MODE=required；
+#   6. 数据目录独立为 ./data（生产正式数据），凭据必须在 .env.prod 中填强随机值。
+
+services:
+  api:
+    environment:
+      # 生产关闭降级：MinIO / Redis 连不上立即报错，不允许静默写回本地磁盘
+      SUIJI_ALLOW_FALLBACK: "0"
+      # 每次启动自动迁移到最新版本（迁移均为判存幂等，可安全重复执行）
+      RUN_MIGRATIONS: "1"
+      # 生产不开放宽松跨域；H5 独立域名需要时在此显式列出具体来源
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      # 客户端全量升级后改为 required：敏感接口必须加密，明文一律 400，防中间人降级
+      CRYPTO_MODE: ${CRYPTO_MODE:-optional}
+    # 生产不挂载源码卷：底座 volumes 仅保留 media / crypto 两个数据卷
+    volumes:
+      - "${DATA_DIR:-./data}/media:/app/data/media"
+      - "${DATA_DIR:-./data}/crypto:/app/data/crypto"
+    # 单 worker：会话撤销账本在 Redis 不可用时降级为进程内存，多进程会不一致；
+    # 扩容前先保证 REDIS_URL 可用，再加 --workers。
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --workers
+      - "1"
+
+  nginx:
+    environment:
+      # 生产收紧文档访问：填自己的固定出口 IP 或 CIDR（如 203.0.113.10/32）；
+      # 留空/默认 127.0.0.1 时公网无法打开 /docs /openapi.json。
+      NGINX_ADMIN_ALLOW: ${NGINX_ADMIN_ALLOW:-127.0.0.1}
+      NGINX_SERVER_NAME: ${NGINX_SERVER_NAME:-localhost}

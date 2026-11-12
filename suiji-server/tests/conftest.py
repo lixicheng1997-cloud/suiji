@@ -18,7 +18,7 @@ os.environ["MEDIA_BACKEND"] = "local"
 os.environ["MINIO_PUBLIC_URL"] = ""
 # 放宽限流配额：功能测试会在同一个 client IP（testclient）上反复注册/上传，
 # 生产配额（注册 5 次/小时）会误伤。限流本身由 tests/test_rate_limit.py 单独验证。
-for _k in ("RL_REGISTER", "RL_LOGIN", "RL_REFRESH", "RL_JOIN", "RL_UPLOAD"):
+for _k in ("RL_REGISTER", "RL_LOGIN", "RL_REFRESH", "RL_JOIN", "RL_UPLOAD", "RL_WEATHER"):
     os.environ[_k] = "100000"
 
 import pytest  # noqa: E402

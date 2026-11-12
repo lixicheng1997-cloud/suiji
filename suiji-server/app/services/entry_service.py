@@ -17,7 +17,8 @@ from .rows import entry_row
 
 # mood（心情）是客户端 mock.js 的正类型，note 是它的历史别名：
 # 快速记录面板给出的「心情」 tile 走 type=mood，这里不收就永远 422 存不下来
-TYPES = {"feeding", "sleep", "milestone", "measure", "poop", "temp", "med", "photo", "note", "mood", "voice"}
+# video：成长视频记录（多段独立视频附件，单段 ≤30s，客户端录制时硬限）
+TYPES = {"feeding", "sleep", "milestone", "measure", "poop", "temp", "med", "photo", "note", "mood", "voice", "video"}
 
 _MEASURE_METRICS = ("height", "weight", "head")
 

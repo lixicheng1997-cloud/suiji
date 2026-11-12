@@ -48,8 +48,9 @@
       />
     </view>
 
-    <!-- 服务器地址：前端公共配置（config/app.js）直接选择，不再手输 -->
-    <view class="lg-server" hover-class="hover-press" :hover-stay-time="80" @click="pickServer">
+    <!-- 服务器地址入口：由前端公共配置 config/app.js 的 SHOW_SERVER_PICKER 控制显隐；
+         关闭时整行与选择面板都不渲染，地址固定走配置默认项 -->
+    <view v-if="showServerPicker" class="lg-server" hover-class="hover-press" :hover-stay-time="80" @click="pickServer">
       <image class="sv-ic" :src="'/static/icons/' + __theme + '/22-fn-backup.png'" />
       <text class="sv-text">数据保存在：{{ server }}</text>
       <text class="sv-edit">切换 ›</text>
@@ -59,6 +60,7 @@
 
     <!-- 服务器地址选择面板（sj-popup 底部弹层，列表来自前端公共配置 config/app.js） -->
     <sj-popup
+      v-if="showServerPicker"
       v-model:show="serverShow"
       mode="bottom"
       title="选择数据保存位置"
@@ -93,6 +95,7 @@ import * as api from '@/utils/api.js'
 import * as ui from '@/utils/ui.js'
 import * as guide from '@/utils/first-run.js'
 import { requestMediaPermissions } from '@/infra/platform.js'
+import { SHOW_SERVER_PICKER } from '@/config/app.js'
 
 /* 媒体权限主动申请的落本机标记（只问一次，避免每次登录重复弹系统授权框） */
 const PERM_ASKED_KEY = 'sj_media_perm_asked'
@@ -108,6 +111,8 @@ export default {
       name: '',
       usernameErr: '',
       busy: false,
+      /* 登录页服务器入口开关：来自前端公共配置 config/app.js（0=隐藏，1=展示） */
+      showServerPicker: !!SHOW_SERVER_PICKER,
       server: '',
       serverShow: false,
       serverList: [],
@@ -125,10 +130,10 @@ export default {
     try {
       this.statusBarHeight = uni.getSystemInfoSync().statusBarHeight || 20
     } catch (e) { /* 保持默认 */ }
-    this.server = api.serverLabel()
-    this.serverUrl = api.currentServer().url
-    /* 首次启动（本机没选过）：按库里 is_default 落一个默认地址 */
+    /* 首次启动（本机没选过）：按配置 is_default 落一个默认地址；
+     * 入口隐藏时仍需落默认地址，只是不在页面上展示可切换的行 */
     api.pickDefaultServer().then(() => {
+      if (!this.showServerPicker) return
       this.server = api.serverLabel()
       this.serverUrl = api.currentServer().url
     })

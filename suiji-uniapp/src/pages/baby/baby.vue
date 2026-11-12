@@ -47,7 +47,7 @@
       <!-- 出生日期 + 实时月龄（v2 pg-field：label 灰粗 / val 墨色特粗） -->
       <view class="pg-sec"><text>出生日期 </text><text class="req">*</text></view>
       <view class="pg-field">
-        <text class="pf-label">出生日期</text>
+        <text class="pf-label pf-label--fit">出生日期</text>
         <!-- 行内只留触发文本：面板实例挂在页面根（见下方 dtp），避开 .pg-field 的 backdrop-filter 包含块 -->
         <text class="pf-val dt-trigger" hover-class="hover-press" :hover-stay-time="80" @click="openBirthPicker">{{ birthDate || '选择出生日期' }} ▾</text>
         <text class="bp-age-chip" v-if="birthDate">{{ ageLabel }}</text>
@@ -359,7 +359,7 @@ export default {
   flex: none;
 }
 .bk:active { transform: scale(0.92); }
-.bk-ic { width: 36rpx; height: 36rpx; }
+.bk-ic { width: 40rpx; height: 40rpx; }
 .pg-title {
   flex: 1;
   font-family: var(--sj-font-display);
@@ -454,6 +454,7 @@ export default {
 .pg-field {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 20rpx;
   background: var(--sj-glass);
   border: 2rpx solid var(--sj-glass-line);
@@ -471,7 +472,10 @@ export default {
 }
 /* label 宽 240rpx + 禁换行：带单位标签（如「出生身长（cm）」，全角括号实际渲染宽于估算）保持单行 */
 .pf-label { color: var(--sj-sub); font-weight: 700; flex: none; width: 240rpx; white-space: nowrap; }
-.pf-val { flex: 1; color: var(--sj-ink); font-weight: 800; }
+/* 短标签（如「出生日期」）按内容收窄，把剩余宽度让给日期值与月龄标签 */
+.pf-label--fit { width: auto; }
+/* min-width:0 允许 flex 项收缩；nowrap 防止日期串在连字符/空格处折成两行 */
+.pf-val { flex: 1; min-width: 0; color: var(--sj-ink); font-weight: 800; white-space: nowrap; }
 /* 出生日期触发文本：pf-val 自带 flex:1 撑满剩余宽度，居右对齐（面板实例挂在页面根） */
 .dt-trigger { text-align: right; }
 /* 页面根 picker 的 ghost 触发器：零尺寸不占布局（同 vaccine 页 .dtp-ghost） */

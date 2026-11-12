@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends
 
 from ..core.deps import require_family
 from . import (auth, babies, bootstrap, crypto, data, entries, events, family, files, growth,
-               journals, media, milestones, notifications, servers, settings, vaccines)
+               journals, media, milestones, notifications, servers, settings, vaccines, weather)
 
 api_router = APIRouter()
 
@@ -17,6 +17,8 @@ api_router.include_router(family.router)
 api_router.include_router(servers.router)
 # crypto 只下发 RSA 公钥（公开材料）：客户端登录前先取它，才能加密第一个请求
 api_router.include_router(crypto.router)
+# weather 按请求 IP 粗判城市返回天气：无需登录/家庭上下文，也不采集设备定位
+api_router.include_router(weather.router)
 # 注意：files 的下载端点支持 ?token=（<img src> 无法带 Header），它的家庭门控在
 # app/api/files.py 内部逐个端点施加，不能走 router 级依赖（会先被 Bearer 解析挡成 401）。
 api_router.include_router(files.router)

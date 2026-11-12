@@ -3,6 +3,12 @@ import uni from '@dcloudio/vite-plugin-uni'
 
 export default defineConfig({
   plugins: [uni()],
+  server: {
+    // 固定 H5 开发端口：被占用时直接报错退出，不再静默漂移到 5174 等其他端口，
+    // 避免浏览器仍访问旧端口、误以为连到了旧后端。
+    port: 5173,
+    strictPort: true
+  },
   css: {
     preprocessorOptions: {
       scss: {

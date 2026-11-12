@@ -19,7 +19,8 @@ export const TYPES = {
   temp:      { label: '体温',   iconKey: 'thermometer', png: '07-temp',       color: '#FF7B6B', tint: '#FFE7E2' },
   med:       { label: '用药',   iconKey: 'pill',        png: '08-med',        color: '#A994D8', tint: '#F0EAFB' },
   mood:      { label: '心情',   iconKey: 'heart',       png: '09-text-mood',  color: '#E86FA0', tint: '#FDE9F2' },
-  voice:     { label: '语音',   iconKey: 'music',       png: '09-voice',      color: '#6FBDE0', tint: '#E4F3FB' },
+  voice:     { label: '语音',   iconKey: 'music',       png: '09-voice',       color: '#6FBDE0', tint: '#E4F3FB' },
+  video:     { label: '视频',   iconKey: 'video',      png: '33-fn-video',    color: '#5FB0A8', tint: '#E2F4F1' },
   /* note 为 mood 的历史别名，保留以兼容既有数据/页面（Phase5 统一迁移后移除） */
   note:      { label: '心情',   iconKey: 'heart',       png: '09-text-mood',  color: '#E86FA0', tint: '#FDE9F2' }
 }

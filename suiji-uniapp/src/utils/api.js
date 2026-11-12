@@ -105,6 +105,12 @@ export function getNickname() {
 export function serverUrl() { return http.baseUrl() }
 export function setServerUrl(url) { http.setBaseUrl(url) }
 
+/** 首页天气：服务端按请求 IP 粗判城市返回 { text, temp, city }；
+ *  拿不到天气时返回空对象，页面静默隐藏天气行（silent：失败不弹错误提示）。 */
+export function getWeather() {
+  return http.get('/weather', { silent: true }).catch(() => ({ text: '', temp: null, city: '' }))
+}
+
 /* ---------- 服务器地址（写死在前端公共配置 config/app.js，页面只读 + 选择） ----------
  * 不再从服务端 /servers（server_endpoint 表）拉取；换环境/加地址只改配置文件。
  * 存储键与 http.js 共用（http.js 负责旧端口 8000 → 30080 的一次性迁移）。 */
@@ -515,6 +521,15 @@ const toViewItem = e => ({
   photo: http.resolveThumb(e.photo || ''),
   /* 原始 photo URL 保留，详情页/大图预览用原图 */
   photo_full: http.resolveUrl(e.photo || ''),
+  /* 视频数组（type=video）：每项 { url, duration, size, thumb }，url 已带 token */
+  videos: (Array.isArray(e.payload && e.payload.videos) ? e.payload.videos : [])
+    .map(v => v && v.url ? {
+      url: http.resolveUrl(v.url),
+      duration: Number(v.duration) || 0,
+      size: Number(v.size) || 0,
+      thumb: v.thumb ? http.resolveUrl(v.thumb) : ''
+    } : null)
+    .filter(Boolean),
   /* 时光轴紧凑播放条只读这几个字段，不整包透出 payload（段地址保持原样，由播放端补 token） */
   voice: e.type === 'voice' ? voiceView(e.payload) : null,
   /* 原始发生时间：首页「进行中」睡眠计时等实时派生用 */
@@ -641,6 +656,57 @@ function uploadPhotos(paths, babyId) {
 }
 
 /**
+ * 逐段上传视频（同照片走 POST /files，但 formData 额外带 duration 供服务端校验）。
+ * 每项形状见 sj-video-picker：{ path, duration, size, thumb }
+ * @returns {Promise<{items: [{url, duration, size, file_id}], files: string[]}>}
+ */
+function uploadVideos(items, babyId) {
+  if (!items || !items.length) return Promise.resolve({ items: [], files: [] })
+  return items.reduce(
+    (p, it) => p.then(acc => {
+      const path = (it && it.path) || ''
+      if (!path) return acc
+      /* 已是云端 URL（编辑回填）直接保留，不重复上传 */
+      if (/^(https?:|\/api\/)/i.test(path)) {
+        acc.items.push({
+          url: path,
+          duration: Number(it.duration) || 0,
+          size: Number(it.size) || 0,
+          thumb: it.thumb || '',
+          file_id: ''
+        })
+        return acc
+      }
+      return http.uploadFile(path, {
+        businessType: 'entry',
+        babyId: babyId || '',
+        formData: { duration: Number(it.duration) || 0 }
+      }).then(f => {
+        const item = {
+          url: f.url || '',
+          duration: Number(it.duration) || 0,
+          size: Number(f.size || it.size) || 0,
+          thumb: '',
+          file_id: f.id || ''
+        }
+        if (f.id) acc.files.push(f.id)
+        /* 本地首帧缩略图：当图片再传一次，拿到 /files/{id}/download 作为封面；
+         * 失败不阻断主流程（封面缺失时详情页用纯色占位） */
+        const thumbPath = it.thumb || ''
+        if (thumbPath && !/^(https?:|\/api\/)/i.test(thumbPath)) {
+          return http.uploadFile(thumbPath, { businessType: 'entry', babyId: babyId || '' })
+            .then(tf => { item.thumb = tf.url || ''; if (tf.id) acc.files.push(tf.id); acc.items.push(item); return acc })
+            .catch(() => { acc.items.push(item); return acc })
+        }
+        acc.items.push(item)
+        return acc
+      })
+    }),
+    Promise.resolve({ items: [], files: [] })
+  )
+}
+
+/**
  * 逐段上传语音（同样走 POST /files）。
  * 现在的录音是一段一条；历史的多段数据同样不落服务端合并——suiji-server 没有 ffmpeg 也没有转码队列，
  * 所以 N 段就是 N 个文件，播放端按顺序衔接（见 utils/voicePlayback.js）。
@@ -705,9 +771,10 @@ function uploadVoice(payload, babyId) {
   }
   if (!row.created_at) row.created_at = now()
 
-  /* 本条记录新上传的文件 id（照片 + 语音段），落库后统一 PATCH 补挂 */
+  /* 本条记录新上传的文件 id（照片 + 视频 + 语音段），落库后统一 PATCH 补挂 */
   let urls = []
   let newFiles = []
+  let videoItems = []
   return uploadPhotos(entry.photos || [], row.baby_id).then(res => {
     urls = res.urls
     newFiles = res.files
@@ -715,6 +782,20 @@ function uploadVoice(payload, babyId) {
       row.photo = urls[0]
       row.payload = Object.assign({}, payload, { photos: urls })
     }
+    /* 视频：逐段传 /files 换云端地址，formData 带 duration 让服务端硬限 30s */
+    if (!entry.videos || !entry.videos.length) return null
+    return uploadVideos(entry.videos, row.baby_id).then(v => {
+      videoItems = v.items
+      newFiles = newFiles.concat(v.files)
+      row.payload = Object.assign({}, row.payload, { videos: v.items.map(x => ({
+        url: x.url, duration: x.duration, size: x.size, thumb: x.thumb || ''
+      })) })
+      /* 视频记录：封面取第一段视频（时光轴/列表用），后端 <video> 直接播 */
+      if (!row.photo && v.items.length && v.items[0].url) {
+        row.photo = v.items[0].url
+      }
+    })
+  }).then(() => {
     /* 语音：逐段传 /files 换云端地址（服务端不做合并，段与段各自成文件） */
     if (row.type !== 'voice') return null
     return uploadVoice(row.payload, row.baby_id).then(v => {
@@ -811,6 +892,18 @@ export function fetchEntry(id) {
   const mediaUrls = (rows.length ? rows : deriveMediaRows(e))
     .map(m => http.resolveUrl(m.url || m.local_path))
   v.photos = mediaUrls
+  /* 视频 URL/缩略图在 payload 里是相对路径，详情页 <video> 必须拿到带 token 的完整地址才能播；
+   * 这里就地 resolve 一份给 detail.vue 的 videoList 用，编辑页回填仍走原始 payload（编辑时保持原样） */
+  if (v.payload && Array.isArray(v.payload.videos)) {
+    v.payload = Object.assign({}, v.payload, {
+      videos: v.payload.videos.map(x => x && x.url ? {
+        url: http.resolveUrl(x.url),
+        duration: Number(x.duration) || 0,
+        size: Number(x.size) || 0,
+        thumb: x.thumb ? http.resolveUrl(x.thumb) : ''
+      } : x)
+    })
+  }
   return Promise.resolve(v)
 }
 
@@ -1192,6 +1285,7 @@ const FEED_TEXT = {
   milestone: e => '记录了里程碑「' + e.title + '」',
   sleep: () => '记录了一次睡眠',
   photo: e => '上传了 ' + (((e.payload || {}).photos || []).length || 1) + ' 张照片',
+  video: e => '拍了 ' + (((e.payload || {}).videos || []).length || 1) + ' 段视频',
   feeding: () => '记录了一次喂养',
   measure: () => '记录了一次测量',
   poop: () => '记录了一次照护情况',
