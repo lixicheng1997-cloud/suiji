@@ -2,10 +2,12 @@
 import asyncio
 import logging
 import os
+import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 # 日志配置放在业务导入之前：导入期的降级告警也能正常输出
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -33,6 +35,7 @@ except ImportError:  # pip install fastapi-offline
 from .api import api_router
 from .core.config import BASE_DIR, settings
 from .core.db import Base, engine
+from .core.observability import check_readiness, record_request, registry
 from .core.payload_crypto import PayloadCryptoMiddleware
 from .core.startup_check import run_startup_checks
 from .media.store import get_store
@@ -199,6 +202,28 @@ async def security_headers(request, call_next):
     return resp
 
 
+def _route_path(request) -> str:
+    """归一化请求路径：用路由模板（如 /api/v1/entries/{baby_id}）做指标标签，
+    避免 /files/{id} 这类路径参数把指标基数打爆。"""
+    route = request.scope.get("route")
+    if route is not None and getattr(route, "path", None):
+        return route.path
+    return request.url.path
+
+
+@app.middleware("http")
+async def metrics_and_access_log(request, call_next):
+    """记录请求计数/耗时指标，并输出一行访问日志（不落 IP 与个人信息）。"""
+    start = time.perf_counter()
+    resp = await call_next(request)
+    duration = time.perf_counter() - start
+    path = _route_path(request)
+    if not path.startswith(("/healthz", "/readyz", "/metrics")):
+        record_request(request.method, path, resp.status_code, duration)
+    logger.info("%s %s -> %s %.3fs", request.method, path, resp.status_code, duration)
+    return resp
+
+
 app.include_router(api_router, prefix="/api/v1")
 
 # 传输加密中间件放在最后注册 = 最外层（Starlette 的 add_middleware 是往头部插）：
@@ -210,6 +235,27 @@ app.add_middleware(PayloadCryptoMiddleware)
 @app.get("/")
 def root():
     return {"app": "suiji-server", "api": "/api/v1"}
+
+
+@app.get("/healthz")
+def healthz():
+    """存活探针：进程能响应即 200，不探测外部依赖（卡死/崩溃才由编排重启）。"""
+    return {"status": "ok"}
+
+
+@app.get("/readyz")
+def readyz():
+    """就绪探针：数据库等硬依赖不可用时 503；Redis/存储异常在明细中标注为 warning。"""
+    ready, details = check_readiness()
+    return JSONResponse(status_code=200 if ready else 503, content={"ready": ready, **details})
+
+
+@app.get("/metrics")
+def metrics():
+    """Prometheus 文本指标；受 METRICS_ENABLED 开关控制，生产应在反代层限制访问。"""
+    if not settings.metrics_enabled:
+        raise HTTPException(status_code=404, detail="metrics disabled")
+    return PlainTextResponse(registry.render(), media_type="text/plain; version=0.0.4")
 
 
 if __name__ == "__main__":

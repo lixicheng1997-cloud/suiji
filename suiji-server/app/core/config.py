@@ -77,6 +77,9 @@ class Settings:
         # 仅在服务确实部署在可信反代（本项目 nginx）之后才开启：
         # 直接暴露时任何人伪造该头即可绕过限流。
         self.trust_proxy = os.getenv("TRUST_PROXY", "0").strip().lower() in ("1", "true", "yes", "on")
+        # /metrics 指标端点开关：生产建议只在反代/内网放行（见 nginx 访问控制）
+        self.metrics_enabled = os.getenv("METRICS_ENABLED", "1").strip().lower() not in (
+            "0", "false", "no", "off")
         # 启动探测 nginx 网关的地址（GET /healthz）。留空时自动尝试：
         # compose 内 http://nginx/healthz，本机直连 http://127.0.0.1:30080/healthz
         self.nginx_probe_url = os.getenv("NGINX_PROBE_URL", "").strip()

@@ -20,6 +20,10 @@ class IdempotencyStore:
         self._mem: dict[str, tuple[str, float]] = {}
         self._connect()
 
+    @property
+    def backend(self) -> str:
+        return "redis" if self._redis is not None else "memory"
+
     # ---------- 后端选择 ----------
     def _connect(self) -> None:
         self._redis_retry_at = time.time() + _REDIS_RETRY_INTERVAL

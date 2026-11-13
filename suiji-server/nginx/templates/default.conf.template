@@ -8,6 +8,7 @@
 #   /docs /redoc             -> api:8000    OpenAPI 文档（离线资源在 /static-offline-docs）
 #   /openapi.json            -> api:8000
 #   /healthz                 -> nginx 自身存活探测（compose healthcheck 使用）
+#   /readyz /metrics        -> api:8000    就绪探针 / Prometheus 指标（私网白名单）
 #   /suiji-website/          -> nginx 直接托管的官网静态站（挂载自 ./static/suiji-website）
 #   /                        -> api:8000    服务标识（{"app":"suiji-server",...}）
 
@@ -152,6 +153,18 @@ server {
         add_header Referrer-Policy           "no-referrer" always;
         add_header Permissions-Policy        "geolocation=(), microphone=(), camera=()" always;
         add_header Content-Security-Policy   "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'self'" always;
+        proxy_pass http://suiji_api;
+    }
+
+    # 指标与就绪探针：暴露后端内部状态（后端/缓存/存储后端、请求计数与耗时），
+    # 与文档同样只放行私网与 NGINX_ADMIN_ALLOW 指定来源，公网一律 403。
+    location ~ ^/(metrics|readyz)(/|$) {
+        allow 127.0.0.1;
+        allow 10.0.0.0/8;
+        allow 172.16.0.0/12;
+        allow 192.168.0.0/16;
+        allow ${NGINX_ADMIN_ALLOW};
+        deny  all;
         proxy_pass http://suiji_api;
     }
 
