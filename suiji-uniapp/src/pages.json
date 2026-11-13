@@ -49,6 +49,16 @@
       }
     },
     {
+      "path": "pages/family-album/family-album",
+      "style": {
+        "enablePullDownRefresh": true,
+        "navigationStyle": "custom",
+        "backgroundColor": "#FFF6F0",
+        "backgroundColorTop": "#FFF6F0",
+        "backgroundColorBottom": "#FFF6F0"
+      }
+    },
+    {
       "path": "pages/me/me",
       "style": {
         "enablePullDownRefresh": true,

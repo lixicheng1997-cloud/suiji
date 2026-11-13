@@ -486,6 +486,8 @@ export default {
       voice: null,
       /* 保存中：照片上传期间禁止重复提交 */
       saving: false,
+      /* 已成功提交：进入返回倒计时后拦截再次点击（与按钮 spinner 解耦，loading 可先复位） */
+      submitted: false,
       statusBarHeight: 20,
       /* 顶栏右侧小字：{宝宝名} · {月龄}（月龄缺失时只显示名字） */
       babyLabel: '',
@@ -935,7 +937,7 @@ export default {
       }
     },
     async onSave() {
-      if (this.saving) return
+      if (this.saving || this.submitted) return
       if (this.type === 'voice' && !(this.voice && this.voice.duration)) {
         this.$refs.ntf.show({ type: 'warn', message: '先录一段宝宝的声音再保存' })
         /* 表单校验失败拦截保存时播音效 */
@@ -1028,10 +1030,8 @@ export default {
          编辑已有记录（entryId）不算首次 */
       const msKey = this.type === 'milestone' && !this.entryId ? String(this.single.milestonePick || '') : ''
       const msFirst = !!msKey && !api.getMilestones().some(m => m.name === msKey && m.done)
-      let saved = false
       try {
         await api.saveEntry(entry)
-        saved = true
         /* NFR-06：保存成功音效只在服务端确认（上方 await 的 REST 成功 resolve）之后播 */
         play('S03')
         /* 测量记录：生长曲线新数据点落位音效（音量极低，S03 之后顺序叠加一次 E03） */
@@ -1040,6 +1040,9 @@ export default {
         if (msFirst) play('E01', { key: msKey })
         /* 成功提示走 sj-notify 顶部横幅；延迟返回让横幅完整可见后再收起 */
         this.$refs.ntf.show({ type: 'ok', message: '已保存' })
+        /* 置提交拦截标志：返回倒计时内不再响应点击，避免落成两条重复记录；
+           按钮 spinner 不在此处保留——先去掉 loading，再延时返回列表 */
+        this.submitted = true
         /* 延迟返回让「已保存」提示可见；goBack 内含无上级页面时的兜底 */
         setTimeout(() => this.goBack(), 1600)
       } catch (e) {
@@ -1049,9 +1052,7 @@ export default {
         play('S05')
       } finally {
         ld.close()
-        /* 成功后不再解锁：新建记录走的是「每次点击生成新 id」的路径，
-           1.6s 提示窗口内再按一次保存会落成两条重复记录 */
-        if (!saved) this.saving = false
+        this.saving = false
       }
     }
   }

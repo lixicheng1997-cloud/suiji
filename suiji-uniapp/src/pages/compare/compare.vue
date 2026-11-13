@@ -35,6 +35,7 @@
               class="slot-img"
               :src="slotPhoto(si).url"
               mode="aspectFill"
+              @click="openSlotPreview(si)"
             />
             <view v-else class="cmp-empty">
               <sj-icon name="04-photo" :size="56" />
@@ -57,7 +58,7 @@
           :class="{ on: sel.indexOf(i) > -1 }"
           v-for="(p, i) in list"
           :key="i"
-          :src="p.url"
+          :src="p.thumb"
           mode="aspectFill"
           lazy-load
           hover-class="hover-press"
@@ -69,6 +70,7 @@
       <view class="pg-hint" v-else><text>还没有照片记录 · 在首页添加照片后即可按同月龄对比</text></view>
     </view>
 
+    <sj-media-preview v-model:show="previewShow" :items="previewItems" :current="previewCurrent" />
     <sj-ui-host />
   </view>
 </template>
@@ -95,7 +97,11 @@ export default {
       age: 0,
       /* sel[0]=左框选中的照片下标，sel[1]=右框；-1 表示未选 */
       sel: [-1, -1],
-      statusBarHeight: 20
+      statusBarHeight: 20,
+      /* 全屏预览：当前月龄全部照片，左右滑动 */
+      previewShow: false,
+      previewItems: [],
+      previewCurrent: 0
     }
   },
 
@@ -109,16 +115,18 @@ export default {
     try {
       this.statusBarHeight = uni.getSystemInfoSync().statusBarHeight || 20
     } catch (e) { /* 保持默认 */ }
-    /* 拉取当前宝宝真实照片记录，按拍摄时月龄分组（替代原型假照片集） */
+    /* 拉取当前宝宝真实照片记录，按拍摄时月龄分组（替代原型假照片集）；同条记录多张照片全部展开 */
     const b = api.getBaby()
     api.fetchEntries({ type: 'photo' }).then(gs => {
       const map = {}
       gs.forEach(g => g.items.forEach(i => {
-        if (!i.photo) return
+        const photos = (i.photos && i.photos.length) ? i.photos : (i.photo_full ? [i.photo_full] : [])
+        if (!photos.length) return
         const m = b && b.birth_date ? ageMonthsAt(b.birth_date, i.occurred_at) : -1
         const label = m >= 0 ? m + ' 个月' : '未设出生日期'
         if (!map[label]) map[label] = []
-        map[label].push({ url: i.photo, date: [i.day, api.creatorLabel(i)].filter(Boolean).join(' · ') })
+        const date = [i.day, api.creatorLabel(i)].filter(Boolean).join(' · ')
+        photos.forEach(url => map[label].push({ url, thumb: i.photo || url, date, entryId: i.id }))
       }))
       const ages = Object.keys(map).sort((x, y) => (parseInt(x) || 0) - (parseInt(y) || 0))
       this.groups = map
@@ -157,6 +165,15 @@ export default {
       } else {
         this.sel[1] = i
       }
+    },
+
+    /* 点对比框大图：全屏预览当前月龄全部照片，定位到框内选中项 */
+    openSlotPreview(si) {
+      const p = this.slotPhoto(si)
+      if (!p) return
+      this.previewItems = this.list.map(x => ({ type: 'image', url: x.url }))
+      this.previewCurrent = Math.max(0, this.list.indexOf(p))
+      this.previewShow = true
     }
   }
 }

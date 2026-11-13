@@ -32,6 +32,31 @@
         </view>
         <!-- 折叠态只显示第一段（最多 4 行），查看更多展开全文 -->
         <text class="dc-text" :class="{ clamp: !isExp(d.id) }" v-for="(p, i) in shownParas(d)" :key="i">{{ p.text }}</text>
+        <!-- 周期内关联的照片/视频缩略图，点击全屏预览 -->
+        <view v-if="d.media && d.media.length" class="dc-media">
+          <view
+            class="dc-thumb"
+            v-for="(m, mi) in d.media"
+            :key="m.id"
+            hover-class="hover-press"
+            :hover-stay-time="80"
+            @click="openDiaryPreview(d, mi)"
+          >
+            <image v-if="m.type === 'image'" class="dc-thumb-img" :src="m.thumb" mode="aspectFill" lazy-load />
+            <video
+              v-else
+              class="dc-thumb-img"
+              :src="m.url"
+              :poster="m.thumb"
+              :controls="false"
+              :autoplay="false"
+              :show-center-play-btn="false"
+              :show-play-btn="false"
+              :object-fit="'cover'"
+            />
+            <view v-if="m.type === 'video'" class="dc-thumb-play"><view class="tri" /></view>
+          </view>
+        </view>
         <view v-if="hasMore(d)" class="dc-more" hover-class="hover-press" :hover-stay-time="80" @click="toggleExp(d.id)">
           <text>{{ isExp(d.id) ? '收起' : '查看更多' }}</text>
           <image class="dc-more-chev" :class="{ open: isExp(d.id) }" src="/static/icons/chevron-down.svg" />
@@ -50,6 +75,7 @@
       <view class="pg-hint tail"><text>未归档草稿保留 30 天后自动清理 · 归档后进入成长档案并标注「AI 生成」</text></view>
     </view>
 
+    <sj-media-preview v-model:show="previewShow" :items="previewItems" :current="previewCurrent" />
     <sj-ui-host />
   </view>
 </template>
@@ -64,7 +90,11 @@ export default {
       list: [],
       /* 已展开「查看更多」的日记 id */
       expandedIds: [],
-      statusBarHeight: 20
+      statusBarHeight: 20,
+      /* 全屏媒体预览 */
+      previewShow: false,
+      previewItems: [],
+      previewCurrent: 0
     }
   },
 
@@ -93,7 +123,9 @@ export default {
   methods: {
     async refresh() {
       try {
-        this.list = await api.listDiaries()
+        const rows = await api.listDiaries()
+        /* 为每篇派生周期内关联的照片/视频（纯前端按区间过滤） */
+        this.list = rows.map(d => Object.assign({}, d, { media: api.diaryMedia(d) }))
       } catch (e) { /* 保留当前列表 */ }
     },
     fmtDate(s) {
@@ -122,6 +154,15 @@ export default {
       } else {
         uni.reLaunch({ url: '/pages/index/index' })
       }
+    },
+    /* 点日记内媒体：全屏预览本篇关联媒体，定位到点击项 */
+    openDiaryPreview(d, mi) {
+      if (!d.media || !d.media.length) return
+      this.previewItems = d.media.map(m => m.type === 'video'
+        ? { type: 'video', url: m.url, thumb: m.thumb }
+        : { type: 'image', url: m.url })
+      this.previewCurrent = Math.max(0, mi)
+      this.previewShow = true
     },
     /* 跳转生成界面：带 id 编辑既有草稿，不带 id 由生成界面新建 */
     goEdit(id) {
@@ -254,6 +295,40 @@ export default {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 4;
   overflow: hidden;
+}
+/* 日记关联媒体：横排方形缩略图 */
+.dc-media {
+  display: flex;
+  gap: 12rpx;
+  flex-wrap: wrap;
+  margin-bottom: 16rpx;
+}
+.dc-thumb {
+  position: relative;
+  width: 152rpx;
+  height: 152rpx;
+  border-radius: 20rpx;
+  overflow: hidden;
+  background: var(--sj-cream);
+  border: 4rpx solid #fff;
+  box-shadow: var(--sj-sh-sm);
+}
+.dc-thumb-img { width: 100%; height: 100%; }
+.dc-thumb-play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transform: translate(-50%, -50%);
+}
+.dc-thumb-play .tri {
+  width: 0;
+  height: 0;
+  border-left: 16rpx solid #fff;
+  border-top: 10rpx solid transparent;
+  border-bottom: 10rpx solid transparent;
+  margin-left: 4rpx;
 }
 /* 查看更多 / 收起 */
 .dc-more {

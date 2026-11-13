@@ -56,7 +56,19 @@
             </view>
             <text class="rec-meta">{{ r.day }} {{ r.time }} · {{ TYPES[r.type].label }} · {{ whoOf(r) }}</text>
           </view>
-          <image v-if="r.photo" class="rec-photo" :src="r.photo" mode="aspectFill" lazy-load />
+          <!-- 视频记录：<video> 停在首帧作封面（有封面图先作 poster）；照片用缩略图 -->
+          <video
+            v-if="r.type === 'video' && r.videos && r.videos[0]"
+            class="rec-photo"
+            :src="r.videos[0].url"
+            :poster="r.videos[0].thumb"
+            :controls="false"
+            :autoplay="false"
+            :show-center-play-btn="false"
+            :show-play-btn="false"
+            :object-fit="'cover'"
+          />
+          <image v-else-if="r.photo" class="rec-photo" :src="r.photo" mode="aspectFill" lazy-load />
         </view>
 
         <!-- 触底分页提示（与首页同款）：加载中→弹跳；还有更多→下箭头；全部加载完→对勾（到底啦） -->

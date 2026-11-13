@@ -34,12 +34,37 @@
       </view>
     </view>
 
-    <!-- 共享相册 -->
-    <view class="fam-card" v-if="albumUrls.length">
-      <text class="fc-title">共享相册</text>
-      <view class="album-grid">
-        <image class="album-img" v-for="(u, i) in albumUrls" :key="i" :src="u" mode="aspectFill" lazy-load />
+    <!-- 共享相册（照片 + 视频；点「查看全部」进入流式相册页） -->
+    <view class="fam-card">
+      <view class="fc-head">
+        <text class="fc-title">共享相册</text>
+        <view class="fc-more" hover-class="hover-press" :hover-stay-time="80" @click="goAlbum">
+          <text>查看全部</text>
+          <image class="fc-more-ic" :src="'/static/icons/ctl/' + __theme + '/56/60-ctl-nav-more.png'" mode="aspectFit" />
+        </view>
       </view>
+      <view class="album-grid" v-if="albumList.length">
+        <view class="album-cell" v-for="(m, i) in albumList" :key="m.id" hover-class="hover-press" :hover-stay-time="80" @click="goAlbum">
+          <image v-if="m.type === 'image'" class="album-img" :src="m.thumb" mode="aspectFill" lazy-load />
+          <video
+            v-else
+            class="album-video"
+            :src="m.url"
+            :poster="m.thumb"
+            :controls="false"
+            :autoplay="false"
+            :show-center-play-btn="false"
+            :show-play-btn="false"
+            :show-fullscreen-btn="false"
+            :object-fit="'cover'"
+          />
+          <template v-if="m.type === 'video'">
+            <view class="album-vmask" />
+            <view class="album-vplay"><view class="tri" /></view>
+          </template>
+        </view>
+      </view>
+      <view v-else class="album-empty">家人记录的照片和视频会汇总在这里</view>
     </view>
 
     <!-- 家人动态卡（合规：不含健康数值） -->
@@ -98,7 +123,7 @@ export default {
       baby: { name: '宝宝' },
       members: [],
       sharedCount: 0,
-      albumUrls: [],
+      albumList: [],
       /* 家人动态：由真实记录派生，禁止出现健康数值 */
       feeds: [],
       /* 当前登录账号是否家庭创建者（仅创建者显示「邀请家人」入口） */
@@ -135,13 +160,16 @@ export default {
         return { n: m.name, r, tag, rel: m.relation || '', c: m.color, rc: roleClass(r), av: m.avatar ? api.fileSrc(m.avatar) : '' }
       })
       this.sharedCount = f.sharedCount
-      this.albumUrls = f.album
+      this.albumList = f.album
       this.feeds = f.feeds
     },
     /* 下拉刷新：tabSwipe 已重拉 bootstrap，重跑本页渲染链路 */
     tabAfterPull() { this.refreshView() },
     goAudit() {
       uni.navigateTo({ url: '/pages/audit/audit' })
+    },
+    goAlbum() {
+      uni.navigateTo({ url: '/pages/family-album/family-album' })
     },
     onInvite() {
       api.inviteFamily()
@@ -296,16 +324,49 @@ export default {
 .fc-title { display: block; font-size: 27rpx; font-weight: 800; color: var(--sj-ink); margin-bottom: 16rpx; }
 
 /* ---------- 共享相册 ---------- */
+.fc-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16rpx; }
+.fc-head .fc-title { margin-bottom: 0; }
+.fc-more {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  font-size: 23rpx;
+  font-weight: 700;
+  color: var(--sj-primary-deep);
+}
+.fc-more-ic { width: 28rpx; height: 28rpx; }
 .album-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16rpx; }
-.album-img {
+.album-cell {
+  position: relative;
   width: 100%;
   height: 150rpx;
   border-radius: 20rpx;
+  overflow: hidden;
   border: 4rpx solid #fff;
   box-shadow: var(--sj-sh-sm);
   box-sizing: border-box;
   background: var(--sj-cream);
 }
+.album-img { width: 100%; height: 100%; }
+.album-video { width: 100%; height: 100%; background: var(--sj-cream); }
+.album-vmask { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.32); }
+.album-vplay {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transform: translate(-50%, -50%);
+}
+.album-vplay .tri {
+  width: 0;
+  height: 0;
+  border-left: 14rpx solid #fff;
+  border-top: 9rpx solid transparent;
+  border-bottom: 9rpx solid transparent;
+  margin-left: 4rpx;
+}
+.album-empty { font-size: 23rpx; color: var(--sj-sub); line-height: 1.6; }
 
 /* ---------- 家庭动态（v2 feed-item） ---------- */
 .feed-item {

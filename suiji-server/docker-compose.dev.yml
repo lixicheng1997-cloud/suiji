@@ -70,6 +70,10 @@ services:
     volumes:
       # 源码卷：改动本地 app/ 即触发热重载（唯一的本地 bind mount，仅代码不含数据）
       - "./app:/app/app:ro"
+      # 迁移脚本卷：alembic/versions 随源码更新，upgrade head 才能应用最新迁移（镜像内副本会过期）
+      - "./alembic:/app/alembic:ro"
+      # 静态配置卷：成长标准 / 里程碑 / 疫苗程序 / 服务器地址等 JSON 随源码更新
+      - "./static:/app/static:ro"
       # 媒体与加密密钥同样用具名卷，不落到项目目录
       - suiji-dev-media:/app/data/media
       - suiji-dev-crypto:/app/data/crypto

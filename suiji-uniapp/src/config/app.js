@@ -10,8 +10,9 @@
  * 据此选择「默认服务器」；列表里另一条环境仍保留，可在选择器里手动切换。
  */
 
-/* 现役端口：云端/生产 nginx 统一入口 30080；旧版本直连 8000，读取本机历史地址时自动升级 */
+/* 云端/生产 nginx 统一入口端口 30080；旧版本本地直连也用过这个端口，读取本机历史地址时迁移到本地 Docker 入口 */
 export const CURRENT_PORT = 30080
+/* 旧版本本地直连端口 8000（已废弃） */
 export const LEGACY_PORT = 8000
 /* 本地 Docker 开发环境入口端口（从 30000 起顺延，见 suiji-server/.env.dev） */
 export const LOCAL_DEV_PORT = 30000
@@ -24,7 +25,7 @@ export const APP_ENV = (process.env.NODE_ENV === 'production') ? 'prod' : 'dev'
  * is_default 仅在对应编译环境下作为首次启动默认地址（下方按 APP_ENV 计算）。 */
 const SERVER_DEFS = [
   { id: 'cloud', name: '云服务', env: 'prod', url: 'http://49.233.77.155:30080/api/v1' },
-  { id: 'local', name: '本地调试', env: 'dev', url: 'http://localhost:30080/api/v1' }
+  { id: 'local', name: '本地调试', env: 'dev', url: 'http://localhost:30000/api/v1' }
 ]
 
 /* 当前编译环境对应的默认服务器：dev 包默认本地，prod 包默认云端；

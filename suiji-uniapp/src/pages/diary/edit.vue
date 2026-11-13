@@ -170,16 +170,19 @@ export default {
       }
       this.saving = true
       const ld = ui.loading('正在暂存草稿…')
+      let saved = false
       try {
         await api.updateDiary(this.diary.id, { paras: this.buildParas() })
         this.$refs.ntf.show({ type: 'ok', message: '已暂存 · 30 天内可继续编辑' })
-        this.goBack()
+        saved = true
       } catch (e) {
         ui.error(e, '暂存失败，草稿已保留')
       } finally {
+        /* 先关闭全屏遮罩、复位按钮状态，再在下方返回列表 */
         ld.close()
         this.saving = false
       }
+      if (saved) this.goBack()
     },
     /* 归档：保存正文并置为已归档（归档后只能预览） */
     async onArchive() {
@@ -192,19 +195,22 @@ export default {
       }
       this.archiving = true
       const ld = ui.loading('正在归档日记…')
+      let saved = false
       try {
         await api.updateDiary(this.diary.id, { paras: this.buildParas(), status: 'archived' })
         /* 日记归档成功：播 E06 */
         play('E06')
         this.$refs.ntf.show({ type: 'ok', message: '已归档 · 进入成长档案并标注「AI 生成」' })
-        this.goBack()
+        saved = true
       } catch (e) {
         /* 归档失败留在本页继续编辑草稿，不能谎报成功 */
         ui.error(e, '归档失败，草稿已保留')
       } finally {
+        /* 先关闭全屏遮罩、复位按钮状态，再在下方返回列表 */
         ld.close()
         this.archiving = false
       }
+      if (saved) this.goBack()
     },
     goBack() {
       if (getCurrentPages().length > 1) {

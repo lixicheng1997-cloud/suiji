@@ -38,6 +38,21 @@
             <text class="ri-name">{{ typeLabel(t.type) }} · {{ t.title }}</text>
             <text class="ri-desc">剩 {{ t.daysLeft }} 天 · <text v-if="t.by">{{ t.by }} </text>删除</text>
           </view>
+          <!-- 首项媒体封面：恢复/彻底删除前先辨认内容 -->
+          <view v-if="t.media" class="rec-media">
+            <video
+              v-if="t.media.type === 'video'"
+              class="rec-media-img"
+              :src="t.media.url"
+              :poster="t.media.thumb"
+              :controls="false"
+              :autoplay="false"
+              :show-center-play-btn="false"
+              :show-play-btn="false"
+              :object-fit="'cover'"
+            />
+            <image v-else class="rec-media-img" :src="t.media.thumb || t.media.url" mode="aspectFill" lazy-load />
+          </view>
           <view v-if="api.canEditEntry(t)" class="tr-btn" hover-class="hover-press" :hover-stay-time="80" @click="restore(t)">
             <text>恢复</text>
           </view>
@@ -64,6 +79,7 @@ import { play } from '@/utils/sound.js'
 export default {
   data() {
     return {
+      api,
       TYPES,
       trash: [],
       statusBarHeight: 20
@@ -265,6 +281,18 @@ export default {
   flex: none;
 }
 .rec-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+/* 媒体封面：与左侧图标同高，方形圆角 */
+.rec-media {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 24rpx;
+  overflow: hidden;
+  flex: none;
+  background: var(--sj-cream);
+  border: 4rpx solid #fff;
+  box-shadow: var(--sj-sh-sm);
+}
+.rec-media-img { width: 100%; height: 100%; }
 .ri-name {
   font-size: 28rpx;
   font-weight: 800;

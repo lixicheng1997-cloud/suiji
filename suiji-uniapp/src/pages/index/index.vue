@@ -286,6 +286,7 @@ export default {
   onReachBottom() { this.loadMore() },
   data() {
     return {
+      api,
       TYPES,
       BADGES,
       baby: api.getBaby() || { name: '宝宝', age: '' },
@@ -614,10 +615,12 @@ export default {
       uni.navigateTo({ url: '/pages/detail/detail?id=' + e.id })
     },
 
-    /* 点缩略图直接全屏预览：图片走 photo_full，视频走 e.videos[0] */
+    /* 点缩略图直接全屏预览：视频走 e.videos；照片优先同条记录多张，回退封面图 */
     previewEntry(e) {
       if (e.type === 'video' && e.videos && e.videos.length) {
         this.previewItems = e.videos.map(v => ({ type: 'video', url: v.url, thumb: v.thumb }))
+      } else if (e.photos && e.photos.length) {
+        this.previewItems = e.photos.map(url => ({ type: 'image', url }))
       } else if (e.photo_full) {
         this.previewItems = [{ type: 'image', url: e.photo_full }]
       } else if (e.photo) {

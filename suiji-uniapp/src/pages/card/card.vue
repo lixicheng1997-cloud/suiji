@@ -54,7 +54,7 @@
           </view>
           <sj-mascot class="mc-crest" :size="112" />
         </view>
-        <image v-if="photos.length" class="mc-photo" :src="photos[photo] ? photos[photo].url : photos[0].url" mode="aspectFill" />
+        <image v-if="photos.length" class="mc-photo" :src="photos[photo] ? photos[photo].url : photos[0].url" mode="aspectFill" @click="openCardPreview" />
         <view v-else class="mc-photo mc-ph" :style="mcTintStyle">
           <image class="mc-ph-ic" :src="'/static/icons/ctl/' + __theme + '/96/58-ctl-upload.png'" mode="aspectFit" />
           <text>还没有照片记录 · 先在首页添加</text>
@@ -83,7 +83,7 @@
           :class="{ on: photo === i }"
           v-for="(p, i) in photos"
           :key="i"
-          :src="p.url"
+          :src="p.thumb"
           mode="aspectFill"
           lazy-load
           hover-class="hover-press"
@@ -104,6 +104,7 @@
     <canvas canvas-id="cardCanvas" class="card-canvas" :style="{ width: CW + 'px', height: CH + 'px' }"></canvas>
 
     <sj-notify ref="ntf" />
+    <sj-media-preview v-model:show="previewShow" :items="previewItems" :current="previewCurrent" />
     <sj-ui-host />
   </view>
 </template>
@@ -129,6 +130,10 @@ export default {
       babyName: '',
       babyAge: '',
       statusBarHeight: 20,
+      /* 全屏预览：可选照片全部，左右滑动 */
+      previewShow: false,
+      previewItems: [],
+      previewCurrent: 0,
       /* 离屏导出画布：1 画布单位 = 1rpx，尺寸/间距全部照抄 .mem-card 的排版度量，
          避免预览与导出图比例不一致（照片被压扁即由此而来）；导出按 2x 放大。
          CH 取祝福语 3 行时的最高卡高，实际导出按内容高度裁切 */
@@ -216,10 +221,13 @@ export default {
         m.id === (options.ms || '') || (options.entry && m.source_entry_id === options.entry))
       if (j > -1) this.msIdx = j
     }
-    /* 拉取真实照片记录（时光轴按日分组 → 拍平取含图条目；带 entry id 供里程碑联动选图） */
+    /* 拉取真实照片记录（时光轴按日分组 → 拍平；同条记录多张照片全部展开，带 entry id 供里程碑联动选图） */
     api.fetchEntries({}).then(groups => {
       const items = []
-      groups.forEach(g => g.items.forEach(i => { if (i.photo) items.push({ url: i.photo, entryId: i.id }) }))
+      groups.forEach(g => g.items.forEach(i => {
+        const photos = (i.photos && i.photos.length) ? i.photos : (i.photo_full ? [i.photo_full] : [])
+        photos.forEach(url => items.push({ url, thumb: i.photo || url, entryId: i.id }))
+      }))
       this.photos = items
       /* 照片到位后再做一次联动：直达场景下 onLoad 时 photos 尚为空 */
       this.syncMsPhoto()
@@ -243,6 +251,14 @@ export default {
       }
     },
     pickPhoto(i) { this.photo = i },
+
+    /* 点卡面大图：全屏预览可选照片，定位到当前所选 */
+    openCardPreview() {
+      if (!this.photos.length) return
+      this.previewItems = this.photos.map(p => ({ type: 'image', url: p.url }))
+      this.previewCurrent = Math.max(0, Math.min(this.photo, this.photos.length - 1))
+      this.previewShow = true
+    },
     /* 选里程碑：若来源记录带照片，自动切到那张（里程碑与照片同源同框） */
     pickMs(i) {
       this.msIdx = i

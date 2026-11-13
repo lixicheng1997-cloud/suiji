@@ -113,7 +113,7 @@ export function getWeather() {
 
 /* ---------- 服务器地址（写死在前端公共配置 config/app.js，页面只读 + 选择） ----------
  * 不再从服务端 /servers（server_endpoint 表）拉取；换环境/加地址只改配置文件。
- * 存储键与 http.js 共用（http.js 负责旧端口 8000 → 30080 的一次性迁移）。 */
+ * 存储键与 http.js 共用（http.js 负责本机旧直连端口 → 本地 Docker 30000 的一次性迁移）。 */
 const SERVER_KEY = http.SERVER_KEY
 
 /** 当前选中的服务器行；未选择过（首次启动）时只有 url（id/name 为空） */
@@ -152,7 +152,7 @@ export function pingServer() {
 export function pickDefaultServer() {
   const cur = currentServer()
   if (cur.id) return Promise.resolve(cur)
-  /* 本机已有保存的地址（老版本遗留、端口已迁移到 30080）：沿用它，
+  /* 本机已有保存的地址（老版本遗留、端口已迁移到本地 Docker 30000）：沿用它，
    * 不再被服务端默认项覆盖（否则本地调试地址会被云端地址顶掉） */
   if (http.hasSavedBase()) return Promise.resolve(cur)
   return fetchServers().then(list => {
@@ -525,6 +525,8 @@ const toViewItem = e => ({
   photo: http.resolveThumb(e.photo || ''),
   /* 原始 photo URL 保留，详情页/大图预览用原图 */
   photo_full: http.resolveUrl(e.photo || ''),
+  /* 同条记录全部照片（台账优先，回退 payload.photos），供时光轴/列表多张照片预览 */
+  photos: albumPhotosOf(e).map(u => http.resolveUrl(u)).filter(Boolean),
   /* 视频数组（type=video）：每项 { url, duration, size, thumb }，url 已带 token */
   videos: (Array.isArray(e.payload && e.payload.videos) ? e.payload.videos : [])
     .map(v => v && v.url ? {
@@ -964,15 +966,20 @@ function trashDaysLeft(deletedAt) {
 export function listTrash() {
   return cache.trash
     .filter(t => trashDaysLeft(t.deleted_at) > 0)
-    .map(t => ({
-      id: t.id,
-      day: monthDay(dayKey(t.deleted_at)),
-      type: t.type,
-      title: t.title,
-      by: creatorLabel({ deleted_by: t.deleted_by, deleted_by_id: t.deleted_by_id }) || '家人',
-      by_id: t.deleted_by_id || '',
-      daysLeft: trashDaysLeft(t.deleted_at)
-    }))
+    .map(t => {
+      /* 首项媒体封面：恢复/彻底删除前先辨认是哪张图/哪段视频 */
+      const m = entryMedia(t)[0] || null
+      return {
+        id: t.id,
+        day: monthDay(dayKey(t.deleted_at)),
+        type: t.type,
+        title: t.title,
+        by: creatorLabel({ deleted_by: t.deleted_by, deleted_by_id: t.deleted_by_id }) || '家人',
+        by_id: t.deleted_by_id || '',
+        daysLeft: trashDaysLeft(t.deleted_at),
+        media: m ? { type: m.type, url: m.url, thumb: m.thumb, duration: m.duration } : null
+      }
+    })
 }
 
 /** 恢复：POST /entries/{id}/restore，成功后移回时光轴缓存 */
@@ -1293,15 +1300,124 @@ const FEED_TEXT = {
   temp: () => '记录了一次照护情况',
   med: () => '记录了一次照护情况'
 }
+/* 成员配色按 ID 命中，ID 缺失（老数据）再按名字串匹配 */
+function colorOfMember(e) {
+  const members = (cache.family && Array.isArray(cache.family.members)) ? cache.family.members : []
+  return (members.find(m => (e.creator_id && m.id === e.creator_id) || m.name === e.creator) || {}).color || '#FF6B8B'
+}
+
+/**
+ * 单条记录的照片清单：优先 entry_media 台账行（与详情页口径一致），
+ * 台账没跟上（编辑换过图 / 本轮乐观更新尚未被 bootstrap 覆盖）再回退 payload.photos，
+ * 最后兜底记录封面 e.photo。返回的都是服务端相对路径。
+ */
+function albumPhotosOf(e) {
+  const rows = cache.media.filter(m => m.entry_id === e.id)
+  if (rows.length) return rows.map(r => r.url).filter(Boolean)
+  const ps = Array.isArray(e.payload && e.payload.photos) ? e.payload.photos : []
+  const list = ps.filter(Boolean)
+  if (list.length) return list
+  return e.photo && e.type !== 'video' ? [e.photo] : []
+}
+
+/**
+ * 单条记录 → 媒体项数组（照片 + 视频混排，顺序：先照片后视频）。
+ * 媒体项形状：
+ *   { id, type:'image'|'video', url, thumb, duration, entryId,
+ *     occurredAt, day, time, who, creatorId, color }
+ * 照片优先 entry_media 台账，回退 payload.photos / 记录封面；视频取 payload.videos。
+ * 纯展示门面，不写缓存；入参为 bootstrap 原始 entry 行（含 payload/photo）。
+ */
+export function entryMedia(e) {
+  const items = []
+  const base = {
+    entryId: e.id,
+    occurredAt: e.occurred_at,
+    day: dayLabel(dayKey(e.occurred_at)),
+    time: timeOf(e.occurred_at),
+    who: creatorLabel(e) || '家人',
+    creatorId: e.creator_id || '',
+    color: colorOfMember(e)
+  }
+  /* 照片：payload.photos / 台账，每张一项 */
+  albumPhotosOf(e).forEach((p, i) => {
+    if (!p) return
+    items.push(Object.assign({}, base, {
+      id: e.id + '-img-' + i,
+      type: 'image',
+      url: http.resolveUrl(p),
+      thumb: http.resolveThumb(p),
+      duration: 0
+    }))
+  })
+  /* 视频：payload.videos 每段一项 */
+  const videos = Array.isArray(e.payload && e.payload.videos) ? e.payload.videos : []
+  videos.forEach((v, i) => {
+    if (!v || !v.url) return
+    items.push(Object.assign({}, base, {
+      id: e.id + '-vid-' + i,
+      type: 'video',
+      url: http.resolveUrl(v.url),
+      thumb: v.thumb ? http.resolveUrl(v.thumb) : '',
+      duration: Number(v.duration) || 0
+    }))
+  })
+  return items
+}
+
+/**
+ * 当前宝宝的全量媒体流（照片 + 视频，按发生时间倒序）。
+ * @param {{ type?: 'all'|'image'|'video', babyId?: string }} [filter]
+ */
+export function getAllMedia(filter = {}) {
+  const baby = getBaby()
+  const babyId = filter.babyId || (baby ? baby.id : '')
+  const items = []
+  cache.entries
+    .filter(e => matchBabyEntry(e, babyId))
+    .slice()
+    .sort((a, b) => (a.occurred_at < b.occurred_at ? 1 : -1))
+    .forEach(e => { items.push(...entryMedia(e)) })
+  if (filter.type && filter.type !== 'all') {
+    return items.filter(m => m.type === filter.type)
+  }
+  return items
+}
+
+/**
+ * 某篇日记周期（range_start~range_end）内关联的照片/视频媒体，时间倒序，最多 limit 张。
+ * 纯前端按日记区间从全量媒体流派生；区间缺失时返回空数组。
+ */
+export function diaryMedia(d, limit = 6) {
+  const start = d.range_start || ''
+  const end = d.range_end || ''
+  return getAllMedia()
+    .filter(m => {
+      const day = String(m.occurredAt || '').slice(0, 10)
+      if (!day) return false
+      if (start && day < start) return false
+      if (end && day > end) return false
+      return true
+    })
+    .slice(0, limit)
+}
+
+/**
+ * 家庭共享相册全量媒体（照片 + 视频混排，时间倒序）。
+ * 口径与 getAllMedia 一致；保留旧导出以兼容既有调用。
+ */
+export function getFamilyAlbum() {
+  return getAllMedia()
+}
+
 export function getFamily() {
   const members = (cache.family && Array.isArray(cache.family.members)) ? cache.family.members : []
   const entries = cache.entries.slice().sort((a, b) => (a.occurred_at < b.occurred_at ? 1 : -1))
-  const album = entries.filter(e => e.photo).slice(0, 4).map(e => http.resolveUrl(e.photo))
-  /* 成员配色按 ID 命中，ID 缺失（老数据）再按名字串匹配 */
-  const colorOf = e => (members.find(m => (e.creator_id && m.id === e.creator_id) || m.name === e.creator) || {}).color || '#FF6B8B'
+  /* 共享相册卡片预览：复用全量相册派生，取前 4 个媒体项（含视频封面） */
+  const album = getFamilyAlbum().slice(0, 4)
   const feeds = entries.slice(0, 3).map(e => ({
     eid: e.id,
-    c: colorOf(e),
+    c: colorOfMember(e),
     who: creatorLabel(e) || '家人',
     /* raw 保留原始 creator（账号名）：仅用于"过滤自己的操作"，不参与展示 */
     raw: e.creator || '',

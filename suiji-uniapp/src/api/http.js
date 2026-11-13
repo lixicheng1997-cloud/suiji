@@ -21,30 +21,32 @@ const MEDIA_KEY = 'sj_token_media'
  * 服务器列表已写死在前端配置文件，不再由服务端 /servers（数据库表）下发 */
 
 /* ---------- 服务器地址 ---------- */
-/* 历史本地/直连端口：8000（旧直连）、30000（旧 docker dev 入口）统一升级到现役端口 */
-const OLD_PORTS = [LEGACY_PORT, LOCAL_DEV_PORT].join('|')
+/* 本机主机：只有 localhost / 127.0.0.1 上的历史本地端口才迁移到本地 Docker 入口 */
+const LOCAL_HOST_RE = 'localhost|127\\.0\\.0\\.1'
+/* 已废弃的本地直连端口：8000（更早直连）、30080（上一版本地直连）；30000 是现役本地 Docker 入口 */
+const LOCAL_LEGACY_PORTS = [LEGACY_PORT, CURRENT_PORT].join('|')
 
 /**
- * 把地址里的历史端口换成现役端口（主机与路径保持不变）：
- *   http://localhost:8000/api/v1  → http://localhost:30080/api/v1
- *   http://localhost:30000/api/v1 → http://localhost:30080/api/v1
- *   http://49.233.77.155:8000/api/v1 → http://49.233.77.155:30080/api/v1
+ * 把本机历史本地地址的端口换成现役本地 Docker 入口（主机与路径保持不变）：
+ *   http://localhost:8000/api/v1   → http://localhost:30000/api/v1
+ *   http://localhost:30080/api/v1  → http://localhost:30000/api/v1
+ * 远程主机（如云端 49.233.77.155:30080）端口保持不变；30000 已是现役，不重复迁移。
  */
 export function upgradePort(url) {
   const s = String(url || '').trim()
   if (!s) return s
   return s.replace(
-    new RegExp('^([a-z][a-z0-9+.-]*://[^/:]+):(?:' + OLD_PORTS + ')(?=$|[/?#])', 'i'),
-    '$1:' + CURRENT_PORT
+    new RegExp('^([a-z][a-z0-9+.-]*://(?:' + LOCAL_HOST_RE + ')):(?:' + LOCAL_LEGACY_PORTS + ')(?=$|[/?#])', 'i'),
+    '$1:' + LOCAL_DEV_PORT
   )
 }
 
 /**
  * 一次性迁移本机已保存的服务器地址（读取地址时触发，幂等）。
  * 旧版本把地址写进了本机 Storage（sj_api_base / sj_server），
- * 只改代码里的默认值并不会覆盖它——客户端会一直请求历史端口 8000。
- * 这里在读地址时把旧端口就地升级为 30080，并同步修正「已选服务器」记录，
- * 保证用户此前选定的主机（本地/云端）不变，只换端口。
+ * 只改代码里的默认值并不会覆盖它——客户端会一直请求历史本地端口。
+ * 这里在读地址时把本机旧直连端口就地迁移到本地 Docker 入口 30000，并同步修正
+ * 「已选服务器」记录；云端主机端口不变，保证用户此前选定的主机不变，只换端口。
  */
 let portUpgraded = false
 function ensurePortUpgraded() {
