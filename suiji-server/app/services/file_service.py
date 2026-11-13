@@ -413,9 +413,40 @@ def get_file(db: Session, auth: AuthContext, file_id: str) -> FileObject:
     return row
 
 
+def _entry_for_file(db: Session, auth: AuthContext, row: FileObject) -> Entry | None:
+    """定位附件所属记录：entry 直挂；entry_media 反查 media → entry；其余类型无记录归属。"""
+    if row.business_type == "entry":
+        return scoped_get(db, Entry, row.business_id, auth.family_id)
+    if row.business_type == "entry_media":
+        md = scoped_get(db, EntryMedia, row.business_id, auth.family_id)
+        if md.entry_id:
+            return scoped_get(db, Entry, md.entry_id, auth.family_id)
+    return None
+
+
+def _assert_record_owner(db: Session, auth: AuthContext, row: FileObject) -> None:
+    """附件跟随记录归属（两角色模型 v1.3）。
+
+    - 创建者：任意附件放行；
+    - 成员：挂在本人创建记录上的附件可改/删；宝宝头像等档案资料随宝宝档案可写，
+      不做个人归属；未挂具体记录（other/空）或所属记录为无主历史记录时，成员不可处置；
+    归属以服务端令牌解析的 user_id 为准，不采信上传人名字串。
+    """
+    if auth.role == "creator":
+        return
+    if row.business_type == "baby":
+        # 宝宝档案资料：随档案可写（成员可参与建档/改档），不做个人归属校验
+        return
+    entry = _entry_for_file(db, auth, row)
+    if entry is not None and entry.creator_id and entry.creator_id == auth.user_id:
+        return
+    raise HTTPException(status_code=403, detail="只能修改或删除自己记录上的文件")
+
+
 def update_file(db: Session, auth: AuthContext, file_id: str, patch: dict) -> dict:
     """改名 / 挂载或改挂业务：只允许改元信息，storage_key 与内容不可变。"""
     row = get_file(db, auth, file_id)
+    _assert_record_owner(db, auth, row)
     business_type = patch.get("business_type")
     business_id = patch.get("business_id")
     baby_id = patch.get("baby_id")
@@ -464,6 +495,7 @@ def object_in_use(db: Session, family_id: str, storage_key: str, exclude_file_id
 def delete_file(db: Session, auth: AuthContext, file_id: str) -> dict:
     """删除台账行；无其他引用时一并释放对象存储里的字节。"""
     row = get_file(db, auth, file_id)
+    _assert_record_owner(db, auth, row)
     storage_key = row.storage_key or ""
     file_id_value = row.id
     db.delete(row)

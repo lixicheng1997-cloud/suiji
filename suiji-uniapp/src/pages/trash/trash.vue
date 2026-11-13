@@ -8,7 +8,7 @@
       </view>
       <text class="pg-title">回收站</text>
       <text v-if="trash.length" class="tr-count">{{ trash.length }} 项</text>
-      <text class="bk-act" hover-class="hover-press" :hover-stay-time="80" @click="clearAll">清空</text>
+      <text v-if="trash.length && isCreator" class="bk-act" hover-class="hover-press" :hover-stay-time="80" @click="clearAll">清空</text>
     </view>
 
     <view class="content">
@@ -38,10 +38,10 @@
             <text class="ri-name">{{ typeLabel(t.type) }} · {{ t.title }}</text>
             <text class="ri-desc">剩 {{ t.daysLeft }} 天 · <text v-if="t.by">{{ t.by }} </text>删除</text>
           </view>
-          <view class="tr-btn" hover-class="hover-press" :hover-stay-time="80" @click="restore(t)">
+          <view v-if="api.canEditEntry(t)" class="tr-btn" hover-class="hover-press" :hover-stay-time="80" @click="restore(t)">
             <text>恢复</text>
           </view>
-          <view class="tr-del" hover-class="hover-press" :hover-stay-time="80" @click="purge(t)">
+          <view v-if="api.canEditEntry(t)" class="tr-del" hover-class="hover-press" :hover-stay-time="80" @click="purge(t)">
             <text>删除</text>
           </view>
         </view>
@@ -78,6 +78,13 @@ export default {
 
   onShow() {
     this.refresh()
+  },
+
+  computed: {
+    /* 清空回收站为家庭级动作，仅创建者可见入口 */
+    isCreator() {
+      return api.getFamilyRole() === 'creator'
+    }
   },
 
   methods: {

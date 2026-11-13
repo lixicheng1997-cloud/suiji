@@ -3,7 +3,6 @@ from .schemas import (
     DeactivateIn,
     EntryIn,
     FamilyCreateIn,
-    FamilyReadonlyIn,
     FilePatch,
     ImportIn,
     JoinIn,
@@ -22,7 +21,7 @@ from .schemas import (
 )
 
 __all__ = [
-    "BabyIn", "DeactivateIn", "EntryIn", "FamilyCreateIn", "FamilyReadonlyIn", "FilePatch", "ImportIn", "JoinIn", "JournalGenerateIn",
+    "BabyIn", "DeactivateIn", "EntryIn", "FamilyCreateIn", "FilePatch", "ImportIn", "JoinIn", "JournalGenerateIn",
     "JournalUpdateIn", "LoginIn", "LogoutIn", "MemberRoleIn", "PasswordIn", "RefreshIn", "RegisterIn",
     "SettingsIn", "SyncRowsIn", "VaccinePatch", "MilestonePatch",
 ]

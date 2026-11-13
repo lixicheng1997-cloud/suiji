@@ -6,11 +6,12 @@ from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.orm import Session
 
 from ..core.db import get_db
-from ..core.deps import get_auth, require_write
+from ..core.deps import get_auth, require_creator, require_write
 from ..models import Entry
 from ..repositories import scoped_get
 from ..schemas import EntryIn
 from ..services import audit_service, cleanup_service, entry_service
+from ..services.entry_service import assert_entry_writable
 from ..services.rows import entry_row
 
 router = APIRouter(prefix="/entries", tags=["entries"])
@@ -61,7 +62,7 @@ def search(q: str = Query(""), type: str = Query(""), baby: str = Query(""),
 # ---- 回收站：字面量路由必须先于 /entries/{id} 注册 ----
 
 @router.delete("/trash")
-def clear_trash(db: Session = Depends(get_db), auth=Depends(require_write)):
+def clear_trash(db: Session = Depends(get_db), auth=Depends(require_creator)):
     rows = db.query(Entry).filter(Entry.family_id == auth.family_id, Entry.deleted_at.isnot(None)).all()
     for e in rows:
         entry_service.purge_entry(db, e)
@@ -75,6 +76,7 @@ def clear_trash(db: Session = Depends(get_db), auth=Depends(require_write)):
 @router.delete("/trash/{entry_id}")
 def purge(entry_id: str, db: Session = Depends(get_db), auth=Depends(require_write)):
     entry = scoped_get(db, Entry, entry_id, auth.family_id)
+    assert_entry_writable(auth, entry)
     label = _entry_label(entry_row(entry))
     entry_service.purge_entry(db, entry)
     audit_service.record(db, auth.family_id, auth, action="purge", target_type="entry", target_id=entry_id,

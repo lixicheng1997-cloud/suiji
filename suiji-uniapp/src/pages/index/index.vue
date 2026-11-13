@@ -63,7 +63,7 @@
           <!-- 左滑删除包装：卡片左移露出底层红色删除块。
                不用 v-memo（微信小程序编译器不支持，会导致 build:mp-weixin 失败） -->
           <view class="rec-swipe" v-for="e in g.items" :key="g.day + e.time + e.id">
-            <view class="swipe-del" :class="{ 'del-show': swipeX(e) !== 0 }" hover-class="hover-press" :hover-stay-time="80" @click.stop="onSwipeDelete(e)">删除</view>
+            <view class="swipe-del" v-if="api.canEditEntry(e)" :class="{ 'del-show': swipeX(e) !== 0 }" hover-class="hover-press" :hover-stay-time="80" @click.stop="onSwipeDelete(e)">删除</view>
             <view
               class="rec-card"
               :class="{ 'rec-milestone': e.type === 'milestone', 'rec-ongoing': e.badge === 'ongoing', 'swipe-on': swipeX(e) !== 0 }"
@@ -645,6 +645,8 @@ export default {
       return s
     },
     onSwipeStart(ev, e) {
+      /* 非本人记录（且非创建者）不允许左滑删除：不进入拖拽态，删除块也不渲染 */
+      if (!api.canEditEntry(e)) return
       /* 触屏取 touches[0]，桌面 H5 鼠标事件直接带 clientX/Y */
       const t = (ev.touches && ev.touches[0]) || ev
       if (this.swipe.openId && this.swipe.openId !== e.id) this.swipe.openId = ''

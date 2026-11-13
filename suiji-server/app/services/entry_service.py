@@ -22,8 +22,52 @@ TYPES = {"feeding", "sleep", "milestone", "measure", "poop", "temp", "med", "pho
 
 _MEASURE_METRICS = ("height", "weight", "head")
 
+# 测量指标合理区间（与 PRD FR-06 口径一致，越界视为录入错误，不进曲线/百分位）
+_MEASURE_RANGES = {
+    "height": (30.0, 130.0, "身长/身高应在 30–130 cm 之间"),
+    "weight": (0.1, 40.0, "体重应在 0.1–40 kg 之间"),
+    "head": (25.0, 55.0, "头围应在 25–55 cm 之间"),
+}
+_TEMP_RANGE = (35.0, 42.0, "体温应在 35.0–42.0 °C 之间")
+
+
+def _to_float(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _check_payload(etype: str, payload: dict) -> None:
+    """录入值合理区间校验：能解析成数字才校验，解析不了按既有 degrade 路径跳过。"""
+    payload = payload or {}
+    if etype == "measure":
+        for metric, (lo, hi, msg) in _MEASURE_RANGES.items():
+            v = _to_float(payload.get(metric))
+            if v is not None and not (lo <= v <= hi):
+                raise HTTPException(status_code=422, detail=msg)
+    elif etype == "temp":
+        v = _to_float(payload.get("value"))
+        if v is not None and not (_TEMP_RANGE[0] <= v <= _TEMP_RANGE[1]):
+            raise HTTPException(status_code=422, detail=_TEMP_RANGE[2])
+
 _actor_name = notify_service.actor_name
 _bump_family_version = notify_service.bump_family_version
+
+
+def assert_entry_writable(auth: AuthContext, entry: Entry) -> None:
+    """记录改/删/恢复/彻底删除前的归属校验（两角色模型 v1.3）。
+
+    - 创建者：任意记录放行；
+    - 成员：仅 `creator_id == 本人` 的记录可处置；
+    - 历史无主记录（creator_id 为空）：成员不可处置，仅创建者可。
+    归属以服务端令牌解析的 user_id 为准，不采信记录上的名字串。
+    """
+    if auth.role == "creator":
+        return
+    if entry.creator_id and entry.creator_id == auth.user_id:
+        return
+    raise HTTPException(status_code=403, detail="只能修改或删除自己创建的记录")
 
 
 def _notify_event(db: Session, auth: AuthContext, entry: Entry, action: str = "create") -> None:
@@ -75,6 +119,20 @@ def _active_baby_id(db: Session, family_id: str) -> str:
         .first()
     )
     return b.id if b else ""
+
+
+def _has_multiple_babies(db: Session, family_id: str) -> bool:
+    """家庭是否有 ≥2 个宝宝：多宝宝时空 baby_id 记录严格隔离，不并入任一宝宝视图。"""
+    return db.query(Baby).filter(Baby.family_id == family_id).count() >= 2
+
+
+def _apply_baby_filter(q, db: Session, family_id: str, baby_id: str):
+    """按当前宝宝过滤记录；单宝宝家庭兼容历史空 baby_id，多宝宝家庭严格匹配。"""
+    if not baby_id:
+        return q
+    if _has_multiple_babies(db, family_id):
+        return q.filter(Entry.baby_id == baby_id)
+    return q.filter(or_(Entry.baby_id == baby_id, Entry.baby_id.is_(None), Entry.baby_id == ""))
 
 
 def _find_baby(db: Session, family_id: str, baby_id: str) -> Baby | None:
@@ -133,7 +191,7 @@ def _rebuild_measurements(db: Session, entry: Entry) -> None:
     _apply_measure(db, entry, _find_baby(db, entry.family_id, entry.baby_id))
 
 
-def _apply_milestone(db: Session, entry: Entry) -> None:
+def _apply_milestone(db: Session, auth: AuthContext, entry: Entry) -> None:
     """payload.name 匹配该宝宝 milestone_record → 置达成；不在预置清单则新建自定义里程碑。"""
     name = (entry.payload or {}).get("name")
     if not name:
@@ -152,14 +210,20 @@ def _apply_milestone(db: Session, entry: Entry) -> None:
         ms = MilestoneRecord(
             id=gen_id("msr"), family_id=entry.family_id, baby_id=entry.baby_id or "",
             name=name, domain="自定义", month="", ref="",
-            done=False, achieved_at="", source_entry_id="", creator="", sort=999,
+            done=False, achieved_at="", source_entry_id="", creator="",
+            creator_id=auth.user_id, sort=999,
         )
         db.add(ms)
+    already = bool(ms.done)
     ms.done = True
-    ms.achieved_at = entry.occurred_at
-    ms.source_entry_id = entry.id
-    ms.creator = entry.creator or ""
-    ms.month = month
+    if not already:
+        # 仅首次达成时记录时间/来源/月龄/记录人；后到或补录的同名记录不覆盖首次达成信息
+        ms.achieved_at = entry.occurred_at
+        ms.source_entry_id = entry.id
+        ms.creator = entry.creator or ""
+        if not ms.creator_id:
+            ms.creator_id = auth.user_id
+        ms.month = month
 
 
 def create_entry(db: Session, auth: AuthContext, body: dict, idem_key: str = "") -> dict:
@@ -173,6 +237,7 @@ def create_entry(db: Session, auth: AuthContext, body: dict, idem_key: str = "")
     if etype not in TYPES:
         raise HTTPException(status_code=422, detail="未知的记录类型")
     _check_note(body.get("note"))
+    _check_payload(etype, body.get("payload") or {})
 
     now = utc_now_iso()
     baby_id = _resolve_baby_id(db, auth.family_id, body.get("baby_id"),
@@ -212,7 +277,7 @@ def create_entry(db: Session, auth: AuthContext, body: dict, idem_key: str = "")
     if entry.type == "measure":
         _apply_measure(db, entry, _find_baby(db, auth.family_id, baby_id))
     elif entry.type == "milestone":
-        _apply_milestone(db, entry)
+        _apply_milestone(db, auth, entry)
     _notify_event(db, auth, entry, action="create")
     _bump_family_version(db, auth.family_id)
     label = f"「{entry.title}」" if entry.title else f" {entry.id[-6:]}"
@@ -231,9 +296,11 @@ def update_entry(db: Session, auth: AuthContext, entry_id: str, body: dict) -> d
     from ..repositories import scoped_get
 
     entry = scoped_get(db, Entry, entry_id, auth.family_id)
+    assert_entry_writable(auth, entry)
     if body.get("type") is not None and body["type"] not in TYPES:
         raise HTTPException(status_code=422, detail="未知的记录类型")
     _check_note(body.get("note"))
+    _check_payload(body.get("type") or entry.type, body.get("payload") or {})
     for field in ("baby_id", "type", "occurred_at", "note",
                   "title", "meta", "badge", "photo"):
         if field in body and body[field] is not None:
@@ -250,7 +317,7 @@ def update_entry(db: Session, auth: AuthContext, entry_id: str, body: dict) -> d
     if entry.type == "measure":
         _rebuild_measurements(db, entry)
     elif entry.type == "milestone":
-        _apply_milestone(db, entry)
+        _apply_milestone(db, auth, entry)
     _bump_family_version(db, auth.family_id)  # 修改不通知家人，但水位线要让客户端重拉对齐
     db.commit()
     db.refresh(entry)
@@ -261,6 +328,7 @@ def soft_delete(db: Session, auth: AuthContext, entry_id: str) -> dict:
     from ..repositories import scoped_get
 
     entry = scoped_get(db, Entry, entry_id, auth.family_id)
+    assert_entry_writable(auth, entry)
     entry.deleted_at = utc_now_iso()
     entry.deleted_by = _actor_name(db, auth)
     entry.deleted_by_id = auth.user_id
@@ -275,6 +343,7 @@ def restore(db: Session, auth: AuthContext, entry_id: str) -> dict:
     from ..repositories import scoped_get
 
     entry = scoped_get(db, Entry, entry_id, auth.family_id)
+    assert_entry_writable(auth, entry)
     entry.deleted_at = None
     entry.deleted_by = None
     entry.deleted_by_id = None
@@ -358,7 +427,7 @@ def timeline_page(db: Session, auth: AuthContext, baby: str = "",
     """主页时光轴专用分页（GET /entries/timeline）。
 
     数据量增长后主页不再读 bootstrap 全量缓存，改走本端点按游标逐页拉取：
-    - baby 缺省取当前活跃宝宝；同时包含历史无 baby_id 的记录（与客户端旧口径一致）；
+    - baby 缺省取当前活跃宝宝；单宝宝家庭兼容历史无 baby_id 记录，多宝宝家庭严格按 baby_id 隔离；
     - 排序 occurred_at desc, id desc，游标编码与 list_entries 相同；
     - day_totals=本页涉及日期的全天真实条数（跨页的天不受分页影响），
       供日期分隔行显示准确条数；返回 {items, next_cursor, has_more, day_totals}。
@@ -367,9 +436,7 @@ def timeline_page(db: Session, auth: AuthContext, baby: str = "",
 
     def _scoped(base):
         q = base.filter(Entry.family_id == auth.family_id, Entry.deleted_at.is_(None))
-        if baby_id:
-            q = q.filter(or_(Entry.baby_id == baby_id, Entry.baby_id.is_(None), Entry.baby_id == ""))
-        return q
+        return _apply_baby_filter(q, db, auth.family_id, baby_id)
 
     q = _scoped(db.query(Entry))
     if cursor:
@@ -414,8 +481,7 @@ def search_page(db: Session, auth: AuthContext, baby: str = "", kw: str = "", et
     """
     baby_id = baby or _active_baby_id(db, auth.family_id)
     q = db.query(Entry).filter(Entry.family_id == auth.family_id, Entry.deleted_at.is_(None))
-    if baby_id:
-        q = q.filter(or_(Entry.baby_id == baby_id, Entry.baby_id.is_(None), Entry.baby_id == ""))
+    q = _apply_baby_filter(q, db, auth.family_id, baby_id)
     if etype and etype != "all":
         q = q.filter(Entry.type == etype)
     word = (kw or "").strip()

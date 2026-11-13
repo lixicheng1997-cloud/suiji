@@ -84,12 +84,9 @@ import * as ui from '@/utils/ui.js'
 import tabSwipe, { pullRefresh } from '@/utils/tabSwipe.js'
 import { play } from '@/utils/sound.js'
 
-/* 角色 → v2 role-* 配色类 */
-function roleClass(r, tag) {
-  if (r === 'creator') return 'role-owner'
-  if (r === 'editor' || (tag || '').indexOf('编辑') >= 0) return 'role-edit'
-  if (r === 'viewer' || (tag || '').indexOf('只读') >= 0) return 'role-view'
-  return 'role-edit'
+/* 角色 → v2 role-* 配色类（两态：创建者 / 成员） */
+function roleClass(r) {
+  return r === 'creator' ? 'role-owner' : 'role-edit'
 }
 
 export default {
@@ -104,8 +101,6 @@ export default {
       albumUrls: [],
       /* 家人动态：由真实记录派生，禁止出现健康数值 */
       feeds: [],
-      /* 家庭契约状态（API-CONTRACT §4）：只读态用于成员权限描述 */
-      familyReadonly: false,
       /* 当前登录账号是否家庭创建者（仅创建者显示「邀请家人」入口） */
       isCreator: false
     }
@@ -130,16 +125,14 @@ export default {
       const baby = api.getBaby()
       this.baby = baby ? { name: baby.name } : { name: '宝宝' }
       const f = api.getFamily()
-      this.familyReadonly = api.isFamilyReadonly()
       /* 创建者判定：family.role（契约 §4 creator|member，历史 owner 视为 creator） */
       const role = api.getFamilyRole()
       this.isCreator = role === 'creator' || role === 'owner'
-      const ro = this.familyReadonly
       /* member 行字段（name/role/color/avatar/relation[+可选 tag/desc]）→ 模板消费形状（n/r/rc/tag/c/av/rel）；两态角色缺省派生 */
       this.members = f.members.map(m => {
         const r = m.role === 'owner' ? 'creator' : (m.role || 'member')
         const tag = m.tag || (r === 'creator' ? '创建者' : '成员')
-        return { n: m.name, r, tag, rel: m.relation || '', c: m.color, rc: roleClass(r, tag), av: m.avatar ? api.fileSrc(m.avatar) : '' }
+        return { n: m.name, r, tag, rel: m.relation || '', c: m.color, rc: roleClass(r), av: m.avatar ? api.fileSrc(m.avatar) : '' }
       })
       this.sharedCount = f.sharedCount
       this.albumUrls = f.album
@@ -272,7 +265,6 @@ export default {
 .role { font-size: 19rpx; font-weight: 800; border-radius: var(--sj-r-pill); padding: 4rpx 16rpx; }
 .role-owner { background: var(--sj-primary-soft); color: var(--sj-primary-deep); }
 .role-edit { background: #E4F3FB; color: #2E7FA8; }
-.role-view { background: #F0EAFB; color: #7A5FB0; }
 .role-invite { background: #E2F5EA; color: #2E7D4F; }
 .member-add {
   justify-content: center;

@@ -61,7 +61,7 @@
         <sj-button class="custom-add" size="mini" text="添加" @click="addCustomRelation" />
       </view>
 
-      <!-- 角色权限（只读，由家庭创建者分配；role 徽标 v2 四色规范） -->
+      <!-- 角色权限（只读展示；两态：创建者/成员，role 徽标两色规范） -->
       <view class="pg-sec"><text>角色权限（家庭空间）</text></view>
       <view class="pg-field">
         <text class="pf-label">当前角色</text>
@@ -170,7 +170,7 @@ export default {
       const isCreator = fam.role === 'creator' || fam.role === 'owner'
       this.mom = isCreator
         ? { role: 'owner', tag: '创建者', desc: '创建家庭空间 · 全部权限' }
-        : { role: 'editor', tag: '成员', desc: api.isFamilyReadonly() ? '家庭只读开启 · 仅可查看' : '参与家庭记录 · 权限由创建者分配' }
+        : { role: 'editor', tag: '成员', desc: '参与家庭记录 · 仅可改删本人记录' }
     }
   },
 
@@ -440,7 +440,6 @@ export default {
 }
 .role.owner { background: var(--sj-primary-soft); color: var(--sj-primary-deep); }
 .role.editor { background: #E4F3FB; color: #2E7FA8; }
-.role.viewer { background: #F0EAFB; color: #7A5FB0; }
 /* 主按钮：外观由 sj-button（block size=lg）统一提供，此处仅保留布局 */
 .pg-btn {
   display: flex;

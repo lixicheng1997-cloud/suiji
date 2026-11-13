@@ -46,10 +46,6 @@ class FamilyCreateIn(BaseModel):
     name: str = ""
 
 
-class FamilyReadonlyIn(BaseModel):
-    readonly: bool
-
-
 class MemberRoleIn(BaseModel):
     role: str  # creator / member
 

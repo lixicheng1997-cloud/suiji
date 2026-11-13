@@ -204,6 +204,7 @@ def generate(db: Session, auth: AuthContext, body: dict) -> dict:
         range=f"{_fmt_date(start)} – {_fmt_date(end)} · 周记草稿",
         range_start=start, range_end=end,
         paras=paras, status="draft",
+        creator_id=auth.user_id,
         model_version=model_version, prompt_version=PROMPT_VERSION,
         fact_count=len(facts), created_at=now, updated_at=now,
     )

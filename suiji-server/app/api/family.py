@@ -1,4 +1,4 @@
-"""家庭 /family（契约 §4）：邀请/加入/只读/成员角色管理。
+"""家庭 /family（契约 §4）：邀请/加入/成员角色管理。
 
 家庭归属唯一（§4.0）：一个用户同一时刻只能关联 1 个家庭——`user.family_id` 是唯一归属指针，
 `family_member` 中同一 user 至多 1 行。换家庭的唯一路径是「凭其他家庭的邀请码加入」：
@@ -16,7 +16,7 @@ from ..core.deps import AuthContext, get_auth, require_creator
 from ..core.rate_limit import limit as rate_limit
 from ..domain.dates import utc_now_iso
 from ..models import Family, FamilyMember, InviteCode, Setting, User
-from ..schemas import FamilyCreateIn, FamilyReadonlyIn, JoinIn, MemberRoleIn
+from ..schemas import FamilyCreateIn, JoinIn, MemberRoleIn
 from ..services import audit_service
 from ..services.bootstrap_service import family_members
 from ..services.ids import gen_id
@@ -49,7 +49,6 @@ def _family_dict(db: Session, auth: AuthContext) -> dict:
     return {
         "id": auth.family_id,
         "name": fam.name if fam else "",
-        "readonly": 1 if auth.readonly else 0,
         "role": auth.role,
         "need_family": fam is None,
     }
@@ -144,14 +143,14 @@ def create_family(body: FamilyCreateIn, db: Session = Depends(get_db), auth: Aut
     now = utc_now_iso()
     name = (body.name or "").strip() or (user.name + "的家庭")
     fid = gen_id("fam")
-    fam = Family(id=fid, name=name, creator_id=user.id, readonly=0, created_at=now)
+    fam = Family(id=fid, name=name, creator_id=user.id, created_at=now)
     db.add(fam)
     _bind(db, auth, fid, "creator", PALETTE[0])
     audit_service.record(db, fid, auth, action="create", target_type="family", target_id=fid,
                          text=f"创建家庭空间「{name}」", created_at=now)
     db.commit()
     return {
-        "family": {"id": fid, "name": name, "readonly": 0, "role": "creator"},
+        "family": {"id": fid, "name": name, "role": "creator"},
         "members": family_members(db, fid),
     }
 
@@ -197,25 +196,10 @@ def join(body: JoinIn, db: Session = Depends(get_db), auth: AuthContext = Depend
                          text=f"「{_name_of(db, user.id)}」凭邀请码加入家庭空间")
     db.commit()
     return {
-        "family": {"id": fam.id, "name": fam.name, "readonly": int(fam.readonly or 0), "role": "member"},
+        "family": {"id": fam.id, "name": fam.name, "role": "member"},
         "members": family_members(db, fam.id),
         "left_family": left,
     }
-
-
-@router.patch("/readonly")
-def set_readonly(body: FamilyReadonlyIn, db: Session = Depends(get_db), auth: AuthContext = Depends(get_auth)):
-    _require_creator(auth)
-    fam = db.get(Family, auth.family_id)
-    if fam is None:
-        raise HTTPException(status_code=404, detail="家庭不存在")
-    fam.readonly = 1 if body.readonly else 0
-    audit_service.record(
-        db, auth.family_id, auth, action="readonly", target_type="family", target_id=auth.family_id,
-        text=("开启家庭只读开关 · 全体成员暂时仅浏览" if fam.readonly else "关闭家庭只读开关 · 恢复全体成员编辑"),
-    )
-    db.commit()
-    return {"family": _family_dict(db, auth), "members": family_members(db, auth.family_id)}
 
 
 @router.patch("/members/{user_id}")

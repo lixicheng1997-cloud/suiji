@@ -25,7 +25,7 @@ import { SERVERS, MESSAGE_POLL_INTERVAL } from '@/config/app.js'
 /* ---------- 内存缓存（= GET /bootstrap 响应镜像，契约 §3） ---------- */
 const cache = {
   user: null,
-  family: null,            // {id,name,readonly,role,members:[...]}
+  family: null,            // {id,name,role,members:[...]}
   active_baby_id: '',
   babies: [],
   entries: [],             // 未软删
@@ -301,13 +301,6 @@ function accountName() {
 function myUserId() {
   return (cache.user || {}).id || ''
 }
-/** 只读判定：创建者恒可写；非创建者看 family.readonly（服务端 403 兜底） */
-function readOnly() {
-  const fam = cache.family || {}
-  if (fam.role === 'creator') return false
-  if (fam.readonly) return true
-  return (cache.settings.family || {}).readOnly === true
-}
 
 /**
  * 详情/编辑要展示的照片：优先 entry_media 台账行，台账没跟上（编辑换过图、
@@ -452,6 +445,17 @@ export function getBabyById(id) {
   if (!b) return null
   return Object.assign({}, b, { age: ageText(b.birth_date, now(), b.gestational_weeks) })
 }
+
+/**
+ * 记录/测量是否属于当前宝宝（多宝宝严格隔离口径）：
+ * - 家庭 ≥2 个宝宝：按 baby_id 严格匹配，无 baby_id 的历史记录不并入任一宝宝；
+ * - 仅 1 个宝宝：无 baby_id 的历史记录兼容并入当前宝宝。
+ */
+function matchBabyEntry(e, babyId) {
+  if (!babyId) return true
+  if ((cache.babies || []).length >= 2) return e.baby_id === babyId
+  return !e.baby_id || e.baby_id === babyId
+}
 /**
  * 头像/文件展示源：/api/ 相对路径（文件行 url）→ 带 token 的绝对 URL；
  * 本地临时路径（blob:/wxfile:/_doc: 等）与 dataURL 原样透传，供选图后即时预览。
@@ -557,7 +561,7 @@ export function fetchEntries(params = {}) {
   const babyId = baby ? baby.id : ''
   const rows = cache.entries
     .filter(e => !params.type || params.type === 'all' || e.type === params.type)
-    .filter(e => !e.baby_id || e.baby_id === babyId)
+    .filter(e => matchBabyEntry(e, babyId))
     .sort((a, b) => (a.occurred_at < b.occurred_at ? 1 : -1))
   const groups = []
   const map = {}
@@ -613,7 +617,7 @@ export function getTodayCount() {
   const baby = getBaby()
   const babyId = baby ? baby.id : ''
   const dk = dayKey(now())
-  return cache.entries.filter(e => dayKey(e.occurred_at) === dk && (!e.baby_id || e.baby_id === babyId)).length
+  return cache.entries.filter(e => dayKey(e.occurred_at) === dk && matchBabyEntry(e, babyId)).length
 }
 
 /** 进行中睡眠记录（原始缓存行，含 occurred_at 供首页实时计时）；无则 null */
@@ -622,7 +626,7 @@ export function getOngoingSleep() {
   const babyId = baby ? baby.id : ''
   return cache.entries.find(e =>
     e.badge === 'ongoing' && e.type === 'sleep' && e.occurred_at &&
-    (!e.baby_id || e.baby_id === babyId)
+    matchBabyEntry(e, babyId)
   ) || null
 }
 
@@ -744,7 +748,6 @@ function uploadVoice(payload, babyId) {
  * 保存一条记录（新建 POST /entries 带 Idempotency-Key=客户端 entry UUID；编辑 PUT）
  * @param {{ type, id?, occurred_at?, payload?, note?, photos?, backfill? }} entry
  */export function saveEntry(entry) {
-  if (readOnly()) return Promise.reject(new Error('当前是只读模式，暂时不能修改'))
   const baby = getBaby()
   const old = entry.id ? cache.entries.find(e => e.id === entry.id) : null
   const occurred = entry.occurred_at || (old ? old.occurred_at : now())
@@ -910,7 +913,6 @@ export function fetchEntry(id) {
 export function updateEntry(id, patch) {
   const i = cache.entries.findIndex(e => e.id === id)
   if (i < 0) return Promise.reject(new Error('记录不存在'))
-  if (readOnly()) return Promise.reject(new Error('当前是只读模式，暂时不能修改'))
   const old = cache.entries[i]
   const merged = Object.assign({}, old, patch, { updated_at: now() })
   if (patch.payload) {
@@ -935,7 +937,6 @@ export function updateEntry(id, patch) {
 
 /** 删除记录：服务端软删进回收站（deleted_at/deleted_by 由服务端落，契约 §6） */
 export function deleteEntry(id) {
-  if (readOnly()) return Promise.reject(new Error('当前是只读模式，暂时不能修改'))
   const i = cache.entries.findIndex(e => e.id === id)
   if (i < 0) return Promise.reject(new Error('记录不存在'))
   const e = cache.entries[i]
@@ -1015,7 +1016,7 @@ export function getLastFeeding() {
   const baby = getBaby()
   const babyId = baby ? baby.id : ''
   const rows = cache.entries
-    .filter(e => e.type === 'feeding' && (!e.baby_id || e.baby_id === babyId))
+    .filter(e => e.type === 'feeding' && matchBabyEntry(e, babyId))
     .sort((a, b) => (a.occurred_at < b.occurred_at ? 1 : -1))
   const e = rows.find(r => r.payload && Number(r.payload.amount) > 0)
   return e ? { amount: Number(e.payload.amount), occurred_at: e.occurred_at } : null
@@ -1025,7 +1026,7 @@ export function getLastFeeding() {
 export function getTodayStats() {
   const baby = getBaby()
   const babyId = baby ? baby.id : ''
-  return calcTodayStats(cache.entries.filter(e => !e.baby_id || e.baby_id === babyId))
+  return calcTodayStats(cache.entries.filter(e => matchBabyEntry(e, babyId)))
 }
 
 /* ---------- 生长（曲线/百分位仍由 domain/growth.js 客户端计算，数据源=缓存） ---------- */
@@ -1045,7 +1046,7 @@ function measurePoints(metric) {
   if (!baby) return []
   return liveMeasurements()
     /* 多宝宝隔离：无 baby_id 的历史测量视为当前宝宝 */
-    .filter(m => m.metric === metric && (!m.baby_id || m.baby_id === baby.id))
+    .filter(m => m.metric === metric && matchBabyEntry(m, baby.id))
     .map(m => ({ ageM: ageMonths(baby.birth_date, m.occurred_at, baby.gestational_weeks), value: m.value }))
     .filter(p => p.ageM >= 0)
     .sort((a, b) => a.ageM - b.ageM)
@@ -1112,9 +1113,9 @@ export function getLatest() {
 export function getMeasures() {
   const baby = getBaby()
   const byDate = {}
-  /* 多宝宝隔离：无 baby_id 的历史测量视为当前宝宝 */
+  /* 多宝宝隔离：≥2 个宝宝按 baby_id 严格匹配，单宝宝兼容无 baby_id 历史测量 */
   liveMeasurements()
-    .filter(m => !m.baby_id || !baby || m.baby_id === baby.id)
+    .filter(m => matchBabyEntry(m, baby && baby.id))
     .forEach(m => {
       const dk = dayKey(m.occurred_at)
       byDate[dk] = byDate[dk] || { date: dk, h: '', w: '', c: '', by: '家庭自测', entry_id: m.entry_id }
@@ -1140,7 +1141,7 @@ export function getMilestones() {
   const baby = getBaby()
   const babyId = baby ? baby.id : ''
   return cache.milestone_records
-    .filter(m => !m.baby_id || m.baby_id === babyId)
+    .filter(m => matchBabyEntry(m, babyId))
     .map(m => ({
       id: m.id, name: m.name, month: m.month, done: !!m.done, domain: m.domain,
       /* 达成日期与来源记录：里程碑纪念卡取日期、可按来源记录带出照片 */
@@ -1494,23 +1495,29 @@ export function getParentInfo() {
 export function saveParentInfo(info) {
   writeSetting('parent', info)
 }
-/* 健康日志可见性：0 家人可见 / 1 仅自己可见 / 2 隐藏（存服务端 settings） */
-export function getHealthVisibility() { return settingOf('health_visibility', 0) }
-export function setHealthVisibility(i) { writeSetting('health_visibility', i) }
-export function getFamilyFlags() { return settingOf('family', { mode: 'solo', readOnly: false, lock: false }) }
-export function setFamilyFlag(key, val) {
-  const f = Object.assign({}, getFamilyFlags())
-  f[key] = val
-  writeSetting('family', f)
-}
 
-/* ---------- 家庭契约（API-CONTRACT §4）：创建 / 邀请码 / 凭码加入 / 家庭只读开关 ---------- */
+/* ---------- 家庭契约（API-CONTRACT §4）：创建 / 邀请码 / 凭码加入 ---------- */
 /** 是否已关联家庭：bootstrap 后 family.id 为空视为无家庭（登录门控用） */
 export function hasFamily() { return !!(cache.family && cache.family.id) }
-/** 当前家庭契约状态 {id,name,readonly,role}（无家庭时 null） */
+/** 当前家庭契约状态 {id,name,role}（无家庭时 null） */
 export function getFamilyInfo() { return cache.family || null }
 export function getFamilyRole() { return (cache.family || {}).role || 'member' }
-export function isFamilyReadonly() { return !!(cache.family && cache.family.readonly) }
+/**
+ * 当前用户能否改/删该记录（两角色模型 v1.3）：
+ * 创建者对任意记录放行；成员仅本人创建；老数据无 creator_id 时按名字串兜底匹配。
+ * 最终归属以服务端校验为准，前端显隐仅为体验层。
+ * @param {object} entry 记录行（含 creator_id / creator）
+ */
+export function canEditEntry(entry) {
+  if (!entry) return false
+  if (getFamilyRole() === 'creator') return true
+  const cid = String(entry.creator_id || '').trim()
+  if (cid) return cid === myUserId()
+  const name = String(entry.creator || '').trim()
+  if (!name) return false
+  const u = cache.user || {}
+  return name === accountName() || name === String(u.username || '') || name === String(u.name || '')
+}
 /** 创建新家庭：POST /family { name }，成功后重新 bootstrap 拉取家庭数据 */
 export function createFamily(name) {
   return http.post('/family', { name: (name || '').trim() }).then(() => bootstrap())
@@ -1531,19 +1538,6 @@ export function joinFamily(code) {
     return bootstrap().then(() => r)
   })
 }
-/** 家庭只读开关（仅创建者）：PATCH /family/readonly，乐观更新缓存，失败回滚并重新对齐 */
-export function setFamilyReadonly(val) {
-  const fam = cache.family || {}
-  const old = fam.readonly
-  fam.readonly = !!val
-  cache.family = fam
-  return http.patch('/family/readonly', { readonly: !!val }).catch(err => {
-    fam.readonly = old
-    uiError(err, '只读开关设置失败')
-    return bootstrap().catch(() => { /* 无网时保留回滚值 */ })
-  })
-}
-
 /** 本机导出服务端不可观测，成功后上报一次留痕（FR-22）；失败不影响导出结果 */
 function reportExport() {
   http.post('/family/audit/export', {}, { silent: true }).catch(() => { /* 留痕失败不阻断导出 */ })
@@ -1552,11 +1546,11 @@ function reportExport() {
 /* ---------- 操作留痕（P20 · FR-22：服务端 audit_log，保留 180 天，成员不可删除） ---------- */
 const AUDIT_TAGS = {
   create: '创建', invite: '邀请', join: '加入', leave: '退出', role: '角色变更',
-  readonly: '只读开关', delete: '删除', purge: '彻底删除', export: '导出', wipe: '数据清除'
+  delete: '删除', purge: '彻底删除', export: '导出', wipe: '数据清除'
 }
 const AUDIT_COLORS = {
   create: '#FF6B8B', invite: '#5FB87A', join: '#5FB87A', leave: '#E85D5D', role: '#FF9E58',
-  readonly: '#FF9E58', delete: '#E85D5D', purge: '#E85D5D', export: '#8FA8D8', wipe: '#E85D5D'
+  delete: '#E85D5D', purge: '#E85D5D', export: '#8FA8D8', wipe: '#E85D5D'
 }
 /**
  * 家庭操作留痕列表：GET /family/audit（真实数据，非原型常量）

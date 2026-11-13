@@ -2,7 +2,7 @@
 
 > 本文件是 suiji-server（FastAPI）与 suiji-uniapp（uni-app）的唯一协调基准。
 > 上游依据：《岁记-宝宝成长记录App-技术设计文档-TDD-v3.0》§5/§6/§8。
-> 基础路径 `/api/v1`；鉴权 `Authorization: Bearer <JWT access>`；401 未认证 / 403 越权或只读 / 404 / 422 校验失败。
+> 基础路径 `/api/v1`；鉴权 `Authorization: Bearer <JWT access>`；401 未认证 / 403 越权 · 非本人记录 · 仅创建者 / 404 / 422 校验失败。
 > 时间统一 UTC ISO8601 字符串（如 `2026-10-23T12:00:00Z`）。
 
 ## 0. 设计原则（缓存镜像模式）
@@ -12,6 +12,7 @@
 - 写操作：客户端先乐观更新缓存，再调 REST；REST 成功 Promise 才 resolve，失败 reject（页面已有错误提示）。
 - 记录的派生字段（title/meta/badge/photo 摘要）由客户端计算后随请求提交，服务端原样存储（导出/多端一致时以存储值为准）。
 - 百分位：服务端在写入 measurement 时用同一张 WHO 参考表计算并落 `growth_point`，留痕权威在服务端。
+- 月龄口径：曲线横轴/百分位用矫正月龄（胎龄 <37 周、未满预产期前回拨，满预产期后不再矫正）；文字月龄「X 个月 Y 天」按实际日历年龄计算，不做矫正回拨。
 
 ## 1. 数据行形状（与客户端旧 db 行一致，snake_case）
 
@@ -23,7 +24,7 @@
 // entry（核心表；软删 deleted_at 非空即回收站）
 { "id":"e_xxx", "baby_id":"baby_xxx", "type":"feeding|sleep|milestone|measure|poop|temp|med|photo|note|mood|voice",
   "occurred_at":"...", "created_at":"...", "updated_at":"...", "is_backfilled":0,
-  "note":"", "creator":"妈妈 · 李芳", "title":"", "meta":"", "badge":"", "photo":"<url或''>",
+  "note":"", "creator":"妈妈 · 李芳", "creator_id":"usr_xxx", "title":"", "meta":"", "badge":"", "photo":"<url或''>",
   "payload":{...}, "deleted_at":null }
 // entry_media
 { "id":"md_xxx", "entry_id":"e_xxx", "baby_id":"", "storage_key":"...", "url":"/api/v1/media/{id}",
@@ -33,7 +34,7 @@
   "occurred_at":"...", "corrected_age_flag":0 }
 // milestone_record（建档时服务端按清单自动初始化该宝宝全部条目）
 { "id":"msr_xxx", "baby_id":"", "name":"翻身", "domain":"大运动", "month":"4-7月",
-  "ref":"4-7 月龄", "done":false, "achieved_at":"", "source_entry_id":"", "creator":"", "sort":0 }
+  "ref":"4-7 月龄", "done":false, "achieved_at":"", "source_entry_id":"", "creator":"", "creator_id":"", "sort":0 }
 // vaccine（建档时服务端按内置国家免疫规划排期自动生成）
 { "id":"v_xxx", "code":"bcg", "baby_id":"", "n":"卡介苗", "dose":"第 1 剂", "age":"出生时",
   "months":0, "cls":"一类", "sort":0, "plan_date":"2026-03-01", "done":false, "done_date":"",
@@ -41,7 +42,7 @@
 // ai_journal
 { "id":"j_xxx", "baby_id":"", "range":"3月1日 – 3月7日 · 周记草稿", "range_start":"2026-03-01",
   "range_end":"2026-03-07", "paras":[{"text":"...","cites":["e_xxx"]}], "status":"draft|archived",
-  "model_version":"gpt|template", "prompt_version":"v1", "fact_count":0, "created_at":"...", "updated_at":"..." }
+  "creator_id":"", "model_version":"gpt|template", "prompt_version":"v1", "fact_count":0, "created_at":"...", "updated_at":"..." }
 // member（avatar/relation 取该用户 setting.parent.avatar / setting.parent.relation，家长信息页保存；未设置为空串）
 { "id":"usr_xxx", "name":"妈妈", "role":"creator|member", "color":"#FF6B8B", "avatar":"/api/files/xxx/download", "relation":"妈妈" }
 // setting（每用户一个 JSON 对象，键与旧 db.getSetting 一致）
@@ -84,11 +85,11 @@ HMAC 覆盖 `suiji:v1|kid|ts|req|resp|path`，密文不能跨接口搬运。
 | 方法 路径 | 入参 | 出参 |
 | --- | --- | --- |
 | POST `/auth/register` | `{username, password, name?}` | `{access, refresh, media, user:{id,name,username}, family:null, need_family:true}`；**注册只建账号，不代建家庭**；用户名已占用返回 `409 {"detail":"用户名「x」已被注册，请换一个"}`（detail 即可直接展示的文案，客户端在注册页钉在账号行下方） |
-| POST `/auth/login` | `{username, password}` | 已关联家庭：`{access, refresh, media, user, family:{id,name,readonly,role}, need_family:false}`；未关联（新注册 / 被创建者移除后回落）返回 `{access, refresh, media, user, family:null, need_family:true}` |
+| POST `/auth/login` | `{username, password}` | 已关联家庭：`{access, refresh, media, user, family:{id,name,role}, need_family:false}`；未关联（新注册 / 被创建者移除后回落）返回 `{access, refresh, media, user, family:null, need_family:true}` |
 | POST `/auth/refresh` | `{refresh}` | `{access, refresh, media, need_family}`；**refresh 一次性轮换**，客户端必须整组覆盖本地令牌 |
 | POST `/auth/logout` | `{refresh?, all?}` | `{ok:true}`；撤销当前 access，并作废传入的 refresh（需 Bearer access）；`all:true` 额外抬高用户水位线，使本账号**所有设备**已签发的令牌立即失效 |
 | POST `/auth/password` | `{old_password, new_password}` | `{access, refresh, media, user, need_family}`；校验旧密码后写新哈希，**抬高用户水位线**（旧令牌全部失效），并为当前设备重签三件套（无需重新登录） |
-| GET `/auth/me` | — | `{user, family:{id,name,readonly,role}\|null, need_family}` |
+| GET `/auth/me` | — | `{user, family:{id,name,role}\|null, need_family}` |
 
 JWT payload：`{user_id, family_id, role, type, jti, iat, iat_ms, exp}`。三类令牌互不通用：
 
@@ -123,7 +124,7 @@ Redis 不可用时降级进程内存（**临时降级，到点自动重连**，�
 GET `/bootstrap` → 全量快照（一次请求填充客户端缓存）：
 
 ```json
-{ "user":{...}, "family":{"id","name","readonly","role","events_version","members":[member...]},
+{ "user":{...}, "family":{"id","name","role","events_version","members":[member...]},
   "active_baby_id":"", "babies":[baby...], "entries":[entry...未软删],
   "measurements":[...], "media":[...], "milestone_records":[...], "vaccines":[...],
   "journals":[...], "settings":{...}, "trash":[entry...已软删（含 deleted_at/deleted_by）] }
@@ -137,13 +138,12 @@ GET `/bootstrap` → 全量快照（一次请求填充客户端缓存）：
 | POST `/family` | `{name?}` → 创建新家庭并归属为 creator，返回 `{family, members}`；已关联家庭 422 |
 | POST `/family/invite` | 创建者→`{code, expires_at}`（7 天有效，可重复生成即失效旧的） |
 | POST `/family/join` | `{code}` → **与当前家庭解绑后**加入为 member，返回 `{family, members, left_family}`；重复加入 422 |
-| PATCH `/family/readonly` | `{readonly:bool}` 仅创建者 |
-| PATCH `/family/members/{user_id}` | `{role:"creator|member"}` 仅创建者（转让/设管理员用） |
+| PATCH `/family/members/{user_id}` | `{role:"creator|member"}` 仅创建者（转让创建者用） |
 | DELETE `/family/members/{user_id}` | 创建者移除成员；移除自己 422 |
 | GET `/family/audit?limit=200&days=180` | 操作留痕列表 `{"items":[audit_log...]}`（FR-22，见 §4.1） |
 | POST `/family/audit/export` | 客户端本机导出（备份包/成长档案）上报一次「导出」留痕，服务端不可观测时由客户端调用 |
 
-只读开关置位后，非创建者所有写接口返回 403 `{detail:"只读模式"}`。
+权限模型为两角色：**创建者 `creator`** 拥有全部权限；**成员 `member`** 可浏览全家、新增记录、参与宝宝档案建档/改档/切换，仅可改/删/恢复/彻底删除本人 `creator_id` 的记录。成员改删非本人记录、调用家庭级动作（邀请/转让/移除成员、清空回收站、导入覆盖、清空全家、导出副本）返回 403。
 
 ### 4.0 家庭归属唯一
 
@@ -161,12 +161,12 @@ GET `/bootstrap` → 全量快照（一次请求填充客户端缓存）：
 // audit_log（服务端写入，无对外增改删接口，成员不可删除）
 // GET /family/audit 读取时：actor_name 按 actor_id 实时解析当前展示名（家长信息 parent.name 昵称 → User.name 注册昵称，
 // 均无则为「家人」，绝不透出登录账号）；actor_relation 取家长信息 parent.relation（与宝宝关系，未设置为空串）
-{ "id":"a_xxx", "action":"create|invite|join|leave|role|readonly|delete|purge|export|wipe",
+{ "id":"a_xxx", "action":"create|invite|join|leave|role|delete|purge|export|wipe",
   "actor_id":"usr_xxx", "actor_name":"妈妈", "actor_relation":"妈妈", "target_type":"family|member|entry|trash|data",
   "target_id":"...", "text":"创建家庭空间「小满的家」", "created_at":"2026-10-21T16:42:00Z" }
 ```
 
-- 写入时机（服务端同一事务内）：创建家庭 / 生成邀请码 / 凭码加入 / 移除成员（退出）/ 角色变更 / 只读开关 / 记录软删 / 彻底删除（单条与清空回收站）/ 服务端导出 `GET /export/data` / 清空家庭数据 `DELETE /account/data`。
+- 写入时机（服务端同一事务内）：创建家庭 / 生成邀请码 / 凭码加入 / 移除成员（退出）/ 角色变更 / 记录软删 / 彻底删除（单条与清空回收站）/ 服务端导出 `GET /export/data` / 清空家庭数据 `DELETE /account/data`。
 - 凭码加入其他家庭时，除向新家庭写 `join`，还向**原家庭**写一条 `leave`（创建者离开时另加一条 `role`，记录创建者身份交接）。
 - 客户端本机导出（`exportBackup` / `exportArchive`）在落盘成功后回调 `POST /family/audit/export` 补一条 `export` 留痕；失败不影响导出结果。
 - 读取：`GET /family/audit` 返回近 `days` 天（默认 180，与保留期一致）内本家庭留痕，按 `created_at desc` 倒序；`family_id` 为空（未关联家庭）返回空数组。
@@ -177,21 +177,23 @@ GET `/bootstrap` → 全量快照（一次请求填充客户端缓存）：
 | 方法 路径 | 说明 |
 | --- | --- |
 | GET `/babies` | 列表（含 is_active） |
-| POST `/babies` | 创建；**服务端同时为该宝宝初始化 milestone_records（内置清单）与 vaccines（按 birth_date 排期）**；首个宝宝自动 active |
-| PUT `/babies/{id}` | 更新（birth_date 变化时重排疫苗 plan_date，保留接种状态） |
-| POST `/babies/{id}/activate` | 切换当前档案 |
+| POST `/babies` | 创建；**服务端同时为该宝宝初始化 milestone_records（内置清单）与 vaccines（按 birth_date 排期）**；首个宝宝自动 active。家庭成员均可建档（家庭隔离，跨家庭 403） |
+| PUT `/babies/{id}` | 更新（birth_date 变化时重排疫苗 plan_date，保留接种状态）；家庭成员均可改档 |
+| POST `/babies/{id}/activate` | 切换当前档案；家庭成员可操作 |
 
 ## 6. 记录 `/entries`
 
 | 方法 路径 | 说明 |
 | --- | --- |
-| POST `/entries` | 请求头 `Idempotency-Key`（客户端 UUID）；body 为 entry 行（含 payload/title/meta/badge/photo）；type=measure 时按 payload 生成 measurement 行并算百分位；type=milestone 且 payload.name 匹配时更新该宝宝对应 milestone_record.done；响应 `{id, ...row}`。补录（`is_backfilled=1`）静默，其余新建给家庭其他成员各落一条 `/notifications` 行（§6.6） |
-| PUT `/entries/{id}` | 全量更新行；measure 类型重建 measurement。**不通知家人**（误触编辑会刷屏），仅 bump `events_version` 让他人重拉对齐 |
-| DELETE `/entries/{id}` | 软删（deleted_at=now, deleted_by=操作人名）→ 进回收站；通知其他成员「X 删除了…」（§6.6） |
-| POST `/entries/{id}/restore` | 恢复；通知其他成员「X 恢复了…」（§6.6） |
-| DELETE `/entries/trash/{id}` | 彻底删除（连同 measurement/media） |
-| DELETE `/entries/trash` | 清空回收站 |
+| POST `/entries` | 请求头 `Idempotency-Key`（客户端 UUID）；body 为 entry 行（含 payload/title/meta/badge/photo）；type=measure 时按 payload 生成 measurement 行并算百分位；type=milestone 且 payload.name 匹配时更新该宝宝对应 milestone_record.done；响应 `{id, ...row}`。**录入区间校验**：measure 的身高 30–130cm、体重 0.1–40kg、头围 25–55cm，temp 体温 35.0–42.0°C，越界 422。补录（`is_backfilled=1`）静默，其余新建给家庭其他成员各落一条 `/notifications` 行（§6.6） |
+| PUT `/entries/{id}` | 全量更新行；measure 类型重建 measurement。**归属：创建者任意；成员仅本人 `creator_id` 的记录，否则 403。不通知家人**（误触编辑会刷屏），仅 bump `events_version` 让他人重拉对齐 |
+| DELETE `/entries/{id}` | 软删（deleted_at=now, deleted_by=操作人名）→ 进回收站；**归属同上，成员仅可删本人记录**；通知其他成员「X 删除了…」（§6.6） |
+| POST `/entries/{id}/restore` | 恢复；**归属同上**；通知其他成员「X 恢复了…」（§6.6） |
+| DELETE `/entries/trash/{id}` | 彻底删除（连同 measurement/media）；**归属同上** |
+| DELETE `/entries/trash` | 清空回收站；**仅创建者**（家庭级批量动作） |
 | GET `/entries?baby=&type=&cursor=&limit=20` | 游标分页（MVP 客户端主要用 bootstrap，此端点供搜索/后续） |
+| GET `/entries/timeline?baby=&cursor=&limit=10` | 主页时光轴游标分页；`baby` 缺省取活跃宝宝。**宝宝隔离**：家庭有 ≥2 个宝宝时按 `baby_id` 严格匹配，无 `baby_id` 的历史记录不并入任一宝宝；仅 1 个宝宝时兼容并入历史空档记录 |
+| GET `/entries/search?baby=&q=&type=&cursor=&limit=10` | 关键词搜索游标分页；宝宝隔离口径同 `/entries/timeline` |
 
 ## 6.5 增量探测 `/events`（家人动态实时通知 · 方案 A 纯轮询）
 
@@ -265,8 +267,8 @@ GET `/bootstrap` → 全量快照（一次请求填充客户端缓存）：
 | POST `/files/batch` | multipart `files`（多个）+ 同一组挂载参数 → `{items, errors, count}`；单个失败不中断其余 |
 | GET `/files?business_type=&business_id=&baby_id=&keyword=&limit=50&offset=0` | 分页列表（按创建时间倒序）→ `{items, total, limit, offset}`；keyword 匹配原始文件名 |
 | GET `/files/{id}` | 文件行详情 |
-| PATCH `/files/{id}` | `{business_type?, business_id?, baby_id?, original_name?, meta?}` 改名/挂载/改挂业务；内容与 storage_key 不可变 |
-| DELETE `/files/{id}` | 删除台账行；同家庭无其他引用时才真正删除对象存储中的字节 |
+| PATCH `/files/{id}` | `{business_type?, business_id?, baby_id?, original_name?, meta?}` 改名/挂载/改挂业务；内容与 storage_key 不可变。**归属跟随记录：创建者任意；成员仅可改本人创建记录上的附件（`entry` 直挂、`entry_media` 反查 entry）；`baby` 档案资料随档案可写；未挂具体记录的附件与无主记录附件成员不可操作** |
+| DELETE `/files/{id}` | 删除台账行；同家庭无其他引用时才真正删除对象存储中的字节。**归属同上** |
 | GET `/files/{id}/download?token=&inline=0` | 下载字节（鉴权：`Authorization: Bearer` 用 access/media，或 `?token=` 传 **media 令牌**；access 放 query 一律 403——它会落进日志与 Referer。无/非法/已撤销 token 403）。`inline=1` 且内容类型属图片/音视频/PDF 时才走服务端代理并带 `Content-Disposition: inline`；**其余类型强制 `attachment`**，避免上传的 HTML 被同源渲染成存储型 XSS |
 | GET `/files/{id}/url?expires=` | 临时直链（MinIO 预签名）；有效期由服务端封顶 `MEDIA_URL_MAX_EXPIRES`（默认 3600s），客户端传再大也无效。本地磁盘后端 `url=null`，请走 `/download` |
 
@@ -312,7 +314,7 @@ mp3/m4a/aac/wav/ogg/flac、pdf/txt/csv/json/zip 之一；并按 magic bytes 嗅�
 | 方法 路径 | 说明 |
 | --- | --- |
 | GET `/milestones?baby_id=` | 该宝宝全部条目 |
-| PUT `/milestones/{id}` | `{done, achieved_at, source_entry_id, month, creator}`；done 由未达成→达成时通知其他成员「X 达成了里程碑「…」」（§6.6），反复改达成日期/取消达成不通知 |
+| PUT `/milestones/{id}` | `{done, achieved_at, source_entry_id, month}`；归属：创建者任意；成员可勾选系统预置清单（`creator_id` 为空的共享行）或本人达成的自定义里程碑。**首次达成时间/来源记录只在未达成→达成时写入，后到或补录的同名记录不覆盖已有首次达成信息**。done 由未达成→达成时通知其他成员「X 达成了里程碑「…」」（§6.6），反复改达成日期/取消达成不通知 |
 
 ## 10. 设置 `/settings`
 
@@ -327,7 +329,7 @@ mp3/m4a/aac/wav/ogg/flac、pdf/txt/csv/json/zip 之一；并按 magic bytes 嗅�
 | --- | --- |
 | POST `/journals/generate` | `{baby_id?, range_start?, range_end?}`（缺省=近 7 天）；服务端管线：事实提取→（配了 LLM 则调用+OutputGuard，失败重生成 1 次）→模板兜底；响应 journal 行 |
 | GET `/journals` | 列表（倒序） |
-| PUT `/journals/{id}` | `{paras?, status?}`（归档/编辑） |
+| PUT `/journals/{id}` | `{paras?, status?}`（归档/编辑）；归属：创建者任意；成员仅可编辑本人生成的草稿（`creator_id` 本人），无主草稿成员不可改 |
 
 LLM 配置走服务端环境变量 `LLM_API_BASE / LLM_API_KEY / LLM_MODEL`；未配置直接模板兜底。Key 绝不下发客户端。
 AI 配置开关（enabled）存 settings.ai，仅作为是否请求生成的门控。
@@ -338,7 +340,7 @@ AI 配置开关（enabled）存 settings.ai，仅作为是否请求生成的门�
 | 方法 路径 | 说明 |
 | --- | --- |
 | GET `/export/data` | 全量 JSON（同 bootstrap 形状），供数据副本导出 |
-| POST `/import` | `{snapshot}`（buildPack 解析后的形状）按 id upsert 合并、同 id 取 updated_at 新者。**仅接受每表列白名单内的字段**：`storage_key`/`sha256`/`size`/`width`/`height`/`deleted_by` 一律由服务端决定（否则可构造指向他人对象的记录跨家庭读取）；`baby_id`/`entry_id` 必须落在本家庭内，否则置空。单次上限 20000 行 |
+| POST `/import` | `{snapshot}`（buildPack 解析后的形状）按 id upsert 合并、同 id 取 updated_at 新者。**仅接受每表列白名单内的字段**：`storage_key`/`sha256`/`size`/`width`/`height`/`deleted_by`/`deleted_by_id`/`creator`/`creator_id` 一律由服务端决定（归属不接受快照包外部指定；否则可构造指向他人对象的记录跨家庭读取）；`baby_id`/`entry_id` 必须落在本家庭内，否则置空。单次上限 20000 行 |
 | DELETE `/account/data` | 清空该家庭全部业务数据（保留账号）——**仅家庭创建者**可调用（普通成员 403） |
 
 ## 13. 生长曲线 `/growth`

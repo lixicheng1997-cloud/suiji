@@ -27,7 +27,6 @@ class Family(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     name: Mapped[str] = mapped_column(String(64), default="家庭空间")
     creator_id: Mapped[str] = mapped_column(String(32), default="")
-    readonly: Mapped[int] = mapped_column(Integer, default=0)  # 0/1
     events_version: Mapped[int] = mapped_column(Integer, default=0)  # 家庭事件水位：entry 任何写操作都 bump，客户端据此感知删除/修改
     created_at: Mapped[str] = mapped_column(String(32), default="")
 
@@ -179,6 +178,8 @@ class MilestoneRecord(Base):
     achieved_at: Mapped[str] = mapped_column(String(32), default="")
     source_entry_id: Mapped[str] = mapped_column(String(32), default="")
     creator: Mapped[str] = mapped_column(String(64), default="")
+    # 记录人账号 ID：与 entry.creator_id 同口径；系统预置清单行为空（家庭共享，成员均可勾选）
+    creator_id: Mapped[str] = mapped_column(String(32), default="", index=True)
     sort: Mapped[int] = mapped_column(Integer, default=0)
 
 
@@ -217,6 +218,8 @@ class AiJournal(Base):
     range_end: Mapped[str] = mapped_column(String(10), default="")
     paras: Mapped[list] = mapped_column(JSON, default=list)  # [{text, cites}]
     status: Mapped[str] = mapped_column(String(16), default="draft")
+    # 草稿生成者账号 ID：成员仅可编辑本人草稿，创建者可改任意草稿
+    creator_id: Mapped[str] = mapped_column(String(32), default="", index=True)
     model_version: Mapped[str] = mapped_column(String(64), default="template")
     prompt_version: Mapped[str] = mapped_column(String(16), default="v1")
     fact_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -230,7 +233,7 @@ class AuditLog(Base):
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     family_id: Mapped[str] = mapped_column(String(32), index=True)
-    action: Mapped[str] = mapped_column(String(16), default="")                    # create/invite/join/leave/role/readonly/delete/purge/export/wipe
+    action: Mapped[str] = mapped_column(String(16), default="")                    # create/invite/join/leave/role/delete/purge/export/wipe
     actor_id: Mapped[str] = mapped_column(String(32), default="")
     actor_name: Mapped[str] = mapped_column(String(64), default="")
     target_type: Mapped[str] = mapped_column(String(16), default="")               # family/member/entry/trash/data

@@ -6,7 +6,7 @@ from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
 from ..core.db import get_db
-from ..core.deps import get_auth, require_creator, require_write
+from ..core.deps import require_creator
 from ..media.store import get_store
 from ..models import AiJournal, Baby, Entry, EntryMedia, Measurement, MilestoneRecord, Vaccine
 from ..schemas import ImportIn
@@ -38,14 +38,15 @@ _IMPORT_TABLES = {
 _IMPORT_COLUMNS = {
     "baby": {"name", "birth_date", "gestational_weeks", "gender", "birth_length",
              "birth_weight", "avatar", "allergy", "is_active", "created_at", "updated_at"},
+    # 记录归属（creator/creator_id/deleted_by/deleted_by_id）由服务端按令牌解析，
+    # 不接受快照包外部指定，避免把记录挂到他人名下。
     "entry": {"type", "baby_id", "occurred_at", "created_at", "updated_at", "is_backfilled",
-              "note", "creator", "creator_id", "title", "meta", "badge", "photo", "payload",
-              "deleted_at", "deleted_by", "deleted_by_id"},
+              "note", "title", "meta", "badge", "photo", "payload", "deleted_at"},
     # storage_key / sha256 / size / width / height 不可导入：见上方说明
     "entry_media": {"entry_id", "baby_id"},
     "measurement": {"entry_id", "baby_id", "metric", "value", "occurred_at", "corrected_age_flag"},
     "milestone_record": {"baby_id", "name", "domain", "month", "ref", "done", "achieved_at",
-                         "source_entry_id", "creator", "sort"},
+                         "source_entry_id", "sort"},
     "vaccine": {"code", "baby_id", "n", "dose", "age", "months", "cls", "sort", "plan_date",
                 "done", "done_date", "org", "lot", "remind", "remind_lead",
                 "created_at", "updated_at"},
@@ -60,7 +61,7 @@ _IMPORT_MAX_ROWS = 20000
 
 
 @router.get("/export/data")
-def export_data(db: Session = Depends(get_db), auth=Depends(get_auth)):
+def export_data(db: Session = Depends(get_db), auth=Depends(require_creator)):
     snap = snapshot(db, auth)
     audit_service.record(db, auth.family_id, auth, action="export", target_type="data",
                          text="导出家庭数据副本（含记录/媒体台账）")
@@ -109,7 +110,7 @@ def _apply_row(db: Session, model, row: dict, family_id: str, allowed: set) -> b
 
 
 @router.post("/import")
-def import_data(body: ImportIn, db: Session = Depends(get_db), auth=Depends(require_write)):
+def import_data(body: ImportIn, db: Session = Depends(get_db), auth=Depends(require_creator)):
     snap = body.snapshot or {}
     total = 0
     imported = {}

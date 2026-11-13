@@ -24,7 +24,7 @@ export const APP_ENV = (process.env.NODE_ENV === 'production') ? 'prod' : 'dev'
  * is_default 仅在对应编译环境下作为首次启动默认地址（下方按 APP_ENV 计算）。 */
 const SERVER_DEFS = [
   { id: 'cloud', name: '云服务', env: 'prod', url: 'http://49.233.77.155:30080/api/v1' },
-  { id: 'local', name: '本地调试', env: 'dev', url: 'http://localhost:30000/api/v1' }
+  { id: 'local', name: '本地调试', env: 'dev', url: 'http://localhost:30080/api/v1' }
 ]
 
 /* 当前编译环境对应的默认服务器：dev 包默认本地，prod 包默认云端；

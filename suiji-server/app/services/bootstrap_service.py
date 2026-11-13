@@ -55,7 +55,6 @@ def snapshot(db: Session, auth: AuthContext) -> dict:
         "family": {
             "id": fid,
             "name": fam.name if fam else "",
-            "readonly": int(fam.readonly or 0) if fam else 0,
             "role": auth.role,
             # 事件版本水位：客户端据此判断「距上次快照后家里有没有发生过变更」
             "events_version": int(fam.events_version or 0) if fam else 0,

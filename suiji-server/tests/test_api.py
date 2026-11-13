@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from conftest import API, register, unique_name
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 64
+PNG2 = b"\x89PNG\r\n\x1a\n" + b"1" * 64
 
 
 def _now_str(days_ago: int = 0, hm: str = "10:00") -> str:
@@ -386,8 +387,10 @@ def test_entry_creator_id_resolves_member_across_family(client):
     assert mom["relation"] == "妈妈" and mom["name"] == "李芳"
 
     # 软删行同样带删除人 ID，回收站才能显示「妈妈 删除」
-    assert client.delete(API + "/entries/e_cid_1", headers=h_dad).json()["deleted_by_id"] == dad_uid
-    restored = client.post(API + "/entries/e_cid_1/restore", headers=h_dad).json()
+    # 成员不能删除他人记录（归属校验 403）；创建者/本人才能处置
+    assert client.delete(API + "/entries/e_cid_1", headers=h_dad).status_code == 403
+    assert client.delete(API + "/entries/e_cid_1", headers=h_mom).json()["deleted_by_id"] == mom_uid
+    restored = client.post(API + "/entries/e_cid_1/restore", headers=h_mom).json()
     assert restored["deleted_at"] is None and "deleted_by_id" not in restored
 
 
@@ -438,12 +441,11 @@ def test_journal_generate_template_fallback(client):
 
 # ---------- 家庭：邀请/加入/只读/越权 ----------
 
-def test_family_join_and_readonly(client):
+def test_family_join_and_member_ownership(client):
+    """两角色模型 v1.3：创建者任意处置；成员只能改/删本人记录，家庭级动作收口创建者。"""
     h_a, b_a = _auth(client, "famA")
     fam_id = b_a["family"]["id"]
-    r = client.post(API + "/family/invite", headers=h_a)
-    assert r.status_code == 200 and r.json()["code"]
-    code = r.json()["code"]
+    code = client.post(API + "/family/invite", headers=h_a).json()["code"]
 
     h_b, _ = _auth(client, "famB")
     r = client.post(API + "/family/join", headers=h_b, json={"code": code})
@@ -451,28 +453,37 @@ def test_family_join_and_readonly(client):
     assert r.json()["family"]["id"] == fam_id
     # 重复加入 422
     assert client.post(API + "/family/join", headers=h_b, json={"code": code}).status_code == 422
-    # 成员不可生成邀请/设只读
+    # 成员不可生成邀请（家庭级管理动作仅创建者）
     assert client.post(API + "/family/invite", headers=h_b).status_code == 403
-    assert client.patch(API + "/family/readonly", headers=h_b, json={"readonly": True}).status_code == 403
 
     baby = _create_baby(client, h_a)
-    # 只读开启：非创建者写 403，创建者可写
-    assert client.patch(API + "/family/readonly", headers=h_a, json={"readonly": True}).status_code == 200
-    r = client.post(API + "/entries", headers=h_b, json={"type": "note", "occurred_at": _now_str()})
-    assert r.status_code == 403 and r.json()["detail"] == "只读模式"
-    r = client.post(API + "/entries", headers=h_a, json={"type": "note", "occurred_at": _now_str()})
-    assert r.status_code == 200
-    # 只读下成员仍可记录者视角读
-    assert client.get(API + "/bootstrap", headers=h_b).status_code == 200
+    # 成员可新增记录
+    own = client.post(API + "/entries", headers=h_b,
+                      json={"type": "note", "occurred_at": _now_str()}).json()
+    # 创建者新增一条
+    other = client.post(API + "/entries", headers=h_a,
+                        json={"type": "note", "occurred_at": _now_str()}).json()
 
+    # 成员不能改/删他人（创建者）的记录 → 403
+    assert client.put(API + "/entries/" + other["id"], headers=h_b,
+                      json={"type": "note", "title": "劫持"}).status_code == 403
+    assert client.delete(API + "/entries/" + other["id"], headers=h_b).status_code == 403
+    # 成员可改/删本人记录
+    assert client.put(API + "/entries/" + own["id"], headers=h_b,
+                      json={"type": "note", "title": "本人改"}).status_code == 200
+    assert client.delete(API + "/entries/" + own["id"], headers=h_b).status_code == 200
+    # 创建者可处置任意记录
+    assert client.delete(API + "/entries/" + other["id"], headers=h_a).status_code == 200
+
+    # 成员可读全家数据
+    assert client.get(API + "/bootstrap", headers=h_b).status_code == 200
+    # 宝宝档案不收口创建者：成员可参与建档/改档/切换
+    assert client.put(API + "/babies/" + baby["id"], headers=h_b,
+                      json={"name": "成员改档"}).status_code == 200
     # 跨家庭越权：无关用户 C 改 A 的宝宝 → 403
     h_c, _ = _auth(client, "famC")
     r = client.put(API + "/babies/" + baby["id"], headers=h_c, json={"name": "劫持"})
     assert r.status_code == 403
-
-    # 关闭只读 → B 可写
-    client.patch(API + "/family/readonly", headers=h_a, json={"readonly": False})
-    assert client.post(API + "/entries", headers=h_b, json={"type": "note", "occurred_at": _now_str()}).status_code == 200
 
     # 移除成员：B 家庭归属回落（B 自己创建过个人家庭 → 回落）
     b_user = client.get(API + "/auth/me", headers=h_b).json()["user"]["id"]
@@ -482,14 +493,123 @@ def test_family_join_and_readonly(client):
     assert me["family"]["id"] != fam_id
 
 
+def test_milestone_ownership(client):
+    """里程碑：预置清单（无 creator_id）家庭共享，成员可勾选；自定义里程碑按本人归属。"""
+    h_a, b_a = _auth(client, "msA")
+    a_uid = b_a["user"]["id"]
+    baby = _create_baby(client, h_a)
+    code = client.post(API + "/family/invite", headers=h_a).json()["code"]
+    h_b, _ = _auth(client, "msB")
+    assert client.post(API + "/family/join", headers=h_b, json={"code": code}).status_code == 200
+
+    # 预置共享清单：成员可勾选达成
+    shared = next(m for m in client.get(API + "/milestones", headers=h_b,
+                                        params={"baby_id": baby["id"]}).json()
+                  if not m["creator_id"] and not m["done"])
+    r = client.put(API + f"/milestones/{shared['id']}", headers=h_b, json={"done": True})
+    assert r.status_code == 200, r.text
+
+    # 创建者从记录达成一条自定义里程碑 → 归属创建者
+    client.post(API + "/entries", headers=h_a, json={
+        "type": "milestone", "title": "翻身", "occurred_at": _now_str(),
+        "payload": {"name": "自定义翻身"}})
+    custom = next(m for m in client.get(API + "/milestones", headers=h_a,
+                                        params={"baby_id": baby["id"]}).json()
+                  if m["name"] == "自定义翻身")
+    assert custom["creator_id"] == a_uid
+    # 成员不能改他人达成的自定义里程碑；创建者可改
+    assert client.put(API + f"/milestones/{custom['id']}", headers=h_b,
+                      json={"done": False}).status_code == 403
+    assert client.put(API + f"/milestones/{custom['id']}", headers=h_a,
+                      json={"done": False}).status_code == 200
+
+
+def test_journal_ownership(client):
+    """日记草稿按生成者归属：成员仅可改本人草稿，创建者任意。"""
+    h_a, _ = _auth(client, "jrA")
+    _create_baby(client, h_a)
+    code = client.post(API + "/family/invite", headers=h_a).json()["code"]
+    h_b, _ = _auth(client, "jrB")
+    assert client.post(API + "/family/join", headers=h_b, json={"code": code}).status_code == 200
+
+    j_a = client.post(API + "/journals/generate", headers=h_a, json={}).json()
+    j_b = client.post(API + "/journals/generate", headers=h_b, json={}).json()
+    assert j_a["creator_id"] and j_b["creator_id"]
+    # 成员不能改他人草稿；本人草稿可改；创建者可改任意
+    assert client.put(API + f"/journals/{j_a['id']}", headers=h_b,
+                      json={"status": "archived"}).status_code == 403
+    assert client.put(API + f"/journals/{j_b['id']}", headers=h_b,
+                      json={"status": "archived"}).status_code == 200
+    assert client.put(API + f"/journals/{j_a['id']}", headers=h_a,
+                      json={"status": "archived"}).status_code == 200
+
+
+def test_file_record_ownership(client):
+    """附件跟随记录归属：成员仅可改/删本人记录上的附件；创建者任意；无记录归属附件成员不可处置。"""
+    h_a, _ = _auth(client, "flA")
+    _create_baby(client, h_a)
+    code = client.post(API + "/family/invite", headers=h_a).json()["code"]
+    h_b, _ = _auth(client, "flB")
+    assert client.post(API + "/family/join", headers=h_b, json={"code": code}).status_code == 200
+
+    # 各自建一条记录
+    own = client.post(API + "/entries", headers=h_b,
+                      json={"type": "note", "occurred_at": _now_str()}).json()
+    other = client.post(API + "/entries", headers=h_a,
+                        json={"type": "note", "occurred_at": _now_str()}).json()
+
+    # 附件挂到记录上：本人记录可删，他人记录不可删
+    f_own = client.post(API + "/files", headers=h_b,
+                        files={"file": ("b.png", PNG2, "image/png")},
+                        data={"business_type": "entry", "business_id": own["id"]}).json()
+    f_other = client.post(API + "/files", headers=h_a,
+                          files={"file": ("a.png", PNG, "image/png")},
+                          data={"business_type": "entry", "business_id": other["id"]}).json()
+    # 无记录归属（自由挂载）的附件：成员不可处置
+    f_free = client.post(API + "/files", headers=h_a,
+                         files={"file": ("c.png", PNG2, "image/png")}).json()
+
+    # 本人记录上的附件可删；他人记录上的附件 403；无记录归属附件 403
+    assert client.delete(API + f"/files/{f_own['id']}", headers=h_b).status_code == 200
+    assert client.delete(API + f"/files/{f_other['id']}", headers=h_b).status_code == 403
+    assert client.delete(API + f"/files/{f_free['id']}", headers=h_b).status_code == 403
+    # 创建者可删任意
+    assert client.delete(API + f"/files/{f_other['id']}", headers=h_a).status_code == 200
+
+
+def test_import_strips_owner_columns(client):
+    """导入不接受快照包外部指定归属：creator/creator_id/deleted_by_id 一律剔除。"""
+    h_a, _ = _auth(client, "impA")
+    _create_baby(client, h_a)
+
+    h_b, _ = _auth(client, "impB")  # _auth 已替其建立个人家庭并成为创建者
+    payload = {
+        "baby": [{
+            "id": "baby_imp_owner", "name": "导入宝宝", "birth_date": "2026-07-15",
+            "gestational_weeks": 40, "gender": "boy", "is_active": 1,
+        }],
+        "entry": [{
+            "id": "e_imp_owner", "type": "note", "baby_id": "baby_imp_owner",
+            "occurred_at": _now_str(), "title": "归属校验",
+            "creator": "冒名的别人", "creator_id": "usr_evil",
+            "deleted_by": "冒名", "deleted_by_id": "usr_evil",
+        }],
+    }
+    r = client.post(API + "/import", headers=h_b, json={"snapshot": payload})
+    assert r.status_code == 200, r.text
+    row = next(e for e in client.get(API + "/bootstrap", headers=h_b).json()["entries"]
+               if e["id"] == "e_imp_owner")
+    assert row["creator_id"] == "" and row["creator"] == ""
+
+
 def test_family_audit_logs_real_operations(client):
-    """FR-22：加入/只读/角色变更/删除/导出等写真实留痕，全员可读且不提供写接口。"""
+    """FR-22：加入/导出/角色变更/删除等写真实留痕，全员可读且不提供写接口。"""
     h_a, b_a = _auth(client, "auditA")
     code = client.post(API + "/family/invite", headers=h_a).json()["code"]
 
     h_b, _ = _auth(client, "auditB")
     assert client.post(API + "/family/join", headers=h_b, json={"code": code}).status_code == 200
-    assert client.patch(API + "/family/readonly", headers=h_a, json={"readonly": True}).status_code == 200
+    assert client.get(API + "/export/data", headers=h_a).status_code == 200
 
     entry = client.post(API + "/entries", headers=h_a, json={
         "type": "note", "title": "留痕用例", "occurred_at": _now_str(), "note": "x",
@@ -498,9 +618,9 @@ def test_family_audit_logs_real_operations(client):
 
     items = client.get(API + "/family/audit", headers=h_a).json()["items"]
     acts = [i["action"] for i in items]
-    # 倒序：最近的删除在最前；join/readonly/create 均真实落库
+    # 倒序：最近的删除在最前；join/export/create 均真实落库
     assert acts[0] == "delete" and "留痕用例" in items[0]["text"]
-    assert "join" in acts and "readonly" in acts and "create" in acts and "invite" in acts
+    assert "join" in acts and "export" in acts and "create" in acts and "invite" in acts
 
     # 成员可读同一份留痕，且服务端不提供任何增改删接口
     assert client.get(API + "/family/audit", headers=h_b).json()["items"][0]["id"] == items[0]["id"]
@@ -652,3 +772,97 @@ def test_vaccine_long_text_clipped(client):
     r = client.put(API + f"/vaccines/{v['id']}", headers=headers, json={"org": "机构" * 30, "lot": "L" * 90})
     assert r.status_code == 200, r.text
     assert len(r.json()["org"]) == 20 and len(r.json()["lot"]) == 20
+
+
+def test_measure_and_temperature_ranges_rejected(client):
+    """P0-2：测量指标与体温越界 422，合理区间放行。"""
+    headers, _ = _auth(client, "range")
+    _create_baby(client, headers)
+
+    assert client.post(API + "/entries", headers=headers, json={
+        "type": "measure", "occurred_at": _now_str(), "payload": {"weight": 999},
+    }).status_code == 422
+    assert client.post(API + "/entries", headers=headers, json={
+        "type": "measure", "occurred_at": _now_str(), "payload": {"height": 200},
+    }).status_code == 422
+    assert client.post(API + "/entries", headers=headers, json={
+        "type": "measure", "occurred_at": _now_str(), "payload": {"head": 100},
+    }).status_code == 422
+    assert client.post(API + "/entries", headers=headers, json={
+        "type": "temp", "occurred_at": _now_str(), "payload": {"value": 45.0},
+    }).status_code == 422
+
+    ok = client.post(API + "/entries", headers=headers, json={
+        "type": "measure", "occurred_at": _now_str(),
+        "payload": {"height": 67.5, "weight": 7.8, "head": 43.2},
+    })
+    assert ok.status_code == 200, ok.text
+    ok_temp = client.post(API + "/entries", headers=headers, json={
+        "type": "temp", "occurred_at": _now_str(), "payload": {"value": 36.8},
+    })
+    assert ok_temp.status_code == 200, ok_temp.text
+
+
+def test_milestone_first_achievement_not_overwritten(client):
+    """P0-3：后到/补录的同名里程碑不覆盖首次达成时间与来源记录。"""
+    headers, _ = _auth(client, "msfirst")
+    baby = _create_baby(client, headers)
+    client.post(API + "/entries", headers=headers, json={
+        "type": "milestone", "occurred_at": _now_str(3, "09:00"),
+        "payload": {"name": "翻身"}, "title": "翻身",
+    })
+    ms = next(m for m in client.get(API + "/milestones?baby_id=" + baby["id"], headers=headers).json()
+              if m["name"] == "翻身")
+    first_at, first_src = ms["achieved_at"], ms["source_entry_id"]
+
+    client.post(API + "/entries", headers=headers, json={
+        "type": "milestone", "occurred_at": _now_str(0, "18:00"),
+        "payload": {"name": "翻身"}, "title": "翻身",
+    })
+    ms2 = next(m for m in client.get(API + "/milestones?baby_id=" + baby["id"], headers=headers).json()
+               if m["name"] == "翻身")
+    assert ms2["achieved_at"] == first_at
+    assert ms2["source_entry_id"] == first_src
+
+
+def test_multi_baby_isolates_untagged_entries(client):
+    """P1-7：多宝宝家庭无 baby_id 的历史记录不并入任一宝宝视图；单宝宝家庭兼容并入。"""
+    from app.core.db import SessionLocal
+    from app.models import Entry
+
+    headers, _ = _auth(client, "multi")
+    b1 = _create_baby(client, headers, name="大宝")
+    b2 = _create_baby(client, headers, name="二宝")
+    family_id = client.get(API + "/bootstrap", headers=headers).json()["family"]["id"]
+
+    db = SessionLocal()
+    db.add(Entry(id="e_untag_1", family_id=family_id, baby_id="", type="note",
+                 occurred_at=_now_str(), title="未分档记录", payload={}))
+    db.commit()
+    db.close()
+
+    # 激活二宝：空档记录不出现在二宝时光轴/搜索
+    client.post(API + f"/babies/{b2['id']}/activate", headers=headers)
+    timeline = client.get(API + "/entries/timeline", headers=headers).json()
+    assert "e_untag_1" not in [e["id"] for e in timeline["items"]]
+    from urllib.parse import quote
+    search = client.get(API + "/entries/search?q=" + quote("未分档"), headers=headers).json()
+    assert "e_untag_1" not in [e["id"] for e in search["items"]]
+
+    # 切回大宝：空档记录同样不并入大宝
+    client.post(API + f"/babies/{b1['id']}/activate", headers=headers)
+    timeline = client.get(API + "/entries/timeline", headers=headers).json()
+    assert "e_untag_1" not in [e["id"] for e in timeline["items"]]
+
+    # 单宝宝家庭：历史空档记录兼容并入当前宝宝
+    h2, _ = _auth(client, "multi1")
+    baby = _create_baby(client, h2)
+    fam2 = client.get(API + "/bootstrap", headers=h2).json()["family"]["id"]
+    db = SessionLocal()
+    db.add(Entry(id="e_untag_single", family_id=fam2, baby_id="", type="note",
+                 occurred_at=_now_str(), title="单宝宝空档", payload={}))
+    db.commit()
+    db.close()
+    tl = client.get(API + "/entries/timeline", headers=h2).json()
+    assert "e_untag_single" in [e["id"] for e in tl["items"]]
+

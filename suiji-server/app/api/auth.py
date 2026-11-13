@@ -56,7 +56,7 @@ def _issue(db: Session, user: User, family: Family) -> dict:
     return dict(
         _issue_tokens(user.id, family.id, role),
         user=user_row(user),
-        family={"id": family.id, "name": family.name, "readonly": int(family.readonly or 0), "role": role},
+        family={"id": family.id, "name": family.name, "role": role},
         need_family=False,
     )
 
@@ -219,7 +219,7 @@ def me(auth=Depends(get_auth)):
     return {
         "user": {"id": auth.user_id, "name": auth.name, "username": auth.username},
         "family": None if need else
-                 {"id": auth.family_id, "name": auth.family_name, "readonly": 1 if auth.readonly else 0, "role": auth.role},
+                 {"id": auth.family_id, "name": auth.family_name, "role": auth.role},
         "need_family": need,
     }
 

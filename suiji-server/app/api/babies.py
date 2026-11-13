@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..core.db import get_db
-from ..core.deps import get_auth, require_write
+from ..core.deps import get_auth, require_member
 from ..domain.dates import today_utc, utc_now_iso
 from ..models import Baby
 from ..repositories import scoped_get
@@ -62,7 +62,7 @@ def list_babies(db: Session = Depends(get_db), auth=Depends(get_auth)):
 
 
 @router.post("")
-def create_baby(body: BabyIn, db: Session = Depends(get_db), auth=Depends(require_write)):
+def create_baby(body: BabyIn, db: Session = Depends(get_db), auth=Depends(require_member)):
     now = utc_now_iso()
     _check_baby(body.model_dump())
     count = db.query(Baby).filter(Baby.family_id == auth.family_id).count()
@@ -94,7 +94,7 @@ def create_baby(body: BabyIn, db: Session = Depends(get_db), auth=Depends(requir
 
 
 @router.put("/{baby_id}")
-def update_baby(baby_id: str, body: BabyIn, db: Session = Depends(get_db), auth=Depends(require_write)):
+def update_baby(baby_id: str, body: BabyIn, db: Session = Depends(get_db), auth=Depends(require_member)):
     baby = scoped_get(db, Baby, baby_id, auth.family_id)
     old_birth = baby.birth_date
     data = body.model_dump(exclude_unset=True)  # 仅更新请求中出现的字段
@@ -116,7 +116,7 @@ def update_baby(baby_id: str, body: BabyIn, db: Session = Depends(get_db), auth=
 
 
 @router.post("/{baby_id}/activate")
-def activate(baby_id: str, db: Session = Depends(get_db), auth=Depends(require_write)):
+def activate(baby_id: str, db: Session = Depends(get_db), auth=Depends(require_member)):
     baby = scoped_get(db, Baby, baby_id, auth.family_id)
     db.query(Baby).filter(Baby.family_id == auth.family_id, Baby.id != baby.id).update({"is_active": 0})
     baby.is_active = 1

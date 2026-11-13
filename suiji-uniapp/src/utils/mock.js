@@ -76,7 +76,7 @@ export const WB_PAGES = [
 /* ---------- 成长之书封底信任项 ---------- */
 export const OW_FEATURES = [
   { icon: 'shield', tint: '#F3EAE2', t: '数据只属于这个家', d: '云端加密存储 · 换机登录即恢复' },
-  { icon: 'users', tint: '#EBF0FA', t: '全家一起记录', d: '邀请码加入共享空间 · 只读开关随时调整' },
+  { icon: 'users', tint: '#EBF0FA', t: '全家一起记录', d: '邀请码加入共享空间 · 各自记录各自负责' },
   { icon: 'sparkles', tint: '#FFF6DC', t: 'AI 成长日记', d: '基于你的记录生成 · 需单独授权' }
 ]
 

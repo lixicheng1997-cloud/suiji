@@ -100,7 +100,7 @@ def milestone_row(m: MilestoneRecord) -> dict:
         "id": m.id, "baby_id": m.baby_id or "", "name": m.name, "domain": m.domain,
         "month": m.month, "ref": m.ref, "done": bool(m.done),
         "achieved_at": m.achieved_at or "", "source_entry_id": m.source_entry_id or "",
-        "creator": m.creator or "", "sort": int(m.sort or 0),
+        "creator": m.creator or "", "creator_id": m.creator_id or "", "sort": int(m.sort or 0),
     }
 
 
@@ -120,6 +120,7 @@ def journal_row(j: AiJournal) -> dict:
         "id": j.id, "baby_id": j.baby_id or "", "range": j.range,
         "range_start": j.range_start, "range_end": j.range_end,
         "paras": j.paras or [], "status": j.status,
+        "creator_id": j.creator_id or "",
         "model_version": j.model_version, "prompt_version": j.prompt_version,
         "fact_count": int(j.fact_count or 0), "created_at": j.created_at, "updated_at": j.updated_at,
     }

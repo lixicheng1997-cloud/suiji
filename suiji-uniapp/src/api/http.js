@@ -4,7 +4,7 @@
  * 本机 kv 只保留两类键：token（sj_token_*）与服务器地址（sj_api_base），业务数据一律不落本地。
  */
 import { kvGet, kvSet, kvRemove, kvGetSecret, kvSetSecret, kvRemoveSecret } from '@/infra/platform.js'
-import { DEFAULT_BASE, LEGACY_PORT, CURRENT_PORT } from '@/config/app.js'
+import { DEFAULT_BASE, LEGACY_PORT, CURRENT_PORT, LOCAL_DEV_PORT } from '@/config/app.js'
 import { toast as uiToast } from '@/utils/ui.js'
 import { clearPublicKey, hasPublicKey, sealRequest, setPublicKey, supported } from '@/infra/crypto.js'
 
@@ -21,16 +21,20 @@ const MEDIA_KEY = 'sj_token_media'
  * 服务器列表已写死在前端配置文件，不再由服务端 /servers（数据库表）下发 */
 
 /* ---------- 服务器地址 ---------- */
+/* 历史本地/直连端口：8000（旧直连）、30000（旧 docker dev 入口）统一升级到现役端口 */
+const OLD_PORTS = [LEGACY_PORT, LOCAL_DEV_PORT].join('|')
+
 /**
  * 把地址里的历史端口换成现役端口（主机与路径保持不变）：
- *   http://localhost:8000/api/v1 → http://localhost:30080/api/v1
+ *   http://localhost:8000/api/v1  → http://localhost:30080/api/v1
+ *   http://localhost:30000/api/v1 → http://localhost:30080/api/v1
  *   http://49.233.77.155:8000/api/v1 → http://49.233.77.155:30080/api/v1
  */
 export function upgradePort(url) {
   const s = String(url || '').trim()
   if (!s) return s
   return s.replace(
-    new RegExp('^([a-z][a-z0-9+.-]*://[^/:]+):' + LEGACY_PORT + '(?=$|[/?#])', 'i'),
+    new RegExp('^([a-z][a-z0-9+.-]*://[^/:]+):(?:' + OLD_PORTS + ')(?=$|[/?#])', 'i'),
     '$1:' + CURRENT_PORT
   )
 }
@@ -407,7 +411,7 @@ function mapError(res) {
   const shown = raw && INTERNAL_DETAIL.test(raw) ? '' : raw
   const s = res.status || 0
   if (s === 400) return makeError(shown || '请求有误，请检查后重试', raw, s, 1)
-  if (s === 403) return makeError(shown || '当前是只读模式，暂时不能修改', raw, s, 1)
+  if (s === 403) return makeError(shown || '没有权限执行该操作', raw, s, 1)
   if (s === 404) return makeError(shown || '内容不存在或已被删除', raw, s, 1)
   if (s === 409) return makeError(shown || '数据有冲突，请刷新后重试', raw, s, 1)
   if (s === 422) return makeError('提交的内容有误，请检查后重试', raw, s, 1)

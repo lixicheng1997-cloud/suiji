@@ -1,9 +1,9 @@
 """里程碑 /milestones（契约 §9）。"""
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..core.db import get_db
-from ..core.deps import get_auth, require_write
+from ..core.deps import AuthContext, get_auth, require_write
 from ..models import MilestoneRecord
 from ..repositories import scoped_get
 from ..schemas import MilestonePatch
@@ -12,7 +12,17 @@ from ..services.rows import milestone_row
 
 router = APIRouter(prefix="/milestones", tags=["milestones"])
 
-_PATCH_FIELDS = ("done", "achieved_at", "source_entry_id", "month", "creator")
+# creator 是历史名字串，归属以 creator_id 为准，不接受客户端改写
+_PATCH_FIELDS = ("done", "achieved_at", "source_entry_id", "month")
+
+
+def _assert_writable(auth: AuthContext, m: MilestoneRecord) -> None:
+    """创建者任意；成员可勾选系统预置清单（creator_id 为空的共享行）或本人达成的里程碑。"""
+    if auth.role == "creator":
+        return
+    if not m.creator_id or m.creator_id == auth.user_id:
+        return
+    raise HTTPException(status_code=403, detail="只能修改自己达成的里程碑")
 
 
 @router.get("")
@@ -26,6 +36,7 @@ def list_milestones(baby_id: str = Query(""), db: Session = Depends(get_db), aut
 @router.put("/{milestone_id}")
 def update(milestone_id: str, body: MilestonePatch, db: Session = Depends(get_db), auth=Depends(require_write)):
     m = scoped_get(db, MilestoneRecord, milestone_id, auth.family_id)
+    _assert_writable(auth, m)
     data = body.model_dump(exclude_unset=True)
     was_done = bool(m.done)
     for f in _PATCH_FIELDS:

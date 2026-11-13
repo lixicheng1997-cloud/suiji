@@ -138,8 +138,8 @@ export default {
       avatarUrl: '',
       /* 开关状态：体检提醒 / 纪念日提醒 / 消息通知 */
       switches: [true, true, true],
-      /* 非提醒类开关（家庭只读等，数据源来自服务端家庭状态；音效/震动为本地持久化开关） */
-      flags: { familyReadonly: false, soundOn: true, vibrateOn: true },
+      /* 音效/震动为本地持久化开关 */
+      flags: { soundOn: true, vibrateOn: true },
       /* 消息中心未读通知数（待办不计入） */
       unread: 0,
       /* 服务器地址选择面板（sj-popup） */
@@ -172,7 +172,7 @@ export default {
       if (p.avatar) this.avatarUrl = api.fileSrc(p.avatar) || p.avatar
       const s = api.getSwitches()
       this.switches = SWITCH_KEYS.map(k => !!s[k])
-      this.flags = { familyReadonly: api.isFamilyReadonly(), soundOn: isSoundOn(), vibrateOn: isVibrateOn() }
+      this.flags = { soundOn: isSoundOn(), vibrateOn: isVibrateOn() }
       this.unread = api.getUnreadTotal()
       const babies = api.getBabies()
       this.babyCount = babies.length
@@ -249,7 +249,6 @@ export default {
       if (r.act === 'server') return this.doServer()
       if (r.act === 'logout') return this.doLogout()
       if (r.act === 'password') return this.doPassword()
-      if (r.act === 'visibility') return this.doVisibility()
       if (r.act === 'family') return uni.switchTab({ url: '/pages/family/family' })
       if (r.act === 'about') {
         return ui.showModal({
@@ -334,38 +333,11 @@ export default {
       })
     },
 
-    /* 健康日志可见性：0 家人可见 / 1 仅自己可见 / 2 隐藏（配置入口统一在「我的」） */
-    doVisibility() {
-      const opts = ['家人可见', '仅自己可见', '隐藏']
-      ui.showActionSheet({
-        itemList: opts,
-        success: res => {
-          api.setHealthVisibility(res.tapIndex)
-          this.$refs.ntf.show({ type: 'ok', message: '已设为：' + opts[res.tapIndex] })
-          this.refresh()
-        }
-      }).catch(() => {})
-    },
-
     toggleSwitch(i) {
       const val = !this.switches[i]
       api.setSwitch(SWITCH_KEYS[i], val)
       this.switches[i] = val
       this.$refs.ntf.show({ type: 'ok', message: val ? '提醒已开启' : '提醒已关闭' })
-    },
-
-    /* 家庭只读开关：乐观翻转 + 服务端确认（原在家庭页，配置入口统一收进「我的」） */
-    toggleFlag(key) {
-      const val = !this.flags[key]
-      this.flags[key] = val
-      if (key === 'familyReadonly') {
-        api.setFamilyReadonly(val).then(() => {
-          this.$refs.ntf.show({ type: 'ok', message: val ? '家庭只读已开启 · 全体成员仅可浏览' : '家庭只读已关闭 · 成员可正常记录' })
-        }).catch(e => {
-          this.flags[key] = !val
-          ui.error(e, '设置失败')
-        })
-      }
     },
 
     /* sj-switch 适配器：事件新值直写 + 保留 toggleSwitch 的持久化与提示（不改原方法） */
@@ -396,15 +368,6 @@ export default {
         /* 临时诊断：500ms 后回显震动 API 结果（定位后删除） */
         if (v) setTimeout(() => this.$refs.ntf.show({ type: 'warn', message: '诊断 vib=' + debugSnapshot().split(' | ')[0] }), 500)
         return
-      }
-      if (key === 'familyReadonly') {
-        api.setFamilyReadonly(v).then(() => {
-          play('S11') // 家庭只读开关拨动成功音效
-          this.$refs.ntf.show({ type: 'ok', message: v ? '家庭只读已开启 · 全体成员仅可浏览' : '家庭只读已关闭 · 成员可正常记录' })
-        }).catch(e => {
-          this.flags[key] = !v
-          ui.error(e, '设置失败')
-        })
       }
     },
 

@@ -30,7 +30,6 @@ class AuthContext:
     name: str
     family_id: str
     role: str          # creator / member（实时查 family_member）
-    readonly: bool     # 当前家庭只读开关
     family_name: str
     jti: str = ""      # 当前 access 令牌 ID，供 /auth/logout 精确撤销
     exp: int = 0       # 当前 access 过期时刻，撤销时用作账本 TTL
@@ -42,10 +41,8 @@ def _resolve(db: Session, payload: dict) -> AuthContext:
         raise HTTPException(status_code=401, detail="登录已失效，请重新登录")
     family = db.get(Family, user.family_id) if user.family_id else None
     role = "member"
-    readonly = False
     family_name = ""
     if family:
-        readonly = bool(family.readonly)
         family_name = family.name
         member = (
             db.query(FamilyMember)
@@ -63,7 +60,6 @@ def _resolve(db: Session, payload: dict) -> AuthContext:
         name=user.name,
         family_id=family.id if family else "",
         role=role,
-        readonly=readonly,
         family_name=family_name,
         jti=payload.get("jti") or "",
         exp=int(payload.get("exp") or 0),
@@ -116,27 +112,25 @@ def require_family(auth: AuthContext = Depends(get_auth)) -> AuthContext:
     return auth
 
 
-def require_family_write(auth: AuthContext = Depends(require_family)) -> AuthContext:
-    """写端点：先过家庭门控（无家庭 409 need_family），再过只读门控。
+def require_member(auth: AuthContext = Depends(require_family)) -> AuthContext:
+    """普通写操作：已登录且已加入家庭即放行。
 
-    files/media 的下载端点为兼容 <img src> 直连而手写鉴权（无 token 需保持 403 语义），
-    因此这两个模块的依赖在各自 endpoint 上施加，不套 router 级依赖。
+    两角色模型（v1.3）下不再有家庭只读开关；成员可参与记录，记录级归属
+    （只能改删本人记录）在 service 层用 assert_entry_writable 判定。
     """
-    return require_write(auth)
-
-
-def require_write(auth: AuthContext = Depends(get_auth)) -> AuthContext:
-    """只读模式下非创建者禁止一切写操作（契约 §4）。"""
-    if auth.readonly and auth.role != "creator":
-        raise HTTPException(status_code=403, detail="只读模式")
     return auth
 
 
-def require_creator(auth: AuthContext = Depends(require_family_write)) -> AuthContext:
-    """仅家庭创建者：用于不可逆/家庭级的操作（清空数据、导入覆盖等）。
+# 过渡别名：既有端点仍引用 require_write / require_family_write，行为等同 require_member。
+# 后续迭代把调用点改名后删除别名。
+require_write = require_member
+require_family_write = require_member
 
-    普通成员（哪怕家庭未开只读）不应具备「一键清空整个家庭全部记录」的能力——
-    那是创建者的管理动作，误触或被盗号时损失不可恢复。
+
+def require_creator(auth: AuthContext = Depends(require_member)) -> AuthContext:
+    """仅家庭创建者：用于不可逆/家庭级的操作（清空数据、导入覆盖、档案管理等）。
+
+    普通成员不应具备家庭级管理动作的能力——误触或被盗号时损失不可恢复。
     """
     if auth.role != "creator":
         raise HTTPException(status_code=403, detail="仅家庭创建者可执行该操作")

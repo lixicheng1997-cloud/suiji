@@ -108,8 +108,9 @@
         <text class="pf-val">{{ whoOf(entry) }}</text>
       </view>
 
-      <!-- 操作区（v2）：一行两个 ghost 按钮 + 通栏 danger 删除 + pg-hint 留痕说明 -->
-      <view class="act-row">
+      <!-- 操作区（v2）：一行两个 ghost 按钮 + 通栏 danger 删除 + pg-hint 留痕说明。
+           两角色模型：非创建者仅本人记录可操作，他人记录不显示入口（服务端 403 兜底） -->
+      <view v-if="canEdit" class="act-row">
         <sj-button
           class="pg-btn"
           variant="ghost"
@@ -120,6 +121,7 @@
         />
       </view>
       <sj-button
+        v-if="canEdit"
         class="pg-btn pg-del"
         variant="danger"
         block
@@ -127,7 +129,7 @@
         text="删除记录"
         @click="onDelete"
       />
-      <view class="pg-hint"><text>删除后进入回收站，30 天内可恢复 · 操作会被记录</text></view>
+      <view v-if="canEdit" class="pg-hint"><text>删除后进入回收站，30 天内可恢复 · 操作会被记录</text></view>
     </view>
 
     <sj-notify ref="ntf" />
@@ -174,6 +176,11 @@ export default {
       if (e.type === 'video') return []
       if (Array.isArray(e.photos) && e.photos.length) return e.photos
       return e.photo ? [e.photo] : []
+    },
+
+    /** 当前用户能否改/删本条记录：创建者任意，成员仅本人记录 */
+    canEdit() {
+      return api.canEditEntry(this.entry)
     },
 
     /**

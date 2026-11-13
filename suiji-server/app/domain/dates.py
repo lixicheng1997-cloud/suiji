@@ -51,30 +51,46 @@ def add_months_str(date_str: str, n: int) -> str:
     return add_months(d, n).isoformat()
 
 
+def _actual_months(b: date, t: date) -> float:
+    """实际月龄（未做早产矫正），用于文字月龄与天数基准。"""
+    months = (t.year - b.year) * 12 + (t.month - b.month)
+    months += (t.day - b.day) / 30.4375
+    return months
+
+
+# 早产矫正基准周数（足月儿 40 周）；仅在实际年龄未满预产期前回拨
+_TERM_WEEKS = 40
+
+
 def age_months(birth_date: str, at: str, gest_weeks: int = 0) -> float:
-    """月龄（小数，用于曲线横轴）；胎龄 <37 按矫正月龄回拨（同 date.js 公式）。"""
+    """月龄（小数，用于曲线横轴）；胎龄 <37 周、未满预产期前按矫正月龄回拨。"""
     b = _to_date(birth_date)
     t = _to_date(at)
     if not b or not t:
         return 0.0
-    months = (t.year - b.year) * 12 + (t.month - b.month)
-    months += (t.day - b.day) / 30.4375
+    months = _actual_months(b, t)
     gw = int(gest_weeks or 0)
     if gw and gw < 37:
-        months -= (37 - gw) / 4.345
+        due = b + timedelta(weeks=(_TERM_WEEKS - gw))
+        if t < due:
+            months -= (_TERM_WEEKS - gw) / 4.345
     return months
 
 
 def age_text(birth_date: str, at: str, gest_weeks: int = 0) -> str:
-    """'X 个月 Y 天' / 'Y 天' / '未出生'。"""
-    months = age_months(birth_date, at, gest_weeks)
-    if months < 0:
-        return "未出生"
-    m = math.floor(months)
+    """'X 个月 Y 天' / 'Y 天' / '未出生'。
+
+    文字月龄按实际日历年龄计算（天数基准与整月对齐）；早产矫正仅用于生长曲线
+    百分位（见 age_months），不回拨文字月龄。
+    """
     b = _to_date(birth_date)
     t = _to_date(at)
     if not b or not t:
         return "未出生"
+    months = _actual_months(b, t)
+    if months < 0:
+        return "未出生"
+    m = math.floor(months)
     base = add_months(b, m)
     days = max(0, (t - base).days)
     if m == 0:

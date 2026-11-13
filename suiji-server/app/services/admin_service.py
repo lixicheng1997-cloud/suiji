@@ -48,7 +48,7 @@ def _attach_family(db: Session, admin: User) -> None:
     now = utc_now_iso()
     fam = db.query(Family).filter(Family.creator_id == admin.id).first()
     if fam is None:
-        fam = Family(id=gen_id("fam"), name=ADMIN_FAMILY_NAME, creator_id=admin.id, readonly=0, created_at=now)
+        fam = Family(id=gen_id("fam"), name=ADMIN_FAMILY_NAME, creator_id=admin.id, created_at=now)
         db.add(fam)
         db.flush()
         db.add(FamilyMember(
@@ -64,7 +64,7 @@ def ensure_admin(db: Session) -> None:
     admin = db.query(User).filter(User.username == ADMIN_USERNAME).first()
     if admin is None:
         now = utc_now_iso()
-        fam = Family(id=gen_id("fam"), name=ADMIN_FAMILY_NAME, creator_id="", readonly=0, created_at=now)
+        fam = Family(id=gen_id("fam"), name=ADMIN_FAMILY_NAME, creator_id="", created_at=now)
         admin = User(
             id=gen_id("usr"), username=ADMIN_USERNAME, name=ADMIN_NAME,
             password_hash=hash_password(ADMIN_INIT_PASSWORD), family_id="",

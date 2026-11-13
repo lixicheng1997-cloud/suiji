@@ -61,30 +61,44 @@ export function daysBetween(a, b) {
   return Math.round((db - da) / 86400000)
 }
 
+/** 实际月龄（未做早产矫正） */
+function actualMonths(b, t) {
+  let months = (t.getFullYear() - b.getFullYear()) * 12 + (t.getMonth() - b.getMonth())
+  months += (t.getDate() - b.getDate()) / 30.4375
+  return months
+}
+
+/** 早产矫正基准周数（足月儿 40 周）；仅在实际年龄未满预产期前回拨 */
+const TERM_WEEKS = 40
+
 /**
- * 月龄计算：'X 个月 Y 天'（TDD：出生信息 + 矫正月龄）
+ * 月龄文字「X 个月 Y 天」：按实际日历年龄计算，不做早产矫正回拨。
  * @param {string} birthDate 'YYYY-MM-DD'
  * @param {string} at 'YYYY-MM-DD HH:mm' 或 'YYYY-MM-DD'
- * @param {number} [gestWeeks] 出生胎龄（周），<37 时按矫正月龄（40 周足月基准）回拨
+ * @param {number} [gestWeeks] 出生胎龄（周），仅用于保持签名一致，文字月龄不矫正
  */
 export function ageText(birthDate, at, gestWeeks) {
-  const months = ageMonths(birthDate, at, gestWeeks)
+  const b = parse(birthDate + ' 00:00')
+  const target = parse(at.length > 10 ? at.slice(0, 10) + ' 00:00' : at + ' 00:00')
+  const months = actualMonths(b, target)
   if (months < 0) return '未出生'
   const m = Math.floor(months)
-  const base = addMonths(parse(birthDate + ' 00:00'), m)
-  const target = parse(at.length > 10 ? at.slice(0, 10) + ' 00:00' : at + ' 00:00')
+  const base = addMonths(b, m)
   const days = Math.max(0, Math.round((target - base) / 86400000))
   if (m === 0) return days + ' 天'
   return m + ' 个月' + (days > 0 ? ' ' + days + ' 天' : '')
 }
 
-/** 月龄（小数，用于曲线横轴） */
+/** 月龄（小数，用于曲线横轴；含早产矫正，满预产期后停止回拨） */
 export function ageMonths(birthDate, at, gestWeeks) {
   const b = parse(birthDate + ' 00:00')
   const t = parse(at.length > 10 ? at : at + ' 00:00')
-  let months = (t.getFullYear() - b.getFullYear()) * 12 + (t.getMonth() - b.getMonth())
-  months += (t.getDate() - b.getDate()) / 30.4375
-  if (gestWeeks && gestWeeks < 37) months -= (37 - gestWeeks) / 4.345
+  let months = actualMonths(b, t)
+  const gw = Number(gestWeeks || 0)
+  if (gw && gw < 37) {
+    const due = new Date(b.getTime() + (TERM_WEEKS - gw) * 7 * 86400000)
+    if (t < due) months -= (TERM_WEEKS - gw) / 4.345
+  }
   return months
 }
 
