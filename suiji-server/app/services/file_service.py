@@ -1,4 +1,4 @@
-"""非结构化文件服务：字节统一入对象存储（MinIO），结构化库只存 storage_key 与元信息。
+"""非结构化文件服务：字节统一入对象存储，结构化库只存 storage_key 与元信息。
 
 对外能力：上传（单/多）、列表、详情、绑定业务、删除（引用计数释放对象）、用量统计。
 字节在对象存储里按 `{family_id}/{YYYY-MM-DD}/{文件名}` 归档（家庭隔离 + 按天分目录）；
@@ -393,7 +393,7 @@ def issue_presign(db: Session, auth: AuthContext, payload: dict) -> dict:
     store = get_store()
     # COS 走 PostObject 表单直传（uni.uploadFile 三端兼容）；其他后端维持 PUT 预签名（H5）。
     if isinstance(store, CosMediaStore):
-        post = store.presigned_post(key, ct, size=size, expires=settings.media_url_expires)
+        post = store.presigned_post(key, ct, max_bytes=size, expires=settings.media_url_expires)
         if not post:
             return {"direct": False}
         return {
@@ -631,7 +631,7 @@ def stats(db: Session, auth: AuthContext) -> dict:
 
 
 def temp_url(row: FileObject, expires: int = 0) -> dict:
-    """临时直链（MinIO 预签名）；本地磁盘后端不支持则返回 None，客户端走 /download 代理。
+    """临时直链（对象存储预签名）；本地磁盘后端不支持则返回 None，客户端走 /download 代理。
 
     预签名 URL 是「绕过 JWT 的免鉴权直连」，拿到即等于拿到该文件，
     所以有效期必须由服务端封顶——客户端传 1 年也只会拿到 1 小时。

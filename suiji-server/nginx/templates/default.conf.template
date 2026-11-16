@@ -92,34 +92,6 @@ server {
         proxy_set_header Connection $connection_upgrade;
     }
 
-    # MinIO 对象存储直连通道：客户端通过 nginx 反代访问 MinIO，不再走 Python 回源。
-    # 预签名 URL 由 FastAPI 用 MINIO_PUBLIC_URL 生成，指向本路径；nginx 透传到容器内 minio:9000。
-    #  - proxy_set_header Host $http_host：MinIO 预签名把 Host 纳入签名计算，
-    #    反代时必须保留原始 Host（公网域名），否则 SignatureDoesNotMatch。
-    #  - expires：图片内容不可变（同一 storage_key 永远同字节），让浏览器缓存 7 天。
-    #  - proxy_cache：nginx 层再缓存一层，多用户访问同一张图时只回源一次 MinIO。
-    location /minio/ {
-        proxy_pass               http://minio:9000/;
-        proxy_set_header Host    $http_host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_http_version       1.1;
-        proxy_set_header Connection "";
-
-        # 浏览器缓存 7 天（预签名 URL 10 分钟过期，但对象内容不变；
-        # 预签名参数每次不同，缓存 key 含完整 query，不会串号）
-        # 只用 add_header 发一份 Cache-Control：expires 指令会自己再写一份，
-        # 两者同时存在时响应里会出现两个 Cache-Control 头。
-        add_header               Cache-Control "public, max-age=604800, immutable";
-
-        # nginx 层缓存（需要在 http 块定义 proxy_cache_path，下面用内嵌映射）
-        proxy_cache             minio_cache;
-        proxy_cache_valid       200 7d;
-        proxy_cache_use_stale    error timeout updating http_500 http_502 http_503;
-        proxy_cache_lock        on;
-    }
-
     # OpenAPI 文档与 fastapi-offline 的本地静态资源（/static-offline-docs/swagger-ui-bundle.js 等）。
     # 文档会列出全部接口与参数，公网可读等于把攻击面画成地图送给对方，所以只放行本地来源。
     #

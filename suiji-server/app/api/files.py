@@ -1,4 +1,4 @@
-"""非结构化文件 /files：字节统一存 MinIO，结构化库只存 storage_key（对象路径）。
+"""非结构化文件 /files：字节统一存对象存储，结构化库只存 storage_key（对象路径）。
 
 下载支持 `Authorization: Bearer` 或 `?token=`（便于 <img src>/<a href> 直连）；
 无/非法 token 一律 403。字面量路由（/batch、/stats）必须先于 /{file_id} 注册。
@@ -137,7 +137,7 @@ def delete(file_id: str, db: Session = Depends(get_db), auth: AuthContext = Depe
 @router.get("/{file_id}/url")
 def temp_url(file_id: str, expires: int = Query(0, ge=0),
              db: Session = Depends(get_db), auth: AuthContext = Depends(require_family)):
-    """临时直链（MinIO 预签名）；本地磁盘后端 url=null，请走 /download。"""
+    """临时直链（对象存储预签名）；本地磁盘后端 url=null，请走 /download。"""
     return file_service.temp_url(file_service.get_file(db, auth, file_id), expires)
 
 
@@ -145,7 +145,7 @@ def temp_url(file_id: str, expires: int = Query(0, ge=0),
 def download(file_id: str, request: Request, token: str = Query(""),
              inline: int = Query(0), variant: str = Query(""),
              db: Session = Depends(get_db)):
-    """下载字节：优先 307 跳 MinIO 预签名，否则服务端流式回源。inline=1 用于图片预览。
+    """下载字节：优先 307 跳对象存储预签名，否则服务端流式回源。inline=1 用于图片预览。
 
     variant=thumb|small：返回上传时预生成的缩略图变体（列表页用，体积小一个数量级）。
     变体对象不存在（历史数据未生成）时静默回退到原图。
@@ -171,11 +171,10 @@ def download(file_id: str, request: Request, token: str = Query(""),
     # 内联渲染会让上传的 HTML 在 API 源站同源执行脚本（存储型 XSS）。
     inline = 1 if (inline and _inline_ok(row)) else 0
     # 预签名直连对象存储（带鉴权与有效期，避免大文件占用 API 带宽）。
-    # effective_key 可能是缩略图变体 key，同样在 MinIO 里，直接 presign 即可。
-    # <img>/<video> 标签不关心 Content-Disposition，直连 MinIO 浏览器照样能渲染；
+    # effective_key 可能是缩略图变体 key，同样在对象存储里，直接 presign 即可。
+    # <img>/<video> 标签不关心 Content-Disposition，直连对象存储浏览器照样能渲染；
     # 只有直接在浏览器地址栏打开 PDF 等场景才需要 inline disposition，那种场景量极少。
-    use_proxy = (settings.media_download_mode == "proxy"
-                 or not settings.minio_public_url)
+    use_proxy = settings.media_download_mode == "proxy"
     if not use_proxy:
         signed = store.url(effective_key, expires=settings.media_url_expires)
         if signed:
@@ -227,7 +226,7 @@ def _drop_range(request: Request) -> None:
                                 if k not in (b"range", b"if-range")]
 
 
-# 播放器要先看到「支持分段」才会发起 Range 请求；预签名跳转那条路径由 MinIO 提供同头
+# 播放器要先看到「支持分段」才会发起 Range 请求；预签名跳转那条路径由对象存储提供同头
 _RANGE_HEADERS = {"Accept-Ranges": "bytes"}
 
 _MAX_RANGE_SPAN = 16 * 1024 * 1024  # 单段最多回 16MB：挡住 bytes=0- 把整桶拉爆的用法

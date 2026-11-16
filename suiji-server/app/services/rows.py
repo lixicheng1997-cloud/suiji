@@ -74,7 +74,7 @@ def media_row(m: EntryMedia) -> dict:
 
 
 def file_row(f: FileObject) -> dict:
-    """非结构化文件行：字节在 MinIO，库里只有 storage_key（对象路径）与元信息。"""
+    """非结构化文件行：字节在对象存储，库里只有 storage_key（对象路径）与元信息。"""
     return {
         "id": f.id, "business_type": f.business_type or "", "business_id": f.business_id or "",
         "baby_id": f.baby_id or "", "original_name": f.original_name or "",

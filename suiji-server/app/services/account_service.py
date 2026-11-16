@@ -7,7 +7,7 @@
 
 彻底删除范围：
 - 创建者：整个家庭的业务数据（entry/measurement/growth_point/media/baby/vaccine/milestone/journal/audit）
-  + MinIO 对象 + family + family_member + invite_code + setting + notification
+  + 对象存储文件 + family + family_member + invite_code + setting + notification
 - 普通成员：只删自己的 family_member/setting/notification，不动家庭数据
 """
 from __future__ import annotations
@@ -71,7 +71,7 @@ def status_of(user: User) -> dict:
 
 
 def _purge_family_business(db: Session, family_id: str) -> None:
-    """清空一个家庭的全部业务数据（含 MinIO 对象）。与 data.py wipe_data 对齐。"""
+    """清空一个家庭的全部业务数据（含对象存储文件）。与 data.py wipe_data 对齐。"""
     for e in db.query(Entry).filter(Entry.family_id == family_id).all():
         entry_service.purge_entry(db, e)
     m_ids = [m.id for m in db.query(Measurement).filter(Measurement.family_id == family_id).all()]
@@ -83,14 +83,14 @@ def _purge_family_business(db: Session, family_id: str) -> None:
             try:
                 get_store().delete(md.storage_key)
             except Exception as exc:
-                logger.warning("删除 MinIO 对象失败 %s：%s", md.storage_key, exc)
+                logger.warning("删除对象存储文件失败 %s：%s", md.storage_key, exc)
         db.delete(md)
     for fo in db.query(FileObject).filter(FileObject.family_id == family_id).all():
         if fo.storage_key:
             try:
                 get_store().delete(fo.storage_key)
             except Exception as exc:
-                logger.warning("删除 MinIO 对象失败 %s：%s", fo.storage_key, exc)
+                logger.warning("删除对象存储文件失败 %s：%s", fo.storage_key, exc)
         db.delete(fo)
     db.query(Baby).filter(Baby.family_id == family_id).delete(synchronize_session=False)
     db.query(MilestoneRecord).filter(MilestoneRecord.family_id == family_id).delete(synchronize_session=False)

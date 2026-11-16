@@ -1,4 +1,4 @@
-"""启动期外部依赖探测：PostgreSQL / Redis / MinIO / Nginx / 本地存储 / 传输加密 / LLM。
+"""启动期外部依赖探测：PostgreSQL / Redis / COS / Nginx / 本地存储 / 传输加密 / LLM。
 
 与 lifespan 的容错策略一致：探测失败只打日志、不中断启动——依赖缺失时服务会
 降级运行（SQLite / 进程内存 / 本地磁盘），但运维必须一眼看清「哪些依赖没起来、
@@ -65,7 +65,7 @@ def _check_redis() -> tuple[str, bool | None, str]:
 
 
 def _check_storage(store) -> tuple[str, bool | None, str]:
-    from ..media.store import LocalMediaStore, MinioMediaStore, CosMediaStore
+    from ..media.store import LocalMediaStore, CosMediaStore
 
     if settings.media_backend == "cos":
         if isinstance(store, CosMediaStore):
@@ -76,15 +76,6 @@ def _check_storage(store) -> tuple[str, bool | None, str]:
                 "（文件不会进 COS，接口仍返回成功，务必排查）")
         return "COS", False, "存储后端初始化失败（见上方告警），文件读写将在请求期重试"
 
-    if settings.media_backend == "minio":
-        if isinstance(store, MinioMediaStore):
-            # 构造时已探测并建桶（_ensure_bucket probe），能拿到实例即就绪
-            return "MinIO", True, f"endpoint={store.endpoint} bucket={store.bucket}（桶已就绪）"
-        if isinstance(store, LocalMediaStore):
-            return "MinIO", False, (
-                f"对象存储不可用，已降级本地磁盘：{store.base_dir}"
-                "（文件不会进 MinIO，接口仍返回成功，务必排查）")
-        return "MinIO", False, "存储后端初始化失败（见上方告警），文件读写将在请求期重试"
     # local 后端：探测媒体目录可写
     probe = settings.media_dir / ".write_probe"
     try:

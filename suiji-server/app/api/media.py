@@ -202,10 +202,9 @@ def download(media_id: str, request: Request, token: str = Query(""),
     if row.sha256:
         headers["ETag"] = f'"{row.sha256[:16]}"'
 
-    # MinIO：优先 307 跳预签名 URL（客户端直连对象存储），否则服务端代理回源
-    # effective_key 可能是缩略图变体 key，同样在 MinIO 里，直接 presign。
-    if (settings.media_download_mode != "proxy"
-            and settings.minio_public_url):
+    # 对象存储：优先 307 跳预签名 URL（客户端直连对象存储），否则服务端代理回源
+    # effective_key 可能是缩略图变体 key，同样在对象存储里，直接 presign。
+    if settings.media_download_mode != "proxy":
         signed = store.url(effective_key, expires=settings.media_url_expires)
         if signed:
             return RedirectResponse(url=signed, status_code=307, headers=headers)

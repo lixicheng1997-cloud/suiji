@@ -14,7 +14,7 @@
 services:
   api:
     environment:
-      # 生产关闭降级：MinIO / Redis 连不上立即报错，不允许静默写回本地磁盘
+      # 生产关闭降级：COS / Redis 连不上立即报错，不允许静默写回本地磁盘
       SUIJI_ALLOW_FALLBACK: "0"
       # 每次启动自动迁移到最新版本（迁移均为判存幂等，可安全重复执行）
       RUN_MIGRATIONS: "1"

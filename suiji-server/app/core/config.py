@@ -49,16 +49,8 @@ class Settings:
         self.run_migrations = os.getenv("RUN_MIGRATIONS", "0").strip().lower() in ("1", "true", "yes", "on")
         self.redis_url = os.getenv("REDIS_URL", "")
         self.media_dir = _abs(os.getenv("MEDIA_DIR", "./data/media"))
-        # 非结构化文件存储后端：local（本地磁盘）/ minio（MinIO/S3 对象存储）
+        # 非结构化文件存储后端：local（本地磁盘）/ cos（腾讯云 COS 对象存储）
         self.media_backend = os.getenv("MEDIA_BACKEND", "local").strip().lower()
-        self.minio_endpoint = os.getenv("MINIO_ENDPOINT", "localhost:9000").strip()
-        self.minio_access_key = os.getenv("MINIO_ACCESS_KEY", "").strip()
-        self.minio_secret_key = os.getenv("MINIO_SECRET_KEY", "").strip()
-        self.minio_bucket = os.getenv("MINIO_BUCKET", "suiji").strip() or "suiji"
-        self.minio_secure = os.getenv("MINIO_SECURE", "false").strip().lower() in ("1", "true", "yes", "on")
-        self.minio_region = os.getenv("MINIO_REGION", "").strip() or None
-        # 客户端实际能访问到的 MinIO 地址（容器内 minio:9000 外网不可达时需配置）
-        self.minio_public_url = os.getenv("MINIO_PUBLIC_URL", "").strip().rstrip("/")
         # 腾讯云 COS（S3 兼容）后端：MEDIA_BACKEND=cos 时生效
         self.cos_endpoint = os.getenv("COS_ENDPOINT", "https://cos.ap-beijing.myqcloud.com").strip()
         self.cos_access_key = os.getenv("COS_ACCESS_KEY", "").strip()

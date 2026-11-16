@@ -114,7 +114,7 @@ class EntryMedia(Base):
 
 
 class FileObject(Base):
-    """非结构化文件台账：字节只存在 MinIO/对象存储，这里只存 storage_key（路径）与元信息。
+    """非结构化文件台账：字节只存在对象存储，这里只存 storage_key（路径）与元信息。
 
     business_type/business_id 为业务挂载点（entry / entry_media / baby / other），
     未绑定业务的“待挂载文件” business_type 为空，后续通过 PATCH /files/{id} 挂到业务行。

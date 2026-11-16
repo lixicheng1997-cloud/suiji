@@ -8,8 +8,7 @@
 #   2. 开发数据全部走 Docker 具名卷（见末尾 volumes），不 bind mount 到本地代码目录，
 #      避免数据库 / 对象存储 / 加密密钥落到项目文件夹；彻底清空开发库用 `down -v`；
 #   3. 打开 CORS（H5 开发服务器 5173/5174 跨域调试）、放开 swagger 文档访问；
-#   4. 允许降级（SUIJI_ALLOW_FALLBACK=1），依赖挂掉时可回退 SQLite / 本地磁盘继续调试；
-#   5. minio / minio-init 沿用本机已有镜像（原 override.yml 的加速器 workaround）。
+#   4. 允许降级（SUIJI_ALLOW_FALLBACK=1），依赖挂掉时可回退 SQLite / 本地磁盘继续调试。
 
 services:
   db:
@@ -23,16 +22,6 @@ services:
   redis:
     volumes:
       - suiji-dev-redis:/data
-
-  minio:
-    # 本机镜像加速器拉不到官方 minio/minio 与 minio/mc（403），沿用本地等价镜像；
-    # 恢复官方镜像：删除本文件中两处 image 覆盖即可。
-    image: pgsty/minio:RELEASE.2026-03-25T00-00-00Z
-    volumes:
-      - suiji-dev-minio:/data
-
-  minio-init:
-    image: minio/mc:latest
 
   # 一次性初始化容器：以 root 把 dev 具名卷（media / crypto）的属主改成镜像内
   # 非 root 用户 suiji（uid/gid 1000）。
@@ -59,7 +48,7 @@ services:
     environment:
       # 源码热更新：挂载 app/ 到容器内，进程以 --reload 启动
       RELOAD: "1"
-      # 开发允许回退：Postgres / MinIO 不可用时降级 SQLite / 本地磁盘，便于离线调试
+      # 开发允许回退：Postgres / 对象存储不可用时降级 SQLite / 本地磁盘，便于离线调试
       SUIJI_ALLOW_FALLBACK: "1"
       # 放开 H5 开发服务器跨域（值来自 .env.dev 的 CORS_ORIGINS）
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174}
@@ -100,6 +89,5 @@ services:
 volumes:
   suiji-dev-postgres:
   suiji-dev-redis:
-  suiji-dev-minio:
   suiji-dev-media:
   suiji-dev-crypto:

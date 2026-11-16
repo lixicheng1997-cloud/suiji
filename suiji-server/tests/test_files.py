@@ -201,3 +201,43 @@ def test_purge_entry_clears_attached_files(client):
     assert client.delete(API + f"/entries/trash/{entry_id}", headers=headers).status_code == 200
     assert client.get(API + "/files", headers=headers).json()["total"] == 0
     assert client.get(API + "/files/stats", headers=headers).json()["count"] == 0
+
+
+def test_presign_cos_post_direct(client, monkeypatch):
+    """COS 后端签发 PostObject 表单凭证：method=post，大小以 max_bytes 传入。
+
+    防回归：历史上 issue_presign 误把 max_bytes 写成 size=size，调用
+    CosMediaStore.presigned_post 时抛 TypeError，HTTP 500。
+    """
+    from app.services import file_service
+    from app.media import CosMediaStore
+
+    class FakeCos(CosMediaStore):
+        def __init__(self):
+            self.last = None
+
+        def presigned_post(self, storage_key, content_type="", max_bytes=0, expires=0):
+            self.last = {"storage_key": storage_key, "max_bytes": max_bytes, "expires": expires}
+            return {
+                "method": "post",
+                "url": "https://bucket.cos.ap-beijing.myqcloud.com",
+                "fields": {"key": storage_key},
+                "storage_key": storage_key,
+            }
+
+    fake = FakeCos()
+    monkeypatch.setattr(file_service, "get_store", lambda: fake)
+
+    headers = _auth(client, "file_cos")
+    r = client.post(API + "/files/presign", headers=headers, json={
+        "filename": "clip.mp4", "content_type": "video/mp4", "size": 8888,
+        "business_type": "other", "business_id": "probe", "baby_id": "",
+    })
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["direct"] is True
+    assert body["method"] == "post"
+    assert body["url"].endswith("myqcloud.com")
+    assert body["fields"]["key"] == body["storage_key"]
+    # 大小必须落到 max_bytes 形参，不能再写成 size=
+    assert fake.last["max_bytes"] == 8888

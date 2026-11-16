@@ -94,10 +94,10 @@ async def lifespan(app: FastAPI):
     settings.media_dir.mkdir(parents=True, exist_ok=True)
     store = None
     try:
-        store = get_store()  # 预热存储后端：MinIO 会在此自动建桶（失败则告警，后续读写重试）
+        store = get_store()  # 预热存储后端：COS 会在此 head_bucket 探测（失败则告警，后续读写重试）
     except Exception as exc:
         logger.warning("存储后端预热失败，后续读写会重试：%s", exc)
-    # 外部依赖体检：PostgreSQL / Redis / MinIO / Nginx 等逐项探测并打日志
+    # 外部依赖体检：PostgreSQL / Redis / COS / Nginx 等逐项探测并打日志
     # （失败只告警不中断启动，与上面各步骤的容错策略一致）
     run_startup_checks(store)
     # 到期数据清理：回收站/AI 日记草稿超 30 天、操作留痕超 180 天、注销冷静期到期账号

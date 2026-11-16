@@ -1,4 +1,4 @@
-# 岁记服务端编排 —— 公共底座（base）：db=postgres:16 + redis=redis:7-alpine + minio + api + nginx
+# 岁记服务端编排 —— 公共底座（base）：db=postgres:16 + redis=redis:7-alpine + api + nginx
 #
 # 本文件只放「开发 / 生产完全一致」的服务定义、健康检查、日志轮转与默认环境变量；
 # 环境差异由两个覆盖文件承接，启动时显式叠加：
@@ -6,13 +6,13 @@
 #   开发：docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file .env.dev up -d
 #   生产：docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod up -d
 #
-# 凭据（POSTGRES_PASSWORD / REDIS_PASSWORD / MINIO_ROOT_PASSWORD / MINIO_SECRET_KEY / JWT_SECRET）
+# 凭据（POSTGRES_PASSWORD / REDIS_PASSWORD / JWT_SECRET）
 # 一律用 ${VAR:?错误提示} 声明为必填——缺失时 compose 直接报错，不会退化成公开弱密码。
 # 所有持久化数据统一挂在公共目录 DATA_DIR（默认 ./data）下，方便备份/迁移。
 #
-# 端口约定：形如 "${宿主端口}:${容器端口}"，容器端口固定（db 5432 / redis 6379 / minio 9000,9001 /
-# api 8000），宿主端口可改；nginx 容器端口由 NGINX_LISTEN_PORT 决定，宿主侧由 NGINX_PORT 决定。
-# 除 nginx 外一律只绑 127.0.0.1：数据库、对象存储、api 直连端口都不该被公网触达。
+# 端口约定：形如 "${宿主端口}:${容器端口}"，容器端口固定（db 5432 / redis 6379 / api 8000），
+# 宿主端口可改；nginx 容器端口由 NGINX_LISTEN_PORT 决定，宿主侧由 NGINX_PORT 决定。
+# 除 nginx 外一律只绑 127.0.0.1：数据库、api 直连端口都不该被公网触达；媒体对象存腾讯云 COS。
 
 # 日志轮转：不限制的话 Docker 默认 json-file 会无限增长，直到把磁盘写满
 x-logging: &default-logging
@@ -65,49 +65,6 @@ services:
       timeout: 3s
       retries: 12
 
-  # 非结构化文件（图片/附件）对象存储：兼容 S3 协议
-  minio:
-    image: pgsty/minio:RELEASE.2026-03-25T00-00-00Z
-    command:
-      - server
-      - /data
-      - --console-address
-      - ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-suiji}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?未设置 MINIO_ROOT_PASSWORD —— 请在环境 env 文件中配置强随机密码}
-      MINIO_DOMAIN: ${MINIO_DOMAIN:-}
-    ports:
-      - "${MINIO_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
-    volumes:
-      - "${DATA_DIR:-./data}/minio:/data"
-    restart: unless-stopped
-    logging: *default-logging
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 12
-      start_period: 20s
-
-  # 可选：随 Compose 启动自动创建桶（默认 api 侧也会自动创建，可省略）。
-  # 默认放入 init profile，需要手动建桶时：docker compose --profile init up minio-init
-  minio-init:
-    image: minio/mc:latest
-    profiles: ["init"]
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |
-        set -eu
-        mc alias set local "http://minio:9000" "${MINIO_ROOT_USER:-suiji}" "${MINIO_ROOT_PASSWORD:?未设置 MINIO_ROOT_PASSWORD}"
-        mc mb --ignore-existing "local/${MINIO_BUCKET:-suiji}"
-    restart: on-failure
-
   api:
     build: .
     # 内存上限：没有它，一次 9 张 12MP 的并发上传能把容器顶到 1.9GB 并压垮宿主 Docker VM。
@@ -148,15 +105,7 @@ services:
       # 不提供默认值兜底：未配置时 api 直接拒绝启动，杜绝用公开占位密钥签令牌
       JWT_SECRET: ${JWT_SECRET:?未设置 JWT_SECRET —— HS256 密钥泄露等于可以伪造任意用户令牌}
       MEDIA_DIR: /app/data/media
-      MEDIA_BACKEND: ${MEDIA_BACKEND:-minio}
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-suiji}
-      # 仅 MEDIA_BACKEND=minio 时需要；切 cos 后留空即可，不再强制必填
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-}
-      MINIO_BUCKET: ${MINIO_BUCKET:-suiji}
-      MINIO_SECURE: ${MINIO_SECURE:-false}
-      MINIO_REGION: ${MINIO_REGION:-}
-      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:9000}
+      MEDIA_BACKEND: ${MEDIA_BACKEND:-local}
       # 腾讯云 COS（S3 兼容）：MEDIA_BACKEND=cos 时生效
       COS_ENDPOINT: ${COS_ENDPOINT:-https://cos.ap-beijing.myqcloud.com}
       COS_ACCESS_KEY: ${COS_ACCESS_KEY:-}
@@ -185,8 +134,6 @@ services:
       db:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      minio:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/')"]
@@ -225,4 +172,4 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-# 数据统一落在 ${DATA_DIR:-./data} 下的 postgres / minio / media 子目录。
+# 数据统一落在 ${DATA_DIR:-./data} 下的 postgres / media / crypto 子目录；媒体对象存腾讯云 COS。
