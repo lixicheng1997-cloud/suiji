@@ -53,6 +53,14 @@ def _content_type_of(upload: UploadFile, name: str) -> str:
             or "application/octet-stream").split(";")[0].strip()
 
 
+def _cleanup_orphan(store, storage_key: str) -> None:
+    """直传登记校验失败时，删除已落到对象存储的孤儿对象；清理失败只告警，不掩盖原始拒绝。"""
+    try:
+        store.delete(storage_key)
+    except Exception as exc:  # noqa: BLE001 - 清理兜底，不能因删除失败改变响应
+        logger.warning("孤儿对象清理失败 %s：%s", storage_key, exc)
+
+
 def read_spool(upload: UploadFile, max_bytes: int) -> tuple[SpooledTemporaryFile, str, int]:
     """分块读取上传流：小文件内存缓冲、大文件落临时盘，同时算 sha256 与大小。"""
     digest = hashlib.sha256()
@@ -217,7 +225,7 @@ def upload_file(db: Session, auth: AuthContext, upload: UploadFile, business_typ
 
     is_video = content_type.startswith("video/")
     if is_video:
-        # 视频单文件大小硬上限（30s@高码率约 30-50MB，给到 100MB 留余量）
+        # 视频单文件大小硬上限（30s@中等码率约 15-30MB，上限 50MB）
         if size > settings.video_max_bytes:
             spool.close()
             raise HTTPException(
@@ -443,6 +451,7 @@ def register_direct(db: Session, auth: AuthContext, payload: dict) -> dict:
     if stream is not None:
         head = b"".join(stream)[:32]
     if not head:
+        _cleanup_orphan(store, key)
         raise HTTPException(status_code=409, detail="直传对象不可读，请重新上传")
 
     name = str(payload.get("original_name") or "")
@@ -452,19 +461,23 @@ def register_direct(db: Session, auth: AuthContext, payload: dict) -> dict:
         duration = 0.0
 
     # 体积以对象存储的权威统计为准，不采信客户端上报值：
-    # presign 时还没字节，客户端报 0 就能绕过 200MB/100MB 上限，直传通道等于开后门。
+    # presign 时还没字节，客户端报 0 就能绕过大小上限，直传通道等于开后门。
     size = store.size(key) or 0
     if size <= 0:
+        _cleanup_orphan(store, key)
         raise HTTPException(status_code=409, detail="直传对象不可读，请重新上传")
     if size > settings.file_max_bytes:
+        _cleanup_orphan(store, key)
         raise HTTPException(status_code=422,
                             detail=f"文件超过 {settings.file_max_bytes // (1024 * 1024)}MB 上限")
     kind_ct = safety.inline_policy(safety.sniff(head))[1]
     if kind_ct.startswith("video/"):
         if size > settings.video_max_bytes:
+            _cleanup_orphan(store, key)
             raise HTTPException(status_code=422,
                                 detail=f"视频超过 {settings.video_max_bytes // (1024 * 1024)}MB 上限")
         if duration > settings.video_max_seconds:
+            _cleanup_orphan(store, key)
             raise HTTPException(status_code=422,
                                 detail=f"视频最长 {settings.video_max_seconds} 秒，请剪辑后再传")
     meta: dict = {"direct": True}

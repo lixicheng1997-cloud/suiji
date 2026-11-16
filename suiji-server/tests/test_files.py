@@ -241,3 +241,73 @@ def test_presign_cos_post_direct(client, monkeypatch):
     assert body["fields"]["key"] == body["storage_key"]
     # 大小必须落到 max_bytes 形参，不能再写成 size=
     assert fake.last["max_bytes"] == 8888
+
+
+_MP4_HEAD = b"\x00\x00\x00\x18ftypmp42isom" + b"\x00" * 16
+
+
+class _FakeDirect:
+    """直传登记用假存储：对象已存在于对象存储，记录删除调用以便断言孤儿清理。"""
+
+    def __init__(self, size):
+        self._size = size
+        self.deleted = []
+
+    def exists(self, storage_key):
+        return True
+
+    def size(self, storage_key):
+        return self._size
+
+    def open_stream(self, storage_key, start=None, end=None):
+        return iter([_MP4_HEAD])
+
+    def delete(self, storage_key):
+        self.deleted.append(storage_key)
+
+
+def _register_direct(client, headers, family_id, key, size, duration):
+    return client.post(API + "/files/register", headers=headers, json={
+        "storage_key": key, "original_name": "clip.mp4",
+        "content_type": "video/mp4", "size": size, "duration": duration,
+        "business_type": "other", "business_id": "probe", "baby_id": "",
+    })
+
+
+def test_register_direct_oversize_video_deletes_orphan(client, monkeypatch):
+    """视频超大小上限：登记拒绝 422，已传到对象存储的孤儿对象被删除。"""
+    from app.services import file_service
+
+    fake = _FakeDirect(60 * 1024 * 1024)  # 超过默认 50MB
+    monkeypatch.setattr(file_service, "get_store", lambda: fake)
+
+    headers, body = register(client, prefix="file_orphan_size")
+    family_id = body["family"]["id"]
+    key = f"{family_id}/clip.mp4"
+    r = _register_direct(client, headers, family_id, key, size=12345, duration=5)
+    assert r.status_code == 422, r.text
+    assert "MB" in r.json()["detail"]
+    assert fake.deleted == [key]
+
+
+def test_register_direct_overlong_video_deletes_orphan(client, monkeypatch):
+    """视频超时长上限：同样拒绝 422 并清理孤儿对象。"""
+    from app.services import file_service
+
+    fake = _FakeDirect(1 * 1024 * 1024)  # 体积合法，时长超限
+    monkeypatch.setattr(file_service, "get_store", lambda: fake)
+
+    headers, body = register(client, prefix="file_orphan_time")
+    family_id = body["family"]["id"]
+    key = f"{family_id}/clip.mp4"
+    r = _register_direct(client, headers, family_id, key, size=1024 * 1024, duration=99)
+    assert r.status_code == 422, r.text
+    assert "秒" in r.json()["detail"]
+    assert fake.deleted == [key]
+
+
+def test_video_default_limit_is_50mb():
+    """默认视频上限 50MB / 30 秒，与前端选片拦截阈值对齐。"""
+    from app.core.config import settings
+    assert settings.video_max_bytes == 50 * 1024 * 1024
+    assert settings.video_max_seconds == 30

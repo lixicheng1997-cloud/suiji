@@ -71,9 +71,9 @@ class Settings:
         # 单文件最大字节（/files 通用非结构化文件接口）
         self.file_max_bytes = int(os.getenv("FILE_MAX_BYTES", str(200 * 1024 * 1024)) or 200 * 1024 * 1024)
         # 视频记录：单段时长上限（秒）与单文件字节上限。
-        # 30s@1080p H.264 高码率约 30-50MB，留余量到 100MB；超出由客户端先拦，服务端兜底。
+        # 30s@中等码率约 15-30MB，上限给到 50MB；超出由客户端选片先拦，服务端兜底。
         self.video_max_seconds = int(os.getenv("VIDEO_MAX_SECONDS", "30") or 30)
-        self.video_max_bytes = int(os.getenv("VIDEO_MAX_BYTES", str(100 * 1024 * 1024)) or 100 * 1024 * 1024)
+        self.video_max_bytes = int(os.getenv("VIDEO_MAX_BYTES", str(50 * 1024 * 1024)) or 50 * 1024 * 1024)
         self.llm_api_base = os.getenv("LLM_API_BASE", "").strip()
         self.llm_api_key = os.getenv("LLM_API_KEY", "").strip()
         self.llm_model = os.getenv("LLM_MODEL", "").strip()

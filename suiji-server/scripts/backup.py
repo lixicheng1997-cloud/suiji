@@ -10,7 +10,7 @@
   3. manifest.json：时间、方言、脱敏连接串、文件清单、大小与 sha256、媒体后端说明。
 
 媒体字节（图片/视频/附件）体量大，本脚本不打包；manifest 里记录后端与目录，
-本地磁盘媒体需另走文件级备份，MinIO/云 OSS 需走存储侧快照或生命周期策略。
+本地磁盘媒体需另走文件级备份，COS/云 OSS 需走存储侧快照或生命周期策略。
 
 用法（在 suiji-server 目录下）：
     python scripts/backup.py                 # 备份到 data/backups，保留最近 7 份
@@ -142,10 +142,10 @@ def _backup_crypto(dest: Path) -> list[dict]:
 
 
 def _media_summary() -> dict:
-    if settings.media_backend == "minio":
+    if settings.media_backend == "cos":
         return {
-            "backend": "minio",
-            "note": "对象在 MinIO/OSS 桶内，本脚本不复制字节；需走存储侧快照/复制策略。",
+            "backend": "cos",
+            "note": "对象在 COS/OSS 桶内，本脚本不复制字节；需走存储侧快照/复制策略。",
         }
     media_dir = settings.media_dir
     count = 0

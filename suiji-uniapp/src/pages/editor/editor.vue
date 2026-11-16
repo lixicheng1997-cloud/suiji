@@ -207,8 +207,8 @@
 
       <!-- ========== 视频 ========== -->
       <block v-else-if="type === 'video'">
-        <view class="pg-sec"><text>视频片段</text><text class="hint-chip">单段 ≤30 秒 · 最多 9 段</text></view>
-        <sj-video-picker ref="videoPicker" v-model="videos" :max="9" :max-seconds="30" />
+        <view class="pg-sec"><text>视频片段</text><text class="hint-chip">单段 ≤30 秒 · ≤50MB · 最多 9 段</text></view>
+        <sj-video-picker ref="videoPicker" v-model="videos" :max="9" :max-seconds="30" :max-size-bytes="52428800" />
 
         <view class="pg-sec"><text>拍摄时间</text></view>
         <sj-datetime-picker class="pk-wrap" mode="time" :value="times.photo" @change="onTimeChange('photo', $event)">

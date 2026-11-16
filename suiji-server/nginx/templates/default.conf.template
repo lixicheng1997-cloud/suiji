@@ -181,7 +181,7 @@ server {
         alias /usr/share/nginx/html/suiji-website/;
         index index.html;
         try_files $uri $uri/ /suiji-website/index.html;
-        # 与 /minio/ 同理：expires 会自带一份 Cache-Control，和下面的 add_header 叠成两个头
+        # expires 会自带一份 Cache-Control，和下面的 add_header 叠成两个头
         add_header Cache-Control "public, max-age=604800";
         add_header X-Content-Type-Options    "nosniff" always;
         add_header Referrer-Policy           "no-referrer" always;

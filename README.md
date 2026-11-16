@@ -24,9 +24,9 @@
 | 客户端 | uni-app（Vue 3 + Vite + uview-plus），一套代码编译 App / H5 / 小程序 |
 | 服务端 | Python 3.12+ · FastAPI · SQLAlchemy 2 · Alembic 迁移 |
 | 数据库 | PostgreSQL 16（业务数据）· Redis 7（幂等去重 + 会话撤销） |
-| 文件存储 | MinIO（S3 兼容对象存储，可切换本地磁盘） |
+| 文件存储 | 腾讯云 COS（S3 兼容对象存储，可切换本地磁盘） |
 | 接入层 | nginx 统一入口（限流、日志脱敏、静态官网、TLS 可选） |
-| 部署 | Docker Compose 一键编排（db + redis + minio + api + nginx） |
+| 部署 | Docker Compose 一键编排（db + redis + api + nginx） |
 
 ## 📁 目录结构
 
@@ -68,7 +68,7 @@ curl http://localhost:30000/healthz
 cd suiji-server
 cp .env.prod.example .env.prod
 # 逐项替换所有 REPLACE_ME_*：POSTGRES_PASSWORD / REDIS_PASSWORD /
-# MINIO_ROOT_PASSWORD / MINIO_SECRET_KEY / JWT_SECRET / ADMIN_INIT_PASSWORD
+# COS_ACCESS_KEY / COS_SECRET_KEY / JWT_SECRET / ADMIN_INIT_PASSWORD
 docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod up -d
 curl http://localhost:30080/healthz
 ```
@@ -81,8 +81,6 @@ curl http://localhost:30080/healthz
 | api（调试用，正常走 nginx） | `30001` | 8000 |
 | PostgreSQL | `30002` | 5432 |
 | Redis | `30003` | 6379 |
-| MinIO API | `30004` | 9000 |
-| MinIO 控制台 | `30005` | 9001 |
 
 开发环境入口（生产默认仍为 `30080`，以 `.env.prod` 的 `NGINX_PORT` 为准）：
 
@@ -103,7 +101,6 @@ curl http://localhost:30080/healthz
 | 文档白名单 `NGINX_ADMIN_ALLOW` | `all`（局域网调试） | `127.0.0.1`（可配固定 IP/CIDR） |
 | 传输加密 `CRYPTO_MODE` | `optional` | 客户端全量升级后改 `required` |
 | 进程 | uvicorn `--reload` | 单 worker `--workers 1` |
-| MinIO 镜像 | 本机等价镜像 `pgsty/minio`（加速器 workaround） | 官方 `minio/minio:latest` |
 
 ### 客户端（uni-app，dev / prod 双环境）
 
@@ -150,7 +147,7 @@ python app/main.py
 
 ## 🔒 安全设计要点
 
-- **端口收敛**：除 nginx 外，PostgreSQL / Redis / MinIO / API 全部只绑 `127.0.0.1`，不经公网暴露
+- **端口收敛**：除 nginx 外，PostgreSQL / Redis / API 全部只绑 `127.0.0.1`，不经公网暴露
 - **无弱密码兜底**：所有密码类变量缺失时容器直接拒绝启动，不会退化为公开占位密码
 - **传输加密**：可选应用层端到端加密（`CRYPTO_MODE=required`），敏感接口密文上链路
 - **限流与脱敏**：注册/登录/上传分接口限流；nginx 日志脱敏；`/docs` IP 白名单

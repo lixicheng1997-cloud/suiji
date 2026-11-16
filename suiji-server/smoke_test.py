@@ -55,7 +55,7 @@ r = c.post("/media", headers=H, files={"file": ("a.png", io.BytesIO(png), "image
 assert r.status_code == 200, r.text
 m = r.json()
 ORIGIN = BASE.split("/api/")[0]
-r = httpx.Client(follow_redirects=True).get(ORIGIN + m["url"], headers=H)  # MinIO 后端 307→预签名
+r = httpx.Client(follow_redirects=True).get(ORIGIN + m["url"], headers=H)  # 对象存储后端 307→预签名
 assert r.status_code == 200 and r.content == png
 r2 = httpx.get(ORIGIN + m["url"])  # 无 token
 assert r2.status_code == 403

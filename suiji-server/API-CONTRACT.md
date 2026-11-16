@@ -252,14 +252,14 @@ GET `/bootstrap` → 全量快照（一次请求填充客户端缓存）：
 
 | 方法 路径 | 说明 |
 | --- | --- |
-| POST `/media` | multipart `file`（+ 可选 `entry_id`）→ `{id, storage_key, url:"/api/v1/media/{id}", sha256, size}`；字节入对象存储（MinIO，MEDIA_BACKEND=local 时退化为本地磁盘），库里只存路径；同时登记一条 `entry_media` 类型文件台账（见 §7.5） |
+| POST `/media` | multipart `file`（+ 可选 `entry_id`）→ `{id, storage_key, url:"/api/v1/media/{id}", sha256, size}`；字节入对象存储（COS，MEDIA_BACKEND=local 时退化为本地磁盘），库里只存路径；同时登记一条 `entry_media` 类型文件台账（见 §7.5） |
 | GET `/media/{id}` | 需鉴权，返回文件字节（Header Bearer 或 `?token=` 传 media 令牌；无/非法/已撤销 token 403） |
 
 客户端保存含照片记录时：先逐张 POST /media 拿 url，回填 entry.photo / payload.photos 后再 POST /entries。
 
 ## 7.5 非结构化文件 `/files`
 
-统一的文件接口：任何非结构化数据（照片、附件、体检报告、音频、导出包…）的字节只进 MinIO，结构化库只保留 `storage_key`（对象路径）与元信息。
+统一的文件接口：任何非结构化数据（照片、附件、体检报告、音频、导出包…）的字节只进对象存储，结构化库只保留 `storage_key`（对象路径）与元信息。
 
 | 方法 路径 | 说明 |
 | --- | --- |
@@ -270,7 +270,7 @@ GET `/bootstrap` → 全量快照（一次请求填充客户端缓存）：
 | PATCH `/files/{id}` | `{business_type?, business_id?, baby_id?, original_name?, meta?}` 改名/挂载/改挂业务；内容与 storage_key 不可变。**归属跟随记录：创建者任意；成员仅可改本人创建记录上的附件（`entry` 直挂、`entry_media` 反查 entry）；`baby` 档案资料随档案可写；未挂具体记录的附件与无主记录附件成员不可操作** |
 | DELETE `/files/{id}` | 删除台账行；同家庭无其他引用时才真正删除对象存储中的字节。**归属同上** |
 | GET `/files/{id}/download?token=&inline=0` | 下载字节（鉴权：`Authorization: Bearer` 用 access/media，或 `?token=` 传 **media 令牌**；access 放 query 一律 403——它会落进日志与 Referer。无/非法/已撤销 token 403）。`inline=1` 且内容类型属图片/音视频/PDF 时才走服务端代理并带 `Content-Disposition: inline`；**其余类型强制 `attachment`**，避免上传的 HTML 被同源渲染成存储型 XSS |
-| GET `/files/{id}/url?expires=` | 临时直链（MinIO 预签名）；有效期由服务端封顶 `MEDIA_URL_MAX_EXPIRES`（默认 3600s），客户端传再大也无效。本地磁盘后端 `url=null`，请走 `/download` |
+| GET `/files/{id}/url?expires=` | 临时直链（对象存储预签名）；有效期由服务端封顶 `MEDIA_URL_MAX_EXPIRES`（默认 3600s），客户端传再大也无效。本地磁盘后端 `url=null`，请走 `/download` |
 
 **上传类型白名单**（`/files`、`/files/batch`、`/media` 共用，见 `app/media/safety.py`）：
 扩展名必须是 jpg/jpeg/png/gif/webp/bmp/heic/heif/avif/tiff、mp4/mov/m4v/webm/3gp、
@@ -295,9 +295,9 @@ mp3/m4a/aac/wav/ogg/flac、pdf/txt/csv/json/zip 之一；并按 magic bytes 嗅�
 
 - `storage_key` 即对象存储路径，格式为 `{family_id}/{YYYY-MM-DD}/{文件名}`：家庭一级目录做数据隔离、日期二级目录按天归档、末级保留原始文件名（非法字符替换为 `_`，超 96 字符截断并保留扩展名）。
 - 同家庭同内容（sha256）复用同一对象：一条字节可有多条台账引用；同一天上传同名但内容不同的文件，末尾自动追加 `_<sha前8位>` 避免覆盖。
-- 上传为流式处理（分块算 sha256，超限 `FILE_MAX_BYTES` 默认 200MB 返回 422），不把整份文件读进内存。
+- 上传为流式处理（分块算 sha256，超限 `FILE_MAX_BYTES` 默认 200MB 返回 422），不把整份文件读进内存；视频另受 `VIDEO_MAX_BYTES`（默认 50MB）与 `VIDEO_MAX_SECONDS`（默认 30 秒）限制。直传登记校验不通过时，后端会删除已落到对象存储的孤儿对象。
 - 彻底删除记录（`DELETE /entries/trash/{id}`）会连同挂在它上面的文件一起释放（引用计数为 0 才删字节）。
-- 环境变量：`MEDIA_BACKEND=minio`、`MINIO_*`、`FILE_MAX_BYTES`、`MEDIA_URL_EXPIRES`、`MEDIA_DOWNLOAD_MODE`、`MEDIA_PATH_DATE_UTC`（日期目录取 UTC）。
+- 环境变量：`MEDIA_BACKEND=cos|local`、`COS_*`、`FILE_MAX_BYTES`、`VIDEO_MAX_BYTES`、`VIDEO_MAX_SECONDS`、`MEDIA_URL_EXPIRES`、`MEDIA_DOWNLOAD_MODE`、`MEDIA_PATH_DATE_UTC`（日期目录取 UTC）。
 
 ## 8. 疫苗 `/vaccines`
 
@@ -373,17 +373,17 @@ FastAPI 默认 `{detail: string}`；客户端 http 层按 status 映射提示文
 
 ## 17. 部署
 
-- 编排分三层：`docker-compose.yml`（公共底座：postgres:16 + redis:7-alpine + minio + api + nginx），`docker-compose.dev.yml`（开发覆盖：源码卷热重载、`./data-dev` 数据目录、放开 CORS/文档白名单、允许降级），`docker-compose.prod.yml`（生产覆盖：代码冻结、关闭降级、收紧文档白名单与 CORS、单 worker）。端口、凭据与后端参数均通过环境变量配置：开发复制 `.env.dev.example` 为 `.env.dev`，生产复制 `.env.prod.example` 为 `.env.prod`。
-- 反向代理（nginx，配置见 `nginx/nginx.conf` 与模板 `nginx/templates/default.conf.template`，启动时由镜像 envsubst 渲染为 `/etc/nginx/conf.d/default.conf`）：`/api/`→api:8000（关闭缓冲以支持 `/files/{id}/download`、`/media/{id}` 流式传输与 200MB 上传直透，`client_max_body_size` 与 `FILE_MAX_BYTES` 对齐）、`/docs`+`/redoc`+`/openapi.json`+`/static-offline-docs`→api:8000（离线文档资源）、`/healthz` 为 nginx 自身探测。客户端服务器地址填 `http://<host>/api/v1`。nginx 不转发 MinIO：api 经 compose 内网 `minio:9000` 直连取回字节后由服务端代理回源下发；MinIO 控制台仅可直连 `http://<host>:9001`（`MINIO_CONSOLE_PORT`，只绑 127.0.0.1）。
+- 编排分三层：`docker-compose.yml`（公共底座：postgres:16 + redis:7-alpine + api + nginx），`docker-compose.dev.yml`（开发覆盖：源码卷热重载、`./data-dev` 数据目录、放开 CORS/文档白名单、允许降级），`docker-compose.prod.yml`（生产覆盖：代码冻结、关闭降级、收紧文档白名单与 CORS、单 worker）。端口、凭据与后端参数均通过环境变量配置：开发复制 `.env.dev.example` 为 `.env.dev`，生产复制 `.env.prod.example` 为 `.env.prod`。
+- 反向代理（nginx，配置见 `nginx/nginx.conf` 与模板 `nginx/templates/default.conf.template`，启动时由镜像 envsubst 渲染为 `/etc/nginx/conf.d/default.conf`）：`/api/`→api:8000（关闭缓冲以支持 `/files/{id}/download`、`/media/{id}` 流式传输与 200MB 上传直透，`client_max_body_size` 与 `FILE_MAX_BYTES` 对齐）、`/docs`+`/redoc`+`/openapi.json`+`/static-offline-docs`→api:8000（离线文档资源）、`/healthz` 为 nginx 自身探测。客户端服务器地址填 `http://<host>/api/v1`。nginx 不转发对象存储：媒体字节存腾讯云 COS，客户端经预签名 URL 直连 COS；预签名不可用时由 api 服务端代理回源下发。
 - api 容器 `DATABASE_URL=postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}`（由 db 服务凭据自动拼装）、`REDIS_URL=redis://redis:6379/0`、`JWT_SECRET`、`MEDIA_DIR=/app/data/media`。
-- 非结构化文件（图片/附件）存储后端由 `MEDIA_BACKEND` 决定：`minio`（默认，对象存储，`MINIO_ENDPOINT=minio:9000`、`MINIO_BUCKET=suiji`，桶不存在时自动创建）或 `local`（本地卷 `MEDIA_DIR`）。两种后端目录结构一致：`{family_id}/{YYYY-MM-DD}/{文件名}`，桶/目录内按家庭隔离、按天归档，便于按家庭备份与清理。
-- 下载方式：`MINIO_PUBLIC_URL` 有值且 `MEDIA_DOWNLOAD_MODE!=proxy` 时返回 307 跳预签名 URL（`MEDIA_URL_EXPIRES` 秒有效、上限 `MEDIA_URL_MAX_EXPIRES`，下载仍需先过 `/media/{id}` 的 JWT 鉴权）；否则由 api 服务端代理回源。
-- **对外暴露面**：只有 nginx 的 `NGINX_PORT` 绑 0.0.0.0，db/redis/minio/api 一律绑 `127.0.0.1`。
+- 非结构化文件（图片/附件）存储后端由 `MEDIA_BACKEND` 决定：`cos`（腾讯云 COS，`COS_ENDPOINT`、`COS_BUCKET`、`COS_REGION` 等，桶在控制台创建）或 `local`（本地卷 `MEDIA_DIR`，开发/兜底用）。两种后端目录结构一致：`{family_id}/{YYYY-MM-DD}/{文件名}`，桶/目录内按家庭隔离、按天归档，便于按家庭备份与清理。
+- 下载方式：对象存储后端在 `MEDIA_DOWNLOAD_MODE!=proxy` 时返回 307 跳 COS 预签名 URL（`MEDIA_URL_EXPIRES` 秒有效、上限 `MEDIA_URL_MAX_EXPIRES`，下载仍需先过 `/media/{id}` 的 JWT 鉴权）；否则（或预签名不可用）由 api 服务端代理回源。
+- **对外暴露面**：只有 nginx 的 `NGINX_PORT` 绑 0.0.0.0，db/redis/api 一律绑 `127.0.0.1`。
   `/docs`、`/openapi.json` 走 `NGINX_ADMIN_ALLOW` IP 白名单（默认 127.0.0.1 = 公网不可访问）。
 - **HTTPS**：默认未启用（保持现有 http 部署可用）。启用方式见 `nginx/templates/tls.conf.template`
   头部三步说明（挂载模板 + 证书卷 + 443 映射）。上 HTTPS 后需同步把 `server_endpoint` 表、
   `static/config/servers.json` 与客户端已存的服务器地址改成 `https://`，否则令牌仍是明文过公网。
 - **限流**：nginx 侧 `auth_limit`（20r/m，覆盖 `/api/v1/auth/*` 与 `/family/join`）与 `api_limit`（30r/s）；
   api 侧按 IP 的固定窗口计数（见 §2）。Redis 可用时两侧都走 Redis，不可用时降级内存并定期重试恢复。
-- 开发期也可直接本机运行：`python app/main.py`（等价 `uvicorn app.main:app --reload`，可用 HOST/PORT/RELOAD 覆盖）或 `uvicorn`（DATABASE_URL 指向 localhost:5433，MinIO 指向 localhost:9000 或直接 `MEDIA_BACKEND=local`）。
+- 开发期也可直接本机运行：`python app/main.py`（等价 `uvicorn app.main:app --reload`，可用 HOST/PORT/RELOAD 覆盖）或 `uvicorn`（DATABASE_URL 指向 localhost:5433，对象存储走 COS 或直接 `MEDIA_BACKEND=local`）。
 - Redis 用途：Idempotency-Key 去重（SETNX，TTL 24h）；不可用时降级进程内存。

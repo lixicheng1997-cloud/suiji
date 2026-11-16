@@ -33,14 +33,14 @@
         <sj-icon class="src-ic" name="33-fn-video" :size="72" />
         <view class="src-txt">
           <text class="src-label">拍摄视频</text>
-          <text class="src-sub">最长 {{ maxSeconds }} 秒 · 高码率录制</text>
+          <text class="src-sub">最长 {{ maxSeconds }} 秒 · ≤ {{ maxSizeMB }}MB</text>
         </view>
       </view>
       <view class="src-row" hover-class="hover-press" @click="chooseSource('album')">
         <sj-icon class="src-ic" name="31-fn-compare" :size="72" />
         <view class="src-txt">
           <text class="src-label">从相册选择</text>
-          <text class="src-sub">已有视频 · 超 {{ maxSeconds }} 秒将被拒绝</text>
+          <text class="src-sub">已有视频 · 超 {{ maxSeconds }} 秒或 {{ maxSizeMB }}MB 将被拒绝</text>
         </view>
       </view>
     </sj-modal>
@@ -93,6 +93,8 @@ export default {
     modelValue: { type: Array, default: () => [] },
     max: { type: Number, default: 9 },
     maxSeconds: { type: Number, default: 30 },
+    /* 硬上限（字节）：选片即拒绝，不进卡片、不发起上传；需与后端 VIDEO_MAX_BYTES 对齐 */
+    maxSizeBytes: { type: Number, default: 50 * 1024 * 1024 },
     /* 超过该字节数视为大原片，选择后先在本地压缩（失败回退原片，不阻断） */
     maxBytes: { type: Number, default: 25 * 1024 * 1024 }
   },
@@ -110,6 +112,7 @@ export default {
   },
   computed: {
     list() { return Array.isArray(this.modelValue) ? this.modelValue : [] },
+    maxSizeMB() { return Math.round(this.maxSizeBytes / 1024 / 1024) },
     uploadSrc() {
       return `/static/icons/ctl/${this.__theme}/96/58-ctl-upload.png`
     }
@@ -242,12 +245,19 @@ export default {
             this.$refs.ntf.show({ type: 'warn', message: '视频 ' + Math.round(dur) + ' 秒，超过 ' + this.maxSeconds + ' 秒上限' })
             return resolve(null)
           }
+          const size = Number(f.size || 0)
+          /* size 取不到（0）时不拦，交由服务端兜底校验；有值且超硬上限则选片即拒 */
+          if (size > 0 && size > this.maxSizeBytes) {
+            const mb = Math.round(this.maxSizeBytes / 1024 / 1024)
+            this.$refs.ntf.show({ type: 'warn', message: '视频 ' + (size / 1024 / 1024).toFixed(1) + 'MB，超过 ' + mb + 'MB 上限' })
+            return resolve(null)
+          }
           /* chooseMedia 返回 thumbTempFilePath（首帧缩略图）；chooseVideo 在部分平台返回 thumb 字段 */
           const thumb = f.thumbTempFilePath || f.thumbUrl || f.thumb || ''
           resolve({
             path,
             duration: dur,
-            size: Number(f.size || 0),
+            size,
             thumb: thumb
           })
         }
