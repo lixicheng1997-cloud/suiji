@@ -40,16 +40,10 @@
           </view>
           <!-- 首项媒体封面：恢复/彻底删除前先辨认内容 -->
           <view v-if="t.media" class="rec-media">
-            <video
+            <sj-video-cover
               v-if="t.media.type === 'video'"
               class="rec-media-img"
-              :src="t.media.url"
-              :poster="t.media.thumb"
-              :controls="false"
-              :autoplay="false"
-              :show-center-play-btn="false"
-              :show-play-btn="false"
-              :object-fit="'cover'"
+              :thumb="t.media.thumb"
             />
             <image v-else class="rec-media-img" :src="t.media.thumb || t.media.url" mode="aspectFill" lazy-load />
           </view>

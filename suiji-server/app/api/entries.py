@@ -9,7 +9,7 @@ from ..core.db import get_db
 from ..core.deps import get_auth, require_creator, require_write
 from ..models import Entry
 from ..repositories import scoped_get
-from ..schemas import EntryIn
+from ..schemas import EntryIn, EntryMediaPatch
 from ..services import audit_service, cleanup_service, entry_service
 from ..services.entry_service import assert_entry_writable
 from ..services.rows import entry_row
@@ -108,6 +108,13 @@ def get_one(entry_id: str, db: Session = Depends(get_db), auth=Depends(get_auth)
 @router.put("/{entry_id}")
 def update(entry_id: str, body: EntryIn, db: Session = Depends(get_db), auth=Depends(require_write)):
     return entry_service.update_entry(db, auth, entry_id, body.model_dump(exclude_unset=True))
+
+
+@router.patch("/{entry_id}/media")
+def merge_media(entry_id: str, body: EntryMediaPatch, db: Session = Depends(get_db),
+                auth=Depends(require_write)):
+    """PATCH /entries/{id}/media：后台媒体上传完成后回填云端地址与状态，只合并媒体键。"""
+    return entry_service.merge_entry_media(db, auth, entry_id, body.model_dump(exclude_unset=True))
 
 
 @router.delete("/{entry_id}")

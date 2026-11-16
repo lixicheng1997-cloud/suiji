@@ -33,7 +33,7 @@
             <image
               v-if="slotPhoto(si)"
               class="slot-img"
-              :src="slotPhoto(si).url"
+              :src="slotPhoto(si).small"
               mode="aspectFill"
               @click="openSlotPreview(si)"
             />
@@ -77,6 +77,7 @@
 
 <script>
 import * as api from '@/utils/api.js'
+import { resolveSmall } from '@/api/http.js'
 
 /* 照片发生时间相对出生日期的整月龄（与原型 ageFromBirth 同口径：日不足借上月） */
 function ageMonthsAt(birthDate, occurredAt) {
@@ -126,7 +127,8 @@ export default {
         const label = m >= 0 ? m + ' 个月' : '未设出生日期'
         if (!map[label]) map[label] = []
         const date = [i.day, api.creatorLabel(i)].filter(Boolean).join(' · ')
-        photos.forEach(url => map[label].push({ url, thumb: i.photo || url, date, entryId: i.id }))
+        /* url=原图（全屏预览），small=800px 变体（对比框展示，避免一进来拉两张 3-10MB 原图） */
+        photos.forEach(url => map[label].push({ url, small: resolveSmall(url), thumb: i.photo || url, date, entryId: i.id }))
       }))
       const ages = Object.keys(map).sort((x, y) => (parseInt(x) || 0) - (parseInt(y) || 0))
       this.groups = map
@@ -134,6 +136,14 @@ export default {
       this.age = 0
       this.sel = ages.length && map[ages[0]].length ? [0, -1] : [-1, -1]
     }).catch(() => { /* 拉取失败保持空态 */ })
+  },
+
+  /* 预览打开时，物理返回键 / 系统返回手势先关预览，不退出页面 */
+  onBackPress() {
+    if (this.previewShow) {
+      this.previewShow = false
+      return true
+    }
   },
 
   methods: {

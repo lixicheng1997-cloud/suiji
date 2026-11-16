@@ -65,7 +65,16 @@ def _check_redis() -> tuple[str, bool | None, str]:
 
 
 def _check_storage(store) -> tuple[str, bool | None, str]:
-    from ..media.store import LocalMediaStore, MinioMediaStore
+    from ..media.store import LocalMediaStore, MinioMediaStore, CosMediaStore
+
+    if settings.media_backend == "cos":
+        if isinstance(store, CosMediaStore):
+            return "COS", True, f"endpoint={store.endpoint} bucket={store.bucket}（桶已就绪）"
+        if isinstance(store, LocalMediaStore):
+            return "COS", False, (
+                f"对象存储不可用，已降级本地磁盘：{store.base_dir}"
+                "（文件不会进 COS，接口仍返回成功，务必排查）")
+        return "COS", False, "存储后端初始化失败（见上方告警），文件读写将在请求期重试"
 
     if settings.media_backend == "minio":
         if isinstance(store, MinioMediaStore):

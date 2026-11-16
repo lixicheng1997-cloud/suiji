@@ -30,13 +30,23 @@ from .rows import (
 
 
 def family_members(db: Session, family_id: str) -> list[dict]:
+    """成员行组装：用户与设置各一次批量取，不在循环里逐条 db.get。
+
+    逐条取是 1 + 2×N 次往返（四口之家 9 次），批量后固定 3 次；GET /family 复用本函数，
+    两边一起受益。返回顺序仍按 family_member 行序，与改动前一致。
+    """
     rows = db.query(FamilyMember).filter(FamilyMember.family_id == family_id).all()
+    if not rows:
+        return []
+    user_ids = [fm.user_id for fm in rows]
+    users = {u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()}
+    settings = {s.user_id: s for s in db.query(Setting).filter(Setting.user_id.in_(user_ids)).all()}
     out = []
     for fm in rows:
-        u = db.get(User, fm.user_id)
+        u = users.get(fm.user_id)
         if u:
             # 成员头像/与宝宝关系：取该用户设置 parent.avatar / parent.relation（家长信息页保存）
-            st = db.get(Setting, u.id)
+            st = settings.get(u.id)
             parent = ((st.data or {}).get("parent") or {}) if st else {}
             avatar = parent.get("avatar") or ""
             relation = parent.get("relation") or ""

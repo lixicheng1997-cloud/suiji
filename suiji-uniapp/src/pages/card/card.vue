@@ -54,7 +54,7 @@
           </view>
           <sj-mascot class="mc-crest" :size="112" />
         </view>
-        <image v-if="photos.length" class="mc-photo" :src="photos[photo] ? photos[photo].url : photos[0].url" mode="aspectFill" @click="openCardPreview" />
+        <image v-if="photos.length" class="mc-photo" :src="(photos[photo] || photos[0]).small || (photos[photo] || photos[0]).url" mode="aspectFill" @click="openCardPreview" />
         <view v-else class="mc-photo mc-ph" :style="mcTintStyle">
           <image class="mc-ph-ic" :src="'/static/icons/ctl/' + __theme + '/96/58-ctl-upload.png'" mode="aspectFit" />
           <text>还没有照片记录 · 先在首页添加</text>
@@ -114,6 +114,8 @@ import * as api from '@/utils/api.js'
 import { CARD_TYPES } from '@/utils/mock.js'
 import { palette, cardSkin, withAlpha, THEME_LABELS } from '@/theme/theme.js'
 import { play } from '@/utils/sound.js'
+import * as ui from '@/utils/ui.js'
+import { resolveSmall } from '@/api/http.js'
 
 export default {
   data() {
@@ -226,12 +228,27 @@ export default {
       const items = []
       groups.forEach(g => g.items.forEach(i => {
         const photos = (i.photos && i.photos.length) ? i.photos : (i.photo_full ? [i.photo_full] : [])
-        photos.forEach(url => items.push({ url, thumb: i.photo || url, entryId: i.id }))
+        photos.forEach(url => items.push({
+          url,
+          thumb: i.photo || url,
+          /* 画布绘制用 800px 中尺寸变体（几百 KB），避免 getImageInfo 去拉 3-10MB 原图；
+             变体缺失时服务端回退原图。点开大图预览仍用 url 原图。 */
+          small: resolveSmall(url),
+          entryId: i.id
+        }))
       }))
       this.photos = items
       /* 照片到位后再做一次联动：直达场景下 onLoad 时 photos 尚为空 */
       this.syncMsPhoto()
     }).catch(() => { /* 拉取失败保持空态 */ })
+  },
+
+  /* 预览打开时，物理返回键 / 系统返回手势先关预览，不退出页面 */
+  onBackPress() {
+    if (this.previewShow) {
+      this.previewShow = false
+      return true
+    }
   },
 
   methods: {
@@ -285,8 +302,11 @@ export default {
         return
       }
       this.generating = true
+      /* 长任务全屏阻断：分「绘制卡片 → 写入相册」两步刷新文案，避免看起来像卡死 */
+      const ld = ui.loading('正在生成卡片…', { sub: '保持应用打开，勿切后台', timeout: 0 })
       try {
         const path = await this.renderCard()
+        ld.update({ text: '正在写入相册…' })
         await this.saveToAlbum(path)
         /* 纪念卡生成完成：百日/周岁各绑 E07 变体，里程碑卡不传 key */
         play('E07', this.type === 0 ? { key: 'hundred' } : this.type === 1 ? { key: 'year' } : {})
@@ -294,6 +314,7 @@ export default {
       } catch (e) {
         this.onGenFail(e)
       } finally {
+        ld.close()
         this.generating = false
       }
     },
@@ -395,7 +416,9 @@ export default {
                 canvasId: 'cardCanvas',
                 x: 0, y: 0, width: W, height: H,
                 destWidth: W * 2, destHeight: H * 2,
-                fileType: 'png',
+                /* JPEG 编码远快于无损 PNG、体积也小；卡面背景是实色渐变、无透明区，可安全使用 */
+                fileType: 'jpeg',
+                quality: 0.92,
                 success: r => resolve(r.tempFilePath),
                 fail: reject
               }, this)
@@ -405,7 +428,7 @@ export default {
 
         if (sel && sel.url) {
           uni.getImageInfo({
-            src: sel.url,
+            src: sel.small || sel.url,
             success: info => { drawPhoto(info); finish() },
             /* 图片拉取失败不阻断：画占位后继续导出 */
             fail: () => { this.photoPlaceholder(ctx, PX, PY, PW, PH, PR); finish() }
@@ -698,7 +721,7 @@ export default {
         try {
           const a = document.createElement('a')
           a.href = filePath
-          a.download = '岁记纪念卡.png'
+          a.download = '岁记纪念卡.jpg'
           document.body.appendChild(a)
           a.click()
           document.body.removeChild(a)

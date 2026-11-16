@@ -113,6 +113,21 @@ class MilestonePatch(BaseModel):
     creator: str | None = None
 
 
+class EntryMediaPatch(BaseModel):
+    """媒体异步上传完成后回填（PATCH /entries/{id}/media）。
+
+    记录元数据先落库，媒体由客户端在会话内后台上传；本接口只合并 payload 内的
+    媒体键与可选封面，不触碰备注/标题/测量值等其他字段。数组为该类媒体的最新全量清单
+    （已完成项带云端 url，未完成项带状态占位），按索引对位覆盖，避免逐条合并错位。
+    """
+    model_config = ConfigDict(extra="allow")
+
+    videos: list[dict] | None = None
+    photos: list[str] | None = None
+    voice: dict | None = None
+    photo: str | None = None
+
+
 class SettingsIn(BaseModel):
     key: str
     value: Any
@@ -140,6 +155,29 @@ class FilePatch(BaseModel):
     baby_id: str | None = None
     original_name: str | None = None
     meta: dict | None = None
+
+
+class PresignIn(BaseModel):
+    """直传预签名请求：客户端先取短时 PUT 地址，直传对象存储后再回调登记。"""
+    filename: str = ""
+    content_type: str = ""
+    size: int = 0
+    duration: float = 0
+    business_type: str = ""
+    business_id: str = ""
+    baby_id: str = ""
+
+
+class RegisterDirectIn(BaseModel):
+    """直传完成后的台账登记：storage_key 由预签名接口下发，不可自拟。"""
+    storage_key: str
+    original_name: str = ""
+    content_type: str = ""
+    size: int = 0
+    duration: float = 0
+    business_type: str = ""
+    business_id: str = ""
+    baby_id: str = ""
 
 
 class DeactivateIn(BaseModel):

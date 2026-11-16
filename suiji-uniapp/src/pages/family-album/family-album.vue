@@ -40,19 +40,12 @@
             :hover-stay-time="80"
             @click="openPreview(m)"
           >
-            <!-- 照片：缩略图铺满；视频：<video> 停在首帧作封面，有封面图先作 poster 兜底 -->
+            <!-- 照片：缩略图铺满；视频：封面图或占位兜底，点击进全屏预览 -->
             <image v-if="m.type === 'image'" class="cell-img" :src="m.thumb" mode="aspectFill" lazy-load />
-            <video
+            <sj-video-cover
               v-else
               class="cell-video"
-              :src="m.url"
-              :poster="m.thumb"
-              :controls="false"
-              :autoplay="false"
-              :show-center-play-btn="false"
-              :show-play-btn="false"
-              :show-fullscreen-btn="false"
-              :object-fit="'cover'"
+              :thumb="m.thumb"
             />
 
             <!-- 视频：暗化遮罩 + 中央播放键 + 右下角时长角标 -->
@@ -141,6 +134,14 @@ export default {
       .then(() => this.load())
       .catch(() => { /* 弱网保留本地缓存 */ })
       .then(() => uni.stopPullDownRefresh())
+  },
+
+  /* 预览打开时，物理返回键 / 系统返回手势先关预览，不退出页面 */
+  onBackPress() {
+    if (this.previewShow) {
+      this.previewShow = false
+      return true
+    }
   },
 
   methods: {

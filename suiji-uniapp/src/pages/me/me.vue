@@ -203,7 +203,6 @@ export default {
           label: '贴心功能',
           rows: [
             { mascot: true, label: '主题切换（' + THEME_LABELS[this.__theme] + '）', val: '轻点换肤', chev: true, act: 'theme' },
-            { png: '32-fn-card', label: '控件样式演示', val: 'sj-* 组件全览', chev: true, go: '/pages/uikit/uikit', adminOnly: true },
             { png: '22-fn-backup', label: '服务器地址', sd: '当前：' + api.serverUrl(), val: server, chev: true, act: 'server', adminOnly: true },
           ]
         },

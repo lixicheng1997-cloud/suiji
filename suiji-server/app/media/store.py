@@ -7,6 +7,10 @@
 文件名可读）；同家庭同内容（sha256）在业务层复用同一对象，同名不同内容自动追加 sha 短码，
 保证一个路径只对应一份字节。旧的 sha 寻址 key（`sha[:2]/sha.ext`）仍可正常读删，平滑兼容。
 """
+import base64
+import hashlib
+import hmac
+import json
 import logging
 import mimetypes
 import re
@@ -17,6 +21,7 @@ from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
 from typing import Iterator
+from urllib.parse import urlparse
 
 from ..core.config import settings
 
@@ -132,6 +137,11 @@ class MediaStore(ABC):
 
     def url(self, storage_key: str, expires: int = 0) -> str | None:
         """可直接下载的临时 URL；不支持则返回 None（走本地/代理下载）。"""
+        return None
+
+    def presigned_put(self, storage_key: str, content_type: str = "",
+                      expires: int = 0) -> str | None:
+        """签发短时 PUT 预签名直传地址；不支持（local 磁盘）返回 None，调用方回退 multipart。"""
         return None
 
     def open_stream(self, storage_key: str, start: int | None = None,
@@ -331,7 +341,6 @@ class MinioMediaStore(MediaStore):
     def url(self, storage_key: str, expires: int = 0) -> str | None:
         """预签名 GET 地址（临时、带签名，等价于契约要求的媒体鉴权）。"""
         from datetime import timedelta
-        from urllib.parse import urlparse, urlunparse
 
         seconds = max(60, int(expires or settings.media_url_expires or 600))
         try:
@@ -340,16 +349,45 @@ class MinioMediaStore(MediaStore):
         except Exception as exc:
             logger.warning("生成预签名 URL 失败 %s：%s", storage_key, exc)
             return None
-        # presign 客户端用纯 host:port 签名（SigV4 把 Host 纳入签名），
-        # 生成的路径是 /bucket/key。若 public_url 带路径前缀（如 /minio，
-        # nginx 反代前缀），需把前缀拼到路径前面。
+        return self._public_url(signed)
+
+    def presigned_put(self, storage_key: str, content_type: str = "",
+                      expires: int = 0) -> str | None:
+        """预签名 PUT 直传地址：客户端直传对象存储，再回调服务端登记台账。
+
+        返回 None 表示当前后端不支持直传（local 磁盘 / 预签名失败），调用方回退 multipart。
+        """
+        from datetime import timedelta
+
+        seconds = max(60, int(expires or settings.media_url_expires or 600))
+        try:
+            # minio 7.2.x 的 presigned_put_object 只收 (bucket, key, expires)：
+            # 早先多传一个 content_type 会抛 TypeError，被下面的 except 吞掉，
+            # 于是所有客户端拿到的都是 direct=false，直传通道整体失效。
+            # 类型不在签名里也没关系——登记回源读头嗅探为准（register_direct）。
+            signed = self._presign.presigned_put_object(
+                self.bucket, storage_key, expires=timedelta(seconds=seconds))
+        except Exception as exc:
+            logger.warning("生成 PUT 预签名 URL 失败 %s：%s", storage_key, exc)
+            return None
+        return self._public_url(signed)
+
+    def _public_url(self, signed: str) -> str:
+        """把纯 host:port 预签名地址改写成客户端可达的 public_url（含 nginx 路径前缀）。
+
+        presign 客户端用纯 host:port 签名（SigV4 把 Host 纳入签名），生成的路径是
+        /bucket/key。若 public_url 带路径前缀（如 /minio，nginx 反代前缀），需把前缀
+        拼到路径前面；不带前缀时原样返回。
+        """
+        from urllib.parse import urlparse, urlunparse
+
         if self.public_url and self.public_url != self._internal_base:
             pub = urlparse(self.public_url)
             sp = urlparse(signed)
             prefix = pub.path.rstrip('/')
             path = prefix + sp.path if prefix else sp.path
-            signed = urlunparse((pub.scheme, pub.netloc, path,
-                                 sp.params, sp.query, sp.fragment))
+            return urlunparse((pub.scheme, pub.netloc, path,
+                               sp.params, sp.query, sp.fragment))
         return signed
 
     def open_stream(self, storage_key: str, start: int | None = None,
@@ -388,6 +426,228 @@ class MinioMediaStore(MediaStore):
             resp.release_conn()
 
 
+class CosMediaStore(MediaStore):
+    """腾讯云 COS（S3 兼容）实现（需要依赖：pip install boto3）。
+
+    与 MinioMediaStore 共用同一套对象路径规则与 ABC 方法集；预签名 GET/PUT 走
+    boto3 SigV4，virtual-hosted 桶域名 `{bucket}.cos.{region}.myqcloud.com`。
+    """
+
+    def __init__(self, endpoint: str, access_key: str, secret_key: str, bucket: str,
+                 region: str = "ap-beijing", public_url: str = "") -> None:
+        if not access_key or not secret_key:
+            raise RuntimeError("MEDIA_BACKEND=cos 需要配置 COS_ACCESS_KEY / COS_SECRET_KEY")
+        if not bucket:
+            raise RuntimeError("MEDIA_BACKEND=cos 需要配置 COS_BUCKET")
+        try:
+            import boto3
+            from botocore.config import Config
+        except ImportError as exc:  # 依赖缺失只在切换到 cos 时才报错
+            raise RuntimeError("MEDIA_BACKEND=cos 需要安装依赖：pip install boto3") from exc
+
+        self.bucket = bucket
+        self.region = region or "ap-beijing"
+        self._access_key = access_key
+        self._secret_key = secret_key
+        endpoint = (endpoint or "https://cos.ap-beijing.myqcloud.com").strip().rstrip("/")
+        if not endpoint.startswith(("http://", "https://")):
+            endpoint = "https://" + endpoint
+        self.endpoint = endpoint
+        self.public_url = public_url.rstrip("/") if public_url else ""
+        self._client = boto3.client(
+            "s3",
+            endpoint_url=endpoint,
+            region_name=self.region,
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            config=Config(
+                signature_version="s3",
+                s3={"addressing_style": "virtual"},
+                retries={"max_attempts": 2},
+            ),
+        )
+        # 桶在控制台已创建：这里 head_bucket 仅探测可达性，不自动建桶
+        self._ensure_bucket(probe=True)
+
+    def _ensure_bucket(self, probe: bool = False) -> None:
+        try:
+            self._client.head_bucket(Bucket=self.bucket)
+        except Exception as exc:
+            msg = f"COS 存储暂不可用（{self.endpoint}:{self.bucket}）：{exc}"
+            if probe:
+                raise RuntimeError(msg)
+            logger.warning("%s，将在下次读写时重试", msg)
+
+    def save(self, data: bytes, sha256_hex: str, suffix: str = "", content_type: str = "",
+             family_id: str = "", filename: str = "", baby_id: str = "", user_id: str = "") -> str:
+        return self.save_stream(BytesIO(data), len(data), sha256_hex, suffix, content_type,
+                                family_id, filename, baby_id, user_id)
+
+    def path(self, storage_key: str) -> Path | None:
+        return None  # 对象无本地路径，下载走 url() / open_stream()
+
+    def exists(self, storage_key: str) -> bool:
+        try:
+            self._client.head_object(Bucket=self.bucket, Key=storage_key)
+            return True
+        except Exception:
+            return False
+
+    def save_stream(self, src, size: int, sha256_hex: str, suffix: str = "",
+                    content_type: str = "", family_id: str = "", filename: str = "",
+                    baby_id: str = "", user_id: str = "") -> str:
+        """流式直传 COS：不把整份文件读进内存。"""
+        base = object_key(family_id, filename, suffix, sha256_hex,
+                          content_type=content_type, baby_id=baby_id, user_id=user_id) \
+            if (family_id or filename) else content_key(sha256_hex, suffix)
+        storage_key = _unique_key(self, base, sha256_hex)
+        ct = content_type or mimetypes.guess_type(storage_key)[0] or "application/octet-stream"
+        src.seek(0)
+        kwargs: dict = {"Bucket": self.bucket, "Key": storage_key, "Body": src, "ContentType": ct}
+        if size and size > 0:
+            kwargs["ContentLength"] = size
+        self._client.put_object(**kwargs)
+        return storage_key
+
+    def delete(self, storage_key: str) -> None:
+        try:
+            self._client.delete_object(Bucket=self.bucket, Key=storage_key)
+        except Exception as exc:
+            logger.warning("删除对象失败 %s：%s", storage_key, exc)
+
+    def url(self, storage_key: str, expires: int = 0) -> str | None:
+        """预签名 GET 地址（临时、带签名，等价于契约要求的媒体鉴权）。"""
+        seconds = max(60, int(expires or settings.media_url_expires or 600))
+        try:
+            signed = self._client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": self.bucket, "Key": storage_key},
+                ExpiresIn=seconds,
+            )
+        except Exception as exc:
+            logger.warning("生成预签名 URL 失败 %s：%s", storage_key, exc)
+            return None
+        return self._public_url(signed)
+
+    def presigned_put(self, storage_key: str, content_type: str = "",
+                      expires: int = 0) -> str | None:
+        """预签名 PUT 直传地址：客户端直传 COS，再回调服务端登记台账。"""
+        seconds = max(60, int(expires or settings.media_url_expires or 600))
+        try:
+            signed = self._client.generate_presigned_url(
+                "put_object",
+                Params={"Bucket": self.bucket, "Key": storage_key},
+                ExpiresIn=seconds,
+            )
+        except Exception as exc:
+            logger.warning("生成 PUT 预签名 URL 失败 %s：%s", storage_key, exc)
+            return None
+        return self._public_url(signed)
+
+    def presigned_post(self, storage_key: str, content_type: str = "",
+                       max_bytes: int = 0, expires: int = 0) -> dict | None:
+        """签发 COS PostObject（POST 表单）直传凭证，供 uni.uploadFile 三端直传。
+
+        返回 `{method:'post', url, fields, storage_key, content_type, expires}`；
+        签名走 COS SHA1 policy 流程（与 boto3 SigV4 是两套独立签名）。
+        表单字段必须排在 file 之前，由前端 uni.uploadFile 以 name='file' 末尾附加文件。
+        """
+        seconds = max(60, int(expires or settings.media_url_expires or 600))
+        now = int(time.time())
+        end = now + seconds
+        key_time = f"{now};{end}"
+        max_bytes = int(max_bytes or settings.file_max_bytes or MAX_MEDIA_BYTES)
+
+        policy = {
+            "expiration": datetime.fromtimestamp(end, timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+            "conditions": [
+                {"bucket": self.bucket},
+                ["eq", "$key", storage_key],
+                ["content-length-range", 0, max_bytes],
+                {"q-sign-algorithm": "sha1"},
+                {"q-ak": self._access_key},
+                {"q-sign-time": key_time},
+            ],
+        }
+        policy_text = json.dumps(policy, separators=(",", ":"), ensure_ascii=False)
+        policy_b64 = base64.b64encode(policy_text.encode("utf-8")).decode("utf-8")
+
+        # SignKey = HMAC-SHA1(SecretKey, KeyTime)；StringToSign = SHA1(Policy 文本)；
+        # Signature = HMAC-SHA1(SignKey 字符串, StringToSign 字符串)，均取 hex 小写。
+        sign_key = hmac.new(self._secret_key.encode("utf-8"), key_time.encode("utf-8"),
+                            hashlib.sha1).hexdigest()
+        string_to_sign = hashlib.sha1(policy_text.encode("utf-8")).hexdigest()
+        signature = hmac.new(sign_key.encode("utf-8"), string_to_sign.encode("utf-8"),
+                             hashlib.sha1).hexdigest()
+
+        fields: dict = {
+            "key": storage_key,
+            "policy": policy_b64,
+            "q-sign-algorithm": "sha1",
+            "q-ak": self._access_key,
+            "q-key-time": key_time,
+            "q-signature": signature,
+            "success_action_status": "200",
+        }
+        if content_type:
+            fields["Content-Type"] = content_type
+
+        return {
+            "method": "post",
+            "url": self._post_url(),
+            "fields": fields,
+            "storage_key": storage_key,
+            "content_type": content_type or "application/octet-stream",
+            "expires": seconds,
+        }
+
+    def _post_url(self) -> str:
+        if self.public_url:
+            return self.public_url
+        return f"https://{self.bucket}.cos.{self.region}.myqcloud.com"
+
+    def open_stream(self, storage_key: str, start: int | None = None,
+                    end: int | None = None) -> Iterator[bytes] | None:
+        """服务端代理下载：对象不存在返回 None（路由层转 404）；带区间时走 Range 读。"""
+        try:
+            kwargs: dict = {"Bucket": self.bucket, "Key": storage_key}
+            if start is not None:
+                kwargs["Range"] = f"bytes={start}-" + (str(end) if end is not None else "")
+            resp = self._client.get_object(**kwargs)
+        except Exception as exc:
+            logger.warning("读取对象失败 %s（%s-%s）：%s", storage_key, start, end, exc)
+            return None
+        return self._iter_object(resp)
+
+    def size(self, storage_key: str) -> int | None:
+        try:
+            return int(self._client.head_object(Bucket=self.bucket, Key=storage_key)["ContentLength"])
+        except Exception as exc:
+            logger.warning("读取对象长度失败 %s：%s", storage_key, exc)
+            return None
+
+    def _public_url(self, signed: str) -> str:
+        """配置了 public_url（自定义域名/前缀）时改写签名地址，否则原样返回。"""
+        from urllib.parse import urlparse, urlunparse
+
+        if not self.public_url:
+            return signed
+        pub = urlparse(self.public_url)
+        sp = urlparse(signed)
+        prefix = pub.path.rstrip("/")
+        path = prefix + sp.path if prefix else sp.path
+        return urlunparse((pub.scheme, pub.netloc, path, sp.params, sp.query, sp.fragment))
+
+    @staticmethod
+    def _iter_object(resp) -> Iterator[bytes]:
+        body = resp["Body"]
+        try:
+            for chunk in body.iter_chunks(64 * 1024):
+                yield chunk
+        finally:
+            body.close()
+
+
 _store: MediaStore | None = None
 
 
@@ -410,6 +670,21 @@ def get_store() -> MediaStore:
                     raise
                 # 本地开发常见：没装 minio 依赖 / 没起 MinIO 服务 → 降级本地磁盘
                 logger.warning("对象存储不可用（%s），降级到本地磁盘：%s", exc, settings.media_dir)
+                _store = LocalMediaStore(settings.media_dir)
+        elif settings.media_backend == "cos":
+            try:
+                _store = CosMediaStore(
+                    endpoint=settings.cos_endpoint,
+                    access_key=settings.cos_access_key,
+                    secret_key=settings.cos_secret_key,
+                    bucket=settings.cos_bucket,
+                    region=settings.cos_region,
+                    public_url=settings.cos_public_url,
+                )
+            except Exception as exc:
+                if not settings.allow_fallback:
+                    raise
+                logger.warning("COS 不可用（%s），降级到本地磁盘：%s", exc, settings.media_dir)
                 _store = LocalMediaStore(settings.media_dir)
         else:
             _store = LocalMediaStore(settings.media_dir)

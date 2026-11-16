@@ -43,16 +43,10 @@
             @click="openDiaryPreview(d, mi)"
           >
             <image v-if="m.type === 'image'" class="dc-thumb-img" :src="m.thumb" mode="aspectFill" lazy-load />
-            <video
+            <sj-video-cover
               v-else
               class="dc-thumb-img"
-              :src="m.url"
-              :poster="m.thumb"
-              :controls="false"
-              :autoplay="false"
-              :show-center-play-btn="false"
-              :show-play-btn="false"
-              :object-fit="'cover'"
+              :thumb="m.thumb"
             />
             <view v-if="m.type === 'video'" class="dc-thumb-play"><view class="tri" /></view>
           </view>
@@ -117,6 +111,14 @@ export default {
         x.range_start <= today && today <= x.range_end
       )
       return d ? d.id : ''
+    }
+  },
+
+  /* 预览打开时，物理返回键 / 系统返回手势先关预览，不退出页面 */
+  onBackPress() {
+    if (this.previewShow) {
+      this.previewShow = false
+      return true
     }
   },
 

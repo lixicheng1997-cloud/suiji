@@ -16,7 +16,7 @@ from ..core.rate_limit import limit as rate_limit
 from ..core.security import ACCESS, MEDIA
 from ..media.store import get_store
 from ..models import FileObject
-from ..schemas import FilePatch
+from ..schemas import FilePatch, PresignIn, RegisterDirectIn
 from ..services import file_service
 from ..services.rows import file_row
 
@@ -83,6 +83,22 @@ def upload_batch(files: list[UploadFile] = File(...), business_type: str = Form(
     if not files:
         raise HTTPException(status_code=422, detail="缺少文件")
     return file_service.upload_many(db, auth, files, business_type, business_id, baby_id)
+
+
+@router.post("/presign")
+def presign(body: PresignIn, db: Session = Depends(get_db),
+            auth: AuthContext = Depends(require_family_write),
+            _rl=rate_limit("upload_ctl", settings.rl_presign, settings.rl_presign_window)):
+    """签发短时 PUT 预签名直传地址；后端不支持直传时返回 direct=false，客户端回退 multipart。"""
+    return file_service.issue_presign(db, auth, body.model_dump())
+
+
+@router.post("/register")
+def register_direct(body: RegisterDirectIn, db: Session = Depends(get_db),
+                     auth: AuthContext = Depends(require_family_write),
+                     _rl=rate_limit("upload_ctl", settings.rl_presign, settings.rl_presign_window)):
+    """直传完成后登记台账：服务端回源读头嗅探，再写文件台账行。"""
+    return file_service.register_direct(db, auth, body.model_dump())
 
 
 @router.get("")

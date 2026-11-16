@@ -16,6 +16,8 @@ alembic==1.14.0
 pytest==8.3.4
 # 非结构化文件对象存储（MEDIA_BACKEND=minio 时使用；切 local 可不装）
 minio==7.2.15
+# 腾讯云 COS（S3 兼容，MEDIA_BACKEND=cos 时使用；boto3 同时承担直传/直读预签名）
+boto3==1.44.3
 # 图片上传前无损重压（PNG/GIF，media/compress.py）；缺失时上传自动跳过压缩
 Pillow==11.1.0
 # HEIC/HEIF 转 JPEG（iPhone 照片兼容性）；缺失时 HEIC 原样存储

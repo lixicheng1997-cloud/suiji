@@ -109,22 +109,21 @@
               </view>
               <text v-if="e.note" class="rec-note">{{ e.note }}</text>
             </view>
-            <!-- 视频记录：真实首帧封面 + 播放按钮（点击直接全屏播放，不进详情） -->
+            <!-- 视频记录：封面图或占位兜底 + 播放按钮（点击直接全屏播放，不进详情）；
+                 后台上传中的占位段显示上传中/失败遮罩，不显示播放钮 -->
             <view v-if="e.type === 'video'" class="rec-video" @click.stop="previewEntry(e)">
-              <video
+              <sj-video-cover
                 v-if="e.videos && e.videos[0]"
                 class="rec-video-bg"
-                :src="e.videos[0].url"
-                :poster="e.videos[0].thumb"
-                :controls="false"
-                :autoplay="false"
-                :show-center-play-btn="false"
-                :show-play-btn="false"
-                :object-fit="'cover'"
+                :thumb="e.videos[0].thumb"
               />
               <view class="rec-video-mask" />
-              <view class="rec-video-play">
+              <view v-if="firstVideoDone(e)" class="rec-video-play">
                 <view class="rvp-tri" />
+              </view>
+              <view v-else class="rec-pending">
+                <view v-if="!(e.videos[0] && e.videos[0].status === 'failed')" class="rp-spinner" />
+                <text class="rec-pending-txt">{{ firstVideoText(e) }}</text>
               </view>
               <text v-if="e.videos && e.videos.length" class="rec-video-count">{{ e.videos.length }} 段</text>
             </view>
@@ -459,6 +458,14 @@ export default {
     if (this._offUnread) { this._offUnread(); this._offUnread = null }
   },
 
+  /* 预览打开时，物理返回键 / 系统返回手势先关预览，不退出页面 */
+  onBackPress() {
+    if (this.previewShow) {
+      this.previewShow = false
+      return true
+    }
+  },
+
   methods: {
     /* 下拉刷新：tabSwipe 已重拉 bootstrap，这里复用本页刷新链路 */
     tabAfterPull() { return this.refresh() },
@@ -615,10 +622,25 @@ export default {
       uni.navigateTo({ url: '/pages/detail/detail?id=' + e.id })
     },
 
-    /* 点缩略图直接全屏预览：视频走 e.videos；照片优先同条记录多张，回退封面图 */
+    /* 首段是否已上传完成（有云端地址）：决定卡片显示播放钮还是占位遮罩 */
+    firstVideoDone(e) {
+      const v = e.videos && e.videos[0]
+      return !!(v && v.url)
+    },
+    firstVideoText(e) {
+      const v = e.videos && e.videos[0]
+      if (!v) return '等待上传'
+      if (v.status === 'failed') return '上传失败'
+      if (v.status === 'uploading') return '上传中 ' + (v.progress || 0) + '%'
+      return '等待上传'
+    },
+    /* 点缩略图直接全屏预览：视频走 e.videos（后台上传中的占位段无云端地址，跳过不预览）；
+       照片优先同条记录多张，回退封面图 */
     previewEntry(e) {
       if (e.type === 'video' && e.videos && e.videos.length) {
-        this.previewItems = e.videos.map(v => ({ type: 'video', url: v.url, thumb: v.thumb }))
+        const done = e.videos.filter(v => v && v.url)
+        if (!done.length) return
+        this.previewItems = done.map(v => ({ type: 'video', url: v.url, thumb: v.thumb }))
       } else if (e.photos && e.photos.length) {
         this.previewItems = e.photos.map(url => ({ type: 'image', url }))
       } else if (e.photo_full) {
@@ -1031,6 +1053,28 @@ export default {
   border-bottom: 10rpx solid transparent;
   margin-left: 4rpx;
 }
+.rec-pending {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+}
+.rp-spinner {
+  width: 32rpx;
+  height: 32rpx;
+  border-radius: 50%;
+  border: 4rpx solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  animation: rp-spin 0.8s linear infinite;
+}
+.rec-pending-txt { color: #fff; font-size: 20rpx; font-weight: 600; }
+@keyframes rp-spin { to { transform: rotate(360deg); } }
 .rec-video-count {
   position: absolute;
   right: 6rpx;

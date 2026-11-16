@@ -25,7 +25,8 @@ def _engine_kwargs(url: str) -> dict:
             db_file = url.split("sqlite:///")[-1]
             Path(db_file).parent.mkdir(parents=True, exist_ok=True)
         return kwargs
-    return {"pool_pre_ping": True}
+    return {"pool_pre_ping": True, "pool_size": settings.db_pool_size,
+            "max_overflow": settings.db_max_overflow, "pool_recycle": settings.db_pool_recycle}
 
 
 def _create_engine_for(url: str):

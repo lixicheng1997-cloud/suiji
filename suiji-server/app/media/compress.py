@@ -11,19 +11,24 @@
 失败、无 Pillow、压缩后反而变大——一律返回原 spool / 原 sha / 原 size，
 上传主流程不受影响。压缩后内容变了，调用方需用返回的新 sha 与 size
 重走去重与台账（同家庭同原图压缩结果确定，去重依然成立）。
+
+字节以文件形态进出，不再 `spool.read()` 整份进内存：一次请求要同时握住原图和
+结果两份，48MP 照片就是 60MB 量级，9 张并发足以顶满 api 容器。
 """
 import hashlib
 import logging
 import shutil
 import subprocess
-from io import BytesIO
+import tempfile
 from tempfile import SpooledTemporaryFile
+
+from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 
 _SPOOL_MAX = 8 * 1024 * 1024        # 与 file_service 一致：小图内存缓冲，大图落临时盘
-_MAX_COMPRESS_BYTES = 64 * 1024 * 1024  # 超过 64MB 的图不重压，避免解压峰值内存
 _JPEGTRAN_TIMEOUT = 30              # 秒；异常大图直接放弃压缩走原图
+_CHUNK = 1024 * 1024
 
 _pillow_ok: bool | None = None
 _jpegtran_bin: str | None = None
@@ -52,46 +57,138 @@ def _jpegtran() -> str | None:
     return _jpegtran_bin
 
 
-def _recompress(data: bytes, content_type: str) -> bytes | None:
-    """按类型无损重压；返回更小的字节，无收益或失败返回 None。"""
+def _has_fd(spool) -> bool:
+    """spool 是否已滚动到临时盘（有真实 fd 才能直接当子进程 stdin）。
+
+    SpooledTemporaryFile 在内存态是 BytesIO，fileno() 抛 UnsupportedOperation。
+    """
     try:
-        if content_type == "image/jpeg":
-            return _jpegtran_lossless(data)
-        if content_type in ("image/png", "image/gif"):
-            return _pillow_lossless(data, content_type)
-    except Exception as exc:  # 压缩失败绝不阻断上传
-        logger.warning("图片无损压缩失败（%s）：%s", content_type, exc)
-    return None
+        spool.seek(0)
+        spool.fileno()
+        return True
+    except Exception:
+        return False
 
 
-def _pillow_lossless(data: bytes, content_type: str) -> bytes | None:
+def _digest(spool) -> tuple[str, int]:
+    """流式算 sha256 与字节数，结束后游标归零。"""
+    d = hashlib.sha256()
+    total = 0
+    spool.seek(0)
+    while True:
+        chunk = spool.read(_CHUNK)
+        if not chunk:
+            break
+        total += len(chunk)
+        d.update(chunk)
+    spool.seek(0)
+    return d.hexdigest(), total
+
+
+def _jpegtran_lossless(spool, size: int):
+    """原图喂 stdin、结果落临时文件；无收益或失败返回 None（不抛，交给上层用原图）。
+
+    只有 spool 已经落到临时盘（>8MB，有真实 fd）才能流式；子进程的 stdout
+    也必须是一个真实文件描述符，SpooledTemporaryFile 的内存态没有 fd，fileno() 直接抛。
+    """
+    binary = _jpegtran()
+    if not binary:
+        return None
+    args = [binary, "-copy", "all", "-optimize", "-progressive"]
+    timeout = _JPEGTRAN_TIMEOUT
+    if _has_fd(spool):
+        out = tempfile.TemporaryFile()
+        keep = False
+        try:
+            proc = subprocess.run(args, stdin=spool, stdout=out,
+                                  stderr=subprocess.PIPE, timeout=timeout)
+            if proc.returncode != 0 or out.tell() == 0:
+                logger.warning("jpegtran 退出码 %s：%s", proc.returncode,
+                               (proc.stderr or b"")[:200].decode("utf-8", "replace"))
+                return None
+            out.seek(0)
+            sha, new_size = _digest(out)
+            if new_size >= size:  # 压不动了：保留原图，别做无用功
+                return None
+            out.seek(0)
+            keep = True
+            return out, sha, new_size
+        except Exception as exc:  # 压缩失败绝不阻断上传
+            logger.warning("jpegtran 无损压缩失败：%s", exc)
+            return None
+        finally:
+            if not keep:
+                out.close()
+    # 内存态小文件（≤8MB）：没有 fd 可交给子进程，退化成一次性管道
+    try:
+        spool.seek(0)
+        proc = subprocess.run(args, input=spool.read(), capture_output=True, timeout=timeout)
+        if proc.returncode != 0 or not proc.stdout:
+            logger.warning("jpegtran 退出码 %s：%s", proc.returncode,
+                           (proc.stderr or b"")[:200].decode("utf-8", "replace"))
+            return None
+        out = SpooledTemporaryFile(max_size=_SPOOL_MAX)
+        out.write(proc.stdout)
+        sha, new_size = _digest(out)
+        if new_size >= size:
+            out.close()
+            return None
+        return out, sha, new_size
+    except Exception as exc:
+        logger.warning("jpegtran 无损压缩失败：%s", exc)
+        return None
+
+
+def _pillow_lossless(spool, content_type: str, size: int):
     if not _has_pillow():
         return None
     from PIL import Image
 
     fmt = "PNG" if content_type == "image/png" else "GIF"
-    im = Image.open(BytesIO(data))
-    if getattr(im, "n_frames", 1) > 1:  # 动图：单帧重存会丢动画
+    out = None
+    try:
+        spool.seek(0)
+        im = Image.open(spool)  # Pillow 收文件对象，不必先整份 read 成 bytes
+        if getattr(im, "n_frames", 1) > 1:  # 动图：单帧重存会丢动画
+            return None
+        out = SpooledTemporaryFile(max_size=_SPOOL_MAX)
+        im.save(out, fmt, optimize=True)
+        sha, new_size = _digest(out)
+        if new_size == 0 or new_size >= size:
+            out.close()
+            return None
+        return out, sha, new_size
+    except Exception as exc:  # 压缩失败绝不阻断上传
+        if out is not None:
+            try:
+                out.close()
+            except Exception:
+                pass
+        logger.warning("图片无损压缩失败（%s）：%s", content_type, exc)
         return None
-    buf = BytesIO()
-    im.save(buf, fmt, optimize=True)
-    out = buf.getvalue()
-    return out if 0 < len(out) < len(data) else None
 
 
-def _jpegtran_lossless(data: bytes) -> bytes | None:
-    binary = _jpegtran()
-    if not binary:
-        return None
-    proc = subprocess.run(
-        [binary, "-copy", "all", "-optimize", "-progressive"],
-        input=data, capture_output=True, timeout=_JPEGTRAN_TIMEOUT)
-    if proc.returncode != 0 or not proc.stdout:
-        logger.warning("jpegtran 退出码 %s：%s", proc.returncode,
-                       proc.stderr[:200].decode("utf-8", "replace"))
-        return None
-    out = proc.stdout
-    return out if len(out) < len(data) else None
+def _within_budget(spool) -> bool:
+    """重压的成本按像素走（实测 12MP 0.28s、48MP 1.2s），所以闸口用像素数而不是字节数：
+    一张 48MP 的 JPEG 才 12MB，按字节根本拦不住。尺寸只读文件头、不解码，代价可忽略。
+
+    读不出来（没装 Pillow、文件异常）一律放行：那种图本来就走不了 Pillow 分支，
+    交给下面的分支各自兜底，不该由闸口把压缩能力再砍一刀。
+    """
+    if not _has_pillow():
+        return True
+    from PIL import Image
+
+    try:
+        spool.seek(0)
+        with Image.open(spool) as im:
+            w, h = im.size
+        return w * h <= settings.compress_max_pixels
+    except Exception as exc:
+        logger.warning("读图尺寸失败，重压闸口放行：%s", exc)
+        return True
+    finally:
+        spool.seek(0)
 
 
 def compress_image(spool, content_type: str, sha: str, size: int):
@@ -102,23 +199,18 @@ def compress_image(spool, content_type: str, sha: str, size: int):
     """
     if content_type not in ("image/png", "image/gif", "image/jpeg"):
         return spool, sha, size
-    if size > _MAX_COMPRESS_BYTES:
+    # 超过 COMPRESS_MAX_PIXELS（默认 2000 万）的原图直接入库：多留约 10% 字节，
+    # 换掉请求线程里秒级的排队——一次保存九张时这几秒是累加的。
+    if not _within_budget(spool):
         return spool, sha, size
-    if content_type == "image/jpeg" and not _jpegtran():
-        return spool, sha, size
-    if content_type != "image/jpeg" and not _has_pillow():
-        return spool, sha, size
-
-    spool.seek(0)
-    data = spool.read()
-    out = _recompress(data, content_type)
-    if not out:
+    if content_type == "image/jpeg":
+        res = _jpegtran_lossless(spool, size)
+    else:
+        res = _pillow_lossless(spool, content_type, size)
+    if not res:
         spool.seek(0)
         return spool, sha, size
-
-    new_spool = SpooledTemporaryFile(max_size=_SPOOL_MAX)
-    new_spool.write(out)
-    new_spool.seek(0)
+    new_spool, new_sha, new_size = res
     spool.close()
-    logger.info("图片无损压缩 %s：%d → %d 字节", content_type, size, len(out))
-    return new_spool, hashlib.sha256(out).hexdigest(), len(out)
+    logger.info("图片无损压缩 %s：%d → %d 字节", content_type, size, new_size)
+    return new_spool, new_sha, new_size

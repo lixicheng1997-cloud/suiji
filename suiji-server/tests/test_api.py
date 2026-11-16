@@ -268,6 +268,42 @@ def test_milestone_entry_marks_record(client):
     assert done["achieved_at"] == _now_str(0, "16:40")
 
 
+def test_entry_media_patch_merges_only_media_keys(client):
+    """后台媒体上传完成后回填：只合并 payload 媒体键与封面，不覆盖备注/标题，不重算副作用。"""
+    headers, _ = _auth(client, "media")
+    _create_baby(client, headers)
+    r = client.post(API + "/entries", headers=headers, json={
+        "id": "e_media_1", "type": "video", "occurred_at": _now_str(),
+        "title": "玩耍记录", "note": "第一次翻身",
+        "payload": {"videos": [
+            {"url": "", "duration": 12, "size": 2048, "thumb": "", "status": "pending", "progress": 0}
+        ]},
+    })
+    assert r.status_code == 200, r.text
+    eid = r.json()["id"]
+
+    pr = client.patch(API + f"/entries/{eid}/media", headers=headers, json={
+        "photo": "/api/v1/files/f_cover/thumb",
+        "videos": [
+            {"url": "/api/v1/files/f_vid_1", "duration": 12, "size": 2048,
+             "thumb": "/api/v1/files/f_cover", "status": "done", "progress": 100}
+        ],
+    })
+    assert pr.status_code == 200, pr.text
+    row = pr.json()
+    # 备注/标题原样保留，封面被回填更新
+    assert row["note"] == "第一次翻身"
+    assert row["title"] == "玩耍记录"
+    assert row["photo"] == "/api/v1/files/f_cover/thumb"
+    v = row["payload"]["videos"][0]
+    assert v["url"] == "/api/v1/files/f_vid_1" and v["status"] == "done"
+
+    # 其他家庭成员越权回填：403/404
+    h2, _ = _auth(client, "media2")
+    assert client.patch(API + f"/entries/{eid}/media", headers=h2,
+                        json={"videos": []}).status_code in (403, 404)
+
+
 def test_idempotency_key(client):
     headers, _ = _auth(client, "idem")
     _create_baby(client, headers)

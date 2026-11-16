@@ -36,6 +36,13 @@ class Settings:
             "0", "false", "no", "off")
         self.jwt_secret = self._resolve_jwt_secret()
         self.database_url = _resolve_sqlite_url(os.getenv("DATABASE_URL", "sqlite:///./data/suiji.db"))
+        # Postgres 连接池大小（仅非 SQLite 生效）：同步 endpoint 跑在 Starlette 默认的 40 线程
+        # 线程池里，而 SQLAlchemy 默认 5+10=15，并发一过 15 就是排队等 pool_timeout(30s)——
+        # 表现是「DB 不忙但请求在涨」，所以把上限定到与线程池同数。
+        self.db_pool_size = int(os.getenv("DB_POOL_SIZE", "10") or 10)
+        self.db_max_overflow = int(os.getenv("DB_MAX_OVERFLOW", "30") or 30)
+        # 主动早于 Postgres / 云代理的空闲断连时间回收连接，避免拿到已被对端关掉的死连接
+        self.db_pool_recycle = int(os.getenv("DB_POOL_RECYCLE", "1800") or 1800)
         # 启动时是否自动执行 Alembic 迁移（alembic upgrade head）。默认 false：
         # 结构变更由启动建表（create_all）兜底，缺列的老库需手动跑迁移；
         # 置 1 后每次启动自动迁移到最新版本（迁移均为判存幂等，可安全重复执行）。
@@ -52,6 +59,14 @@ class Settings:
         self.minio_region = os.getenv("MINIO_REGION", "").strip() or None
         # 客户端实际能访问到的 MinIO 地址（容器内 minio:9000 外网不可达时需配置）
         self.minio_public_url = os.getenv("MINIO_PUBLIC_URL", "").strip().rstrip("/")
+        # 腾讯云 COS（S3 兼容）后端：MEDIA_BACKEND=cos 时生效
+        self.cos_endpoint = os.getenv("COS_ENDPOINT", "https://cos.ap-beijing.myqcloud.com").strip()
+        self.cos_access_key = os.getenv("COS_ACCESS_KEY", "").strip()
+        self.cos_secret_key = os.getenv("COS_SECRET_KEY", "").strip()
+        self.cos_bucket = os.getenv("COS_BUCKET", "").strip()
+        self.cos_region = os.getenv("COS_REGION", "ap-beijing").strip() or "ap-beijing"
+        # 客户端实际可达的桶域名；留空则用预签名里的 virtual-hosted 桶域名
+        self.cos_public_url = os.getenv("COS_PUBLIC_URL", "").strip().rstrip("/")
         # 预签名 URL 有效期（秒）与其硬上限：客户端传多大都不能突破上限，
         # 否则 /files/{id}/url?expires= 会变成「自己签发一年有效的免鉴权直链」
         self.media_url_expires = int(os.getenv("MEDIA_URL_EXPIRES", "600") or 600)
@@ -97,9 +112,21 @@ class Settings:
         self.rl_join_window = int(os.getenv("RL_JOIN_WINDOW", "300") or 300)
         self.rl_upload = int(os.getenv("RL_UPLOAD", "60") or 60)
         self.rl_upload_window = int(os.getenv("RL_UPLOAD_WINDOW", "300") or 300)
+        # 直传的控制面（presign 签发 + register 登记）：每文件 2 次调用，与字节量无关。
+        # 早先和 /files 共用 rl:upload 键，等于把上传配额拦腰砍断（60 次只够 30 个文件）。
+        self.rl_presign = int(os.getenv("RL_PRESIGN", "240") or 240)
+        self.rl_presign_window = int(os.getenv("RL_PRESIGN_WINDOW", "300") or 300)
         # 天气：首页每次 onShow 拉一次，按 IP 限到较宽松配额（外部定位/天气接口本身有额度）
         self.rl_weather = int(os.getenv("RL_WEATHER", "30") or 30)
         self.rl_weather_window = int(os.getenv("RL_WEATHER_WINDOW", "300") or 300)
+        # 缩略图后台生成线程数：请求线程只落原图，变体交给这几个核慢慢做。
+        # 设太大会和大文件上传请求抢 CPU（Pillow 解码一张 12MP 约 36MB 峰值内存）。
+        self.media_workers = int(os.getenv("MEDIA_WORKERS", "2") or 2)
+        # 无损重压的像素闸（COMPRESS_MAX_PIXELS）：重压省 4%~10% 字节，代价按像素走
+        # （实测 12MP 0.28s、48MP 1.2s，都在请求线程里排队）。默认 2000 万像素：
+        # 常见手机照片（12~20MP）照压，只把 48MP 这类巨型图排除——多留约 10% 字节，
+        # 换掉一次保存九张时排在最后的那几秒。存储优先就调大，延迟优先就调小。
+        self.compress_max_pixels = int(os.getenv("COMPRESS_MAX_PIXELS", "20000000") or 20000000)
         # 密码最小长度（注册/改密共用）
         self.password_min_length = int(os.getenv("PASSWORD_MIN_LENGTH", "8") or 8)
         # ---- 应用层传输加密（见 core/crypto.py 的长注释）----

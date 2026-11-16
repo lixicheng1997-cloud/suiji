@@ -149,19 +149,34 @@ export function resolveUrl(u) {
   return url
 }
 
+/* 是否服务端媒体地址：相对路径（/api/v1/files|media/…）与同域绝对地址都认；
+   静态图标、本地临时路径（blob:/wxfile:/_doc/）、外链一律不动。 */
+function _isMediaUrl(u) {
+  return /\/api\/v1\/(files|media)\//.test(String(u).split('?')[0])
+}
+
+/* 在 resolveUrl 基础上追加 &variant=<kind>；变体不存在时服务端自动回退原图，不会 404。 */
+function _withVariant(u, kind) {
+  const url = resolveUrl(u)
+  if (!url || !_isMediaUrl(u)) return url
+  if (url.indexOf('variant=') >= 0) return url
+  return url + (url.indexOf('?') < 0 ? '?' : '&') + 'variant=' + kind
+}
+
 /**
- * 列表缩略图地址：在 resolveUrl 基础上追加 &variant=thumb。
- * 服务端对图片返回 400px 宽的预生成 JPEG（通常 50-150KB），
- * 而不是 3-10MB 的原图；变体不存在时服务端自动回退原图，不会 404。
+ * 列表缩略图地址：400px 宽预生成 JPEG（通常 50-150KB），替代 3-10MB 原图。
  * 详情页/点开放大仍用 resolveUrl 拿原图。
  */
 export function resolveThumb(u) {
-  const url = resolveUrl(u)
-  if (!url) return ''
-  // 只对 /files/{id}/download 和 /media/{id} 加 variant；其他地址（静态图标、本地临时路径）不动
-  if (!/^\/api\/v1\/(files|media)\//.test(String(u).split('?')[0])) return url
-  if (url.indexOf('variant=') >= 0) return url
-  return url + (url.indexOf('?') < 0 ? '?' : '&') + 'variant=thumb'
+  return _withVariant(u, 'thumb')
+}
+
+/**
+ * 中尺寸变体地址：800px 宽预生成 JPEG（q82，几百 KB），用于卡片/详情等需要清晰、
+ * 但不必拉原图的场景；变体缺失时服务端回退原图。
+ */
+export function resolveSmall(u) {
+  return _withVariant(u, 'small')
 }
 
 /* ---------- 传输加密：敏感接口端到端加密（详见 infra/crypto.js 头注释） ----------
@@ -537,6 +552,16 @@ function normOpts(opts) {
  * 刻意排除 html/htm/svg/xml/js：这些被下载端点内联渲染就是存储型 XSS。 */
 export const ALLOWED_UPLOAD_EXT = /\.(jpe?g|png|gif|webp|bmp|heic|heif|avif|tiff|mp4|mov|m4v|webm|3gp|mp3|m4a|aac|wav|ogg|flac|pdf|txt|csv|json|zip)$/i
 
+/* 裸 PUT 直传通道在本端是否真的能跑通：仅 H5 有可靠的 XMLHttpRequest PUT；
+ * 小程序/App 的 putDirectObject 必定 reject。PostObject 表单直传走 uni.uploadFile，
+ * 三端通用，不受此开关限制。是否直传最终以后端 sign.direct / sign.method 为准。 */
+// #ifdef H5
+export const DIRECT_PUT_OK = true
+// #endif
+// #ifndef H5
+export const DIRECT_PUT_OK = false
+// #endif
+
 /**
  * 非结构化文件上传：multipart POST /files（契约 §7.5），uni.uploadFile 走同一套鉴权与错误映射。
  * 字节统一入对象存储，业务行只保存返回的文件 URL；挂载点可上传后再经 PATCH /files/{id} 补挂。
@@ -571,6 +596,8 @@ export function uploadFile(filePath, opts) {
       }, o.formData || {}),
       timeout: 180000,
       header: token ? { Authorization: 'Bearer ' + token } : {},
+      /* 上传进度透传：progressEvent = { progress, totalBytesWritten, totalBytesExpectedToWrite } */
+      onProgressUpdate: p => { if (typeof o.onProgress === 'function') o.onProgress(p) },
       success: res => {
         let body = {}
         try { body = JSON.parse(res.data) } catch (e) { /* 非 JSON 走状态码判断 */ }
@@ -601,6 +628,100 @@ export function uploadFile(filePath, opts) {
         notify(e, o)
         reject(e)
       }
+    })
+  })
+}
+
+/**
+ * 请求直传预签名（POST /files/presign）。
+ * 返回 `{ direct, upload_url, storage_key, content_type, expires }`；direct=false 时回退 multipart。
+ * silent：直传是可选加速通道，失败不弹错误，交给回退流程。
+ */
+export function presignUpload(meta) {
+  return post('/files/presign', meta, { silent: true })
+}
+
+/** 直传完成后登记台账（POST /files/register），返回文件行（与 multipart /files 同形状） */
+export function registerUpload(payload) {
+  return post('/files/register', payload, { silent: true })
+}
+
+/**
+ * 裸 PUT 直传到预签名对象地址。
+ * 通道现状：仅 H5 有可靠的裸 PUT（小程序/App 无 PUT 封装）；三端通用的直传走
+ * postDirectObject（PostObject 表单）。任何失败都 reject，不在这里弹错误提示
+ * （回退流程会按原 multipart 路径处理）。
+ * @param {string} uploadUrl 预签名 PUT 地址
+ * @param {string} filePath 本地临时文件路径
+ * @param {{contentType?: string, onProgress?: Function}} [opts]
+ */
+export function putDirectObject(uploadUrl, filePath, opts) {
+  const o = opts || {}
+  // #ifdef MP-WEIXIN
+  return Promise.reject(new Error('direct put unsupported on weixin'))
+  // #endif
+  // #ifdef APP-PLUS
+  return Promise.reject(new Error('direct put unsupported on app'))
+  // #endif
+  // #ifdef H5
+  return new Promise((resolve, reject) => {
+    fetch(filePath)
+      .then(r => { if (!r.ok) throw new Error('read local blob failed'); return r.blob() })
+      /* fetch 读不出发货进度，批次进度条会 0→100 跳变；XHR 的 upload.onprogress
+         与 uni.uploadFile 同形状回报，回退/直传两条路的进度口径保持一致。 */
+      .then(blob => new Promise((res, rej) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open('PUT', uploadUrl, true)
+        if (o.contentType) xhr.setRequestHeader('Content-Type', o.contentType)
+        xhr.upload.onprogress = e => {
+          if (typeof o.onProgress !== 'function' || !e.lengthComputable) return
+          o.onProgress({
+            progress: Math.round((e.loaded / (e.total || e.loaded || 1)) * 100),
+            totalBytesWritten: e.loaded,
+            totalBytesExpectedToWrite: e.total
+          })
+        }
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) res()
+          else rej(new Error('direct put failed ' + xhr.status))
+        }
+        xhr.onerror = () => rej(new Error('direct put network error'))
+        xhr.ontimeout = () => rej(new Error('direct put timeout'))
+        xhr.timeout = 180000
+        xhr.send(blob)
+      }))
+      .catch(reject)
+  })
+  // #endif
+}
+
+/**
+ * PostObject 表单直传：uni.uploadFile POST 到 COS 桶域名（App / 小程序 / H5 三端兼容）。
+ * 表单字段（key、policy、q-sign 系列、q-signature）由后端按 COS SHA1 policy 签好下发；
+ * 桶域名凭签名自证，不带后端 Bearer。200/204 视为成功；任何失败 reject，交回退 multipart。
+ * @param {{url: string, fields: object, content_type?: string}} sign 后端 /files/presign 下发的 post 凭证
+ * @param {string} filePath 本地临时文件路径
+ * @param {{onProgress?: Function}} [opts]
+ */
+export function postDirectObject(sign, filePath, opts) {
+  const o = opts || {}
+  return new Promise((resolve, reject) => {
+    if (!sign || !sign.url || !sign.fields) {
+      reject(new Error('post sign invalid'))
+      return
+    }
+    uni.uploadFile({
+      url: sign.url,
+      filePath,
+      name: 'file',
+      formData: sign.fields,
+      timeout: 180000,
+      onProgressUpdate: p => { if (typeof o.onProgress === 'function') o.onProgress(p) },
+      success: res => {
+        if (res.statusCode === 200 || res.statusCode === 204) { resolve(); return }
+        reject(new Error('post direct failed ' + res.statusCode))
+      },
+      fail: () => reject(new Error('post direct network error'))
     })
   })
 }

@@ -110,6 +110,9 @@ services:
 
   api:
     build: .
+    # 内存上限：没有它，一次 9 张 12MP 的并发上传能把容器顶到 1.9GB 并压垮宿主 Docker VM。
+    # 默认 1g 留了 2 倍余量（后台缩略图 2 个 worker × Pillow 解码峰值 ≈36MB/张）。
+    mem_limit: ${API_MEM_LIMIT:-1g}
     ports:
       # 只绑 127.0.0.1：直连 8000 会绕过 nginx 的日志脱敏与限流，对外一律走 nginx
       - "${API_PORT:-8000}:8000"
@@ -126,10 +129,19 @@ services:
       RL_JOIN_WINDOW: ${RL_JOIN_WINDOW:-300}
       RL_UPLOAD: ${RL_UPLOAD:-60}
       RL_UPLOAD_WINDOW: ${RL_UPLOAD_WINDOW:-300}
+      RL_PRESIGN: ${RL_PRESIGN:-240}
+      RL_PRESIGN_WINDOW: ${RL_PRESIGN_WINDOW:-300}
+      MEDIA_WORKERS: ${MEDIA_WORKERS:-2}
+      # 无损重压的像素闸：默认 2000 万（48MP 以上不重排，省下请求线程里 1.2s 的 CPU）
+      COMPRESS_MAX_PIXELS: ${COMPRESS_MAX_PIXELS:-20000000}
       PASSWORD_MIN_LENGTH: ${PASSWORD_MIN_LENGTH:-8}
       MEDIA_URL_MAX_EXPIRES: ${MEDIA_URL_MAX_EXPIRES:-3600}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-suiji}:${POSTGRES_PASSWORD:?未设置 POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-suiji}
+      # Postgres 连接池：同步 endpoint 跑在 40 线程的线程池上，SQLAlchemy 默认 5+10 会先卡在「等连接」
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-30}
+      DB_POOL_RECYCLE: ${DB_POOL_RECYCLE:-1800}
       # 启动时自动执行 Alembic 迁移（alembic upgrade head，判存幂等）；默认 0 不迁移
       RUN_MIGRATIONS: ${RUN_MIGRATIONS:-0}
       REDIS_URL: redis://:${REDIS_PASSWORD:?未设置 REDIS_PASSWORD}@redis:6379/0
@@ -139,11 +151,19 @@ services:
       MEDIA_BACKEND: ${MEDIA_BACKEND:-minio}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-suiji}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?未设置 MINIO_SECRET_KEY}
+      # 仅 MEDIA_BACKEND=minio 时需要；切 cos 后留空即可，不再强制必填
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-}
       MINIO_BUCKET: ${MINIO_BUCKET:-suiji}
       MINIO_SECURE: ${MINIO_SECURE:-false}
       MINIO_REGION: ${MINIO_REGION:-}
       MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:9000}
+      # 腾讯云 COS（S3 兼容）：MEDIA_BACKEND=cos 时生效
+      COS_ENDPOINT: ${COS_ENDPOINT:-https://cos.ap-beijing.myqcloud.com}
+      COS_ACCESS_KEY: ${COS_ACCESS_KEY:-}
+      COS_SECRET_KEY: ${COS_SECRET_KEY:-}
+      COS_BUCKET: ${COS_BUCKET:-}
+      COS_REGION: ${COS_REGION:-ap-beijing}
+      COS_PUBLIC_URL: ${COS_PUBLIC_URL:-}
       MEDIA_URL_EXPIRES: ${MEDIA_URL_EXPIRES:-600}
       MEDIA_DOWNLOAD_MODE: ${MEDIA_DOWNLOAD_MODE:-auto}
       MEDIA_PATH_DATE_UTC: ${MEDIA_PATH_DATE_UTC:-0}

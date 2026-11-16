@@ -40,7 +40,7 @@
             v-for="(p, i) in photoList"
             :key="i"
             class="detail-photo"
-            :src="p"
+            :src="smallSrc(p)"
             mode="aspectFill"
             @click="openPhotoPreview(i)"
           />
@@ -64,20 +64,19 @@
           />
           <view class="dp-video-collapse" @click="playing = false"><text>收起</text></view>
         </view>
-        <!-- 封面态：当前段首帧 + 中央播放钮 + 明显切换按钮 -->
-        <view v-else class="dp-video-wrap" hover-class="hover-press" @click="openVideoPreview">
-          <video
+        <!-- 封面态：当前段首帧 + 中央播放钮 + 明显切换按钮；占位段显示上传中/失败遮罩 -->
+        <view v-else class="dp-video-wrap" hover-class="hover-press" @click="onCoverClick">
+          <sj-video-cover
             class="dp-video"
-            :src="videoList[currentIdx].url"
-            :poster="videoList[currentIdx].thumb"
-            :controls="false"
-            :autoplay="false"
-            :show-center-play-btn="false"
-            :show-play-btn="false"
-            :object-fit="'cover'"
+            :thumb="currentVideo.thumb"
           />
           <view class="dp-video-mask" />
-          <view class="dp-video-play">
+          <view v-if="!currentVideo.url" class="dp-pending">
+            <view v-if="currentVideo.status !== 'failed'" class="dp-spinner" />
+            <text class="dp-pending-txt">{{ pendingText(currentVideo) }}</text>
+            <text v-if="currentVideo.status === 'failed' && canEdit" class="dp-retry">点此重传</text>
+          </view>
+          <view v-else class="dp-video-play">
             <view class="dp-tri" />
           </view>
           <text v-if="videoList.length > 1" class="dp-video-num">{{ currentIdx + 1 }} / {{ videoList.length }}</text>
@@ -145,6 +144,7 @@ import { TYPES, BADGES } from '@/utils/mock.js'
 import * as api from '@/utils/api.js'
 import * as ui from '@/utils/ui.js'
 import { play } from '@/utils/sound.js'
+import { resolveSmall } from '@/api/http.js'
 
 export default {
   data() {
@@ -169,13 +169,16 @@ export default {
     /**
      * 照片列表归一：优先 entry.photos（多张），回退 entry.photo（单张）。
      * video 类型的 entry.photo 是视频封面地址（不是图片），不能塞进 <image>，跳过。
+     * 这里保持原图地址：内联条带渲染时经 smallSrc 取 800px 变体，点开放大仍用原图。
      */
     photoList() {
       const e = this.entry
       if (!e) return []
       if (e.type === 'video') return []
       if (Array.isArray(e.photos) && e.photos.length) return e.photos
-      return e.photo ? [e.photo] : []
+      /* 单图记录回退封面：photo_full（原图）优先，photo 是 400px 封面口径、只作兜底 */
+      const one = e.photo_full || e.photo
+      return one ? [one] : []
     },
 
     /** 当前用户能否改/删本条记录：创建者任意，成员仅本人记录 */
@@ -192,12 +195,19 @@ export default {
       if (!e) return []
       const list = (e.payload && Array.isArray(e.payload.videos)) ? e.payload.videos : []
       return list
-        .map(v => v && v.url ? {
-          url: v.url,
+        .map(v => v ? {
+          url: v.url || '',
           duration: Number(v.duration) || 0,
-          thumb: v.thumb || ''
+          thumb: v.thumb || '',
+          status: v.status || (v.url ? 'done' : 'pending'),
+          progress: Number(v.progress) || 0
         } : null)
         .filter(Boolean)
+    },
+
+    /** 当前段：后台上传中的占位项 url 为空，模板据此渲染「上传中/失败」遮罩 */
+    currentVideo() {
+      return this.videoList[this.currentIdx] || {}
     },
 
     /**
@@ -249,6 +259,14 @@ export default {
     }).catch(() => { /* 保留当前展示 */ })
   },
 
+  /* 预览打开时，物理返回键 / 系统返回手势先关预览，不退出页面 */
+  onBackPress() {
+    if (this.previewShow) {
+      this.previewShow = false
+      return true
+    }
+  },
+
   methods: {
     /* 记录人展示：与宝宝关系 + 昵称（与主页列表同口径，不展示登录账号）；按 creator_id 解析成员 */
     whoOf(e) {
@@ -263,10 +281,31 @@ export default {
       this.previewCurrent = i || 0
       this.previewShow = true
     },
+    /* 内联条带（686rpx 宽）用 800px 变体：原图 3-10MB/张，横滑几条记录就是几十 MB */
+    smallSrc(u) {
+      return resolveSmall(u)
+    },
     openVideoPreview() {
-      this.previewItems = this.videoList.map(v => ({ type: 'video', url: v.url, thumb: v.thumb }))
-      this.previewCurrent = this.currentIdx
+      /* 后台上传中的占位项没有云端地址，不进全屏预览，避免播到空 src */
+      const done = this.videoList.filter(v => v.url)
+      if (!done.length) return
+      this.previewItems = done.map(v => ({ type: 'video', url: v.url, thumb: v.thumb }))
+      this.previewCurrent = Math.min(this.currentIdx, done.length - 1)
       this.previewShow = true
+    },
+    /* 封面点击：已上传则预览；失败且本人可编辑则触发重传；其余占位态不响应 */
+    onCoverClick() {
+      const v = this.currentVideo
+      if (v.url) { this.openVideoPreview(); return }
+      if (v.status === 'failed' && this.canEdit) this.retryCurrent()
+    },
+    pendingText(v) {
+      if (v.status === 'failed') return '上传失败'
+      if (v.status === 'uploading') return '上传中 ' + (v.progress || 0) + '%'
+      return '等待上传'
+    },
+    retryCurrent() {
+      if (this.entryId) api.retryEntryMedia(this.entryId)
     },
     prevVideo() {
       if (!this.videoList.length || this.currentIdx === 0) return
@@ -489,6 +528,36 @@ export default {
   margin-left: 8rpx;
   filter: drop-shadow(0 4rpx 8rpx rgba(0, 0, 0, 0.4));
 }
+.dp-pending {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14rpx;
+}
+.dp-spinner {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  border: 5rpx solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  animation: dp-spin 0.8s linear infinite;
+}
+.dp-pending-txt { color: #fff; font-size: 26rpx; font-weight: 600; }
+.dp-retry {
+  margin-top: 4rpx;
+  padding: 8rpx 24rpx;
+  border-radius: 24rpx;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 24rpx;
+}
+@keyframes dp-spin { to { transform: rotate(360deg); } }
 .dp-video-collapse {
   position: absolute;
   right: 16rpx;

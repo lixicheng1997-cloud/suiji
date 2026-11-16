@@ -2,6 +2,7 @@ from .schemas import (
     BabyIn,
     DeactivateIn,
     EntryIn,
+    EntryMediaPatch,
     FamilyCreateIn,
     FilePatch,
     ImportIn,
@@ -12,7 +13,9 @@ from .schemas import (
     LogoutIn,
     MemberRoleIn,
     PasswordIn,
+    PresignIn,
     RefreshIn,
+    RegisterDirectIn,
     RegisterIn,
     SettingsIn,
     SyncRowsIn,
@@ -21,7 +24,7 @@ from .schemas import (
 )
 
 __all__ = [
-    "BabyIn", "DeactivateIn", "EntryIn", "FamilyCreateIn", "FilePatch", "ImportIn", "JoinIn", "JournalGenerateIn",
-    "JournalUpdateIn", "LoginIn", "LogoutIn", "MemberRoleIn", "PasswordIn", "RefreshIn", "RegisterIn",
-    "SettingsIn", "SyncRowsIn", "VaccinePatch", "MilestonePatch",
+    "BabyIn", "DeactivateIn", "EntryIn", "EntryMediaPatch", "FamilyCreateIn", "FilePatch", "ImportIn", "JoinIn", "JournalGenerateIn",
+    "JournalUpdateIn", "LoginIn", "LogoutIn", "MemberRoleIn", "PasswordIn", "PresignIn", "RefreshIn",
+    "RegisterDirectIn", "RegisterIn", "SettingsIn", "SyncRowsIn", "VaccinePatch", "MilestonePatch",
 ]

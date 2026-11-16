@@ -71,6 +71,11 @@ export default {
       this.tabTouchStart = p ? { x: p.x, y: p.y } : null
     },
     onTabTouchEnd(e) {
+      /* 已禁用「左右滑动手势切页」：页签切换只走底部 sj-tabbar 点击（uni.switchTab）。
+         下方原滑动判定 / 退场切页动画保留注释，需要恢复时取消注释即可。
+         注意：下拉刷新 pullRefresh 与本手势无关，不受影响。 */
+      return
+      // eslint-disable-next-line no-unreachable
       const start = this.tabTouchStart
       this.tabTouchStart = null
       if (!start || this._tabSwitching || !this.tabSwipeAllowed()) return

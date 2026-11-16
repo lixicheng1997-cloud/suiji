@@ -109,8 +109,9 @@ server {
 
         # 浏览器缓存 7 天（预签名 URL 10 分钟过期，但对象内容不变；
         # 预签名参数每次不同，缓存 key 含完整 query，不会串号）
-        expires                  7d;
-        add_header               Cache-Control "public";
+        # 只用 add_header 发一份 Cache-Control：expires 指令会自己再写一份，
+        # 两者同时存在时响应里会出现两个 Cache-Control 头。
+        add_header               Cache-Control "public, max-age=604800, immutable";
 
         # nginx 层缓存（需要在 http 块定义 proxy_cache_path，下面用内嵌映射）
         proxy_cache             minio_cache;
@@ -208,8 +209,8 @@ server {
         alias /usr/share/nginx/html/suiji-website/;
         index index.html;
         try_files $uri $uri/ /suiji-website/index.html;
-        expires 7d;
-        add_header Cache-Control "public";
+        # 与 /minio/ 同理：expires 会自带一份 Cache-Control，和下面的 add_header 叠成两个头
+        add_header Cache-Control "public, max-age=604800";
         add_header X-Content-Type-Options    "nosniff" always;
         add_header Referrer-Policy           "no-referrer" always;
         add_header Permissions-Policy        "geolocation=(), microphone=(), camera=()" always;

@@ -7,7 +7,9 @@ IP 不入库、不落业务表，仅在本次请求内用于查询天气。
   1. 定位：ip-api.com（IPv4 公网 IP → 城市名 / 经纬度，45 次/分钟匿名限额）；
   2. 天气：wttr.in（城市名或经纬度 → 当前天气中文描述 + 温度，format=j1）。
 
-结果按城市（经纬度四舍五入到 0.1°）在进程内存缓存 30 分钟，避免每次进首页都打外部接口；
+结果按城市（经纬度四舍五入到 0.1°）在进程内存缓存 30 分钟，IP→城市的定位结果同样缓存 30 分钟——
+两道缓存合起来才真正做到「进首页不必每次都打外部接口」：只缓存天气而每次重新定位，
+等于把 ip-api 那一跳留在关键路径上。
 外部接口不可用/超时/格式不符时返回 None，由端点回空对象，前端静默隐藏天气行。
 """
 import logging
@@ -22,6 +24,10 @@ logger = logging.getLogger(__name__)
 _HTTP_TIMEOUT = 6.0
 _CACHE_TTL = 1800.0  # 30 分钟
 _cache: dict[str, tuple[float, dict]] = {}
+# IP → 定位结果。_cache 按城市存，可它的 key 要先定位才拿得到，所以定位本身必须单独存：
+# 否则下面这道缓存永远命不中，每次进首页都要多付一次 ip-api 往返（实测 0.4~1.4s）。
+_loc_cache: dict[str, tuple[float, dict]] = {}
+_LOC_CACHE_MAX = 512    # key 是公网 IP，必须设上限，不然表会跟着访客数一直长
 
 # 外部接口返回的天气中文/英文描述词 → 首页展示用的短文案（兼容常见阴晴雨雪）
 _COND_MAP = {
@@ -164,15 +170,32 @@ def _fetch_weather(loc: dict) -> Optional[dict]:
     return None
 
 
+def _locate_cached(ip: str) -> Optional[dict]:
+    """IP → 定位结果，命中直接复用，未命中才打外部接口（失败回退出口 IP）。
+
+    只缓存成功结果：定位接口偶发失败不该被钉成半小时「无天气」。
+    """
+    now = time.time()
+    hit = _loc_cache.get(ip)
+    if hit and now - hit[0] < _CACHE_TTL:
+        return hit[1]
+    loc = _ip_locate(ip) or _egress_locate()
+    if not loc:
+        return None
+    _loc_cache[ip] = (now, loc)
+    if len(_loc_cache) > _LOC_CACHE_MAX:
+        for k in sorted(_loc_cache, key=lambda x: _loc_cache[x][0])[:_LOC_CACHE_MAX // 4]:
+            _loc_cache.pop(k, None)
+    return loc
+
+
 def get_weather(ip: str) -> dict:
     """对外主入口：按客户端 IP 取天气；任何一步失败返回空对象（前端隐藏天气）。
 
     客户端为内网地址（本地 Docker 开发、局域网调试）时，定位回退到服务端出口公网 IP，
     避免开发环境天气恒为空；生产环境客户端均为公网 IP，走正常按请求方定位。
     """
-    loc = _ip_locate(ip)
-    if not loc:
-        loc = _egress_locate()
+    loc = _locate_cached(ip)
     if not loc:
         return {}
     key = _cache_key(loc["lat"], loc["lon"])

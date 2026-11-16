@@ -46,17 +46,10 @@
       <view class="album-grid" v-if="albumList.length">
         <view class="album-cell" v-for="(m, i) in albumList" :key="m.id" hover-class="hover-press" :hover-stay-time="80" @click="goAlbum">
           <image v-if="m.type === 'image'" class="album-img" :src="m.thumb" mode="aspectFill" lazy-load />
-          <video
+          <sj-video-cover
             v-else
             class="album-video"
-            :src="m.url"
-            :poster="m.thumb"
-            :controls="false"
-            :autoplay="false"
-            :show-center-play-btn="false"
-            :show-play-btn="false"
-            :show-fullscreen-btn="false"
-            :object-fit="'cover'"
+            :thumb="m.thumb"
           />
           <template v-if="m.type === 'video'">
             <view class="album-vmask" />
@@ -169,7 +162,16 @@ export default {
       uni.navigateTo({ url: '/pages/audit/audit' })
     },
     goAlbum() {
-      uni.navigateTo({ url: '/pages/family-album/family-album' })
+      uni.navigateTo({
+        url: '/pages/family-album/family-album',
+        fail: err => {
+          /* 跳转失败（页面未打进包 / 路由异常 / 页面栈超限等）原本被静默，真机上表现为「点了没反应」。
+             errMsg 打到控制台便于在 HBuilderX/真机日志定位；同时给一条可读提示，方便现场反馈。 */
+          const msg = (err && err.errMsg) || '未知错误'
+          console.warn('[family] navigateTo family-album failed:', msg)
+          this.$refs.ntf.show({ type: 'err', message: '打开共享相册失败：' + msg })
+        }
+      })
     },
     onInvite() {
       api.inviteFamily()

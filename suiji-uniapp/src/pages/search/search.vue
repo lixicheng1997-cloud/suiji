@@ -56,17 +56,11 @@
             </view>
             <text class="rec-meta">{{ r.day }} {{ r.time }} · {{ TYPES[r.type].label }} · {{ whoOf(r) }}</text>
           </view>
-          <!-- 视频记录：<video> 停在首帧作封面（有封面图先作 poster）；照片用缩略图 -->
-          <video
-            v-if="r.type === 'video' && r.videos && r.videos[0]"
+          <!-- 视频记录：仅已上传完成段有云端封面；后台上传中的占位段无 url，不渲染空封面 -->
+          <sj-video-cover
+            v-if="r.type === 'video' && r.videos && r.videos[0] && r.videos[0].url"
             class="rec-photo"
-            :src="r.videos[0].url"
-            :poster="r.videos[0].thumb"
-            :controls="false"
-            :autoplay="false"
-            :show-center-play-btn="false"
-            :show-play-btn="false"
-            :object-fit="'cover'"
+            :thumb="r.videos[0].thumb"
           />
           <image v-else-if="r.photo" class="rec-photo" :src="r.photo" mode="aspectFill" lazy-load />
         </view>

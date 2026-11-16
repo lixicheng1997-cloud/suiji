@@ -2,7 +2,7 @@
   <view class="sj-pp">
     <!-- 已选照片：缩略图 + 右上角删除；点击整体预览大图 -->
     <view v-for="(p, i) in list" :key="i" class="ph-item" hover-class="hover-press" @click="onPreview(i)">
-      <image class="ph-img" :src="srcOf(p)" mode="aspectFill" />
+      <image class="ph-img" :src="thumbOf(p)" mode="aspectFill" />
       <view class="ph-del" @click.stop="onRemove(i)"><text class="ph-x">×</text></view>
     </view>
 
@@ -45,7 +45,7 @@
  * 4. 预览 / 删除。
  * 上传仍由调用方保存时统一走 http.uploadFile（POST /files），本组件只产出本地路径。
  */
-import { resolveUrl } from '@/api/http.js'
+import { resolveUrl, resolveThumb } from '@/api/http.js'
 import { play } from '@/utils/sound.js'
 
 export default {
@@ -75,6 +75,10 @@ export default {
     /* 云端 /api/ 相对路径 → 带 token 的绝对地址；本地路径原样透传 */
     srcOf(p) {
       return resolveUrl(p)
+    },
+    /* 144rpx 小格子只画缩略图变体：编辑旧记录回填 9 张时，原图口径就是四五十 MB */
+    thumbOf(p) {
+      return resolveThumb(p)
     },
     /* 添加：先弹出来源对话框（sj-modal），再按所选来源调起相机/相册 */
     onAdd() {
@@ -113,7 +117,7 @@ export default {
           success: res => {
             const paths = (res.tempFilePaths && res.tempFilePaths.length)
               ? res.tempFilePaths
-              : (res.tempFiles || []).map(f => f.path).filter(Boolean)
+              : (res.tempFiles || []).map(f => f.path || f.tempFilePath).filter(Boolean)
             resolve(paths)
           },
           fail: reject

@@ -292,12 +292,6 @@
       "style": {
         "navigationStyle": "custom"
       }
-    },
-    {
-      "path": "pages/uikit/uikit",
-      "style": {
-        "navigationStyle": "custom"
-      }
     }
   ],
   "globalStyle": {

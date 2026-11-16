@@ -324,6 +324,35 @@ def update_entry(db: Session, auth: AuthContext, entry_id: str, body: dict) -> d
     return entry_row(entry)
 
 
+def merge_entry_media(db: Session, auth: AuthContext, entry_id: str, body: dict) -> dict:
+    """后台媒体上传完成后回填：只合并 payload 的媒体键与可选封面，不动其他字段。
+
+    - videos/photos/voice 传入则整体替换对应键（全量清单，索引对位）；
+    - photo 传入则更新记录封面（首段已完成的图片/视频云端 url）；
+    - 不重算测量/里程碑副作用（媒体回填不改变录入值）；仅刷新水位线让家人端重拉。
+    """
+    from ..repositories import scoped_get
+
+    entry = scoped_get(db, Entry, entry_id, auth.family_id)
+    assert_entry_writable(auth, entry)
+
+    payload = dict(entry.payload or {})
+    if body.get("videos") is not None:
+        payload["videos"] = body["videos"]
+    if body.get("photos") is not None:
+        payload["photos"] = body["photos"]
+    if body.get("voice") is not None:
+        payload["voice"] = body["voice"]
+    entry.payload = payload
+    if body.get("photo"):
+        entry.photo = body["photo"]
+    entry.updated_at = utc_now_iso()
+    _bump_family_version(db, auth.family_id)
+    db.commit()
+    db.refresh(entry)
+    return entry_row(entry)
+
+
 def soft_delete(db: Session, auth: AuthContext, entry_id: str) -> dict:
     from ..repositories import scoped_get
 

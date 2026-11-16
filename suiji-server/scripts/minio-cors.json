@@ -1,0 +1,9 @@
+[
+  {
+    "AllowedOrigin": ["http://49.233.77.155:30080"],
+    "AllowedMethod": ["GET", "PUT"],
+    "AllowedHeader": ["Content-Type", "Content-Length", "User-Agent"],
+    "ExposeHeader": ["ETag"],
+    "MaxAgeSeconds": 3000
+  }
+]

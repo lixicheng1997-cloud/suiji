@@ -17,10 +17,10 @@ from sqlalchemy.orm import Session
 
 from ..core.config import settings
 from ..core.deps import AuthContext
-from ..media import safety
+from ..media import jobs, safety
 from ..media.compress import compress_image
-from ..media.store import get_store
-from ..media.thumbnails import generate_variants, transcode_heic_to_jpeg
+from ..media.store import CosMediaStore, get_store, object_key
+from ..media.thumbnails import transcode_heic_to_jpeg
 from ..models import Baby, Entry, EntryMedia, FileObject
 from ..repositories import scoped_get
 from ..services.ids import gen_id
@@ -247,88 +247,49 @@ def upload_file(db: Session, auth: AuthContext, upload: UploadFile, business_typ
         return file_row(dup)
 
     # HEIC → JPEG 转码（iPhone 照片在 Android/Web 解码兼容性差）
-    spool.seek(0)
-    compressed_bytes = spool.read()
-    transcoded = transcode_heic_to_jpeg(compressed_bytes, content_type)
-    if transcoded:
-        new_bytes, content_type = transcoded
-        ext = ".jpg"
-        size = len(new_bytes)
-        sha = hashlib.sha256(new_bytes).hexdigest()
-        compressed_bytes = new_bytes
-        # 替换 spool 为转码后的字节
-        spool.close()
-        spool = SpooledTemporaryFile(max_size=_SPOOL_MAX)
-        spool.write(new_bytes)
+    # 只有嗅探确认是 HEIC 才把整份读进内存：JPEG/PNG 的字节已经在 spool 里，白读一次是峰值内存
+    if content_type in ("image/heic", "image/heif"):
         spool.seek(0)
-        # 转码后可能命中已有行（同一 HEIC 之前转过）
-        dup = _existing(db, auth.family_id, sha, business_type, business_id)
-        if dup is not None:
+        transcoded = transcode_heic_to_jpeg(spool.read(), content_type)
+        if transcoded:
+            new_bytes, content_type = transcoded
+            ext = ".jpg"
+            size = len(new_bytes)
+            sha = hashlib.sha256(new_bytes).hexdigest()
             spool.close()
-            return file_row(dup)
+            spool = SpooledTemporaryFile(max_size=_SPOOL_MAX)
+            spool.write(new_bytes)
+            spool.seek(0)
+            # 转码后可能命中已有行（同一 HEIC 之前转过）
+            dup = _existing(db, auth.family_id, sha, business_type, business_id)
+            if dup is not None:
+                spool.close()
+                return file_row(dup)
 
-    # 生成缩略图变体（仅图片；非图片/Pillow 不可用返回空 dict）
-    # 在 save_stream 原图之前读字节，避免大图落盘后再读一次
-    if not compressed_bytes:
-        spool.seek(0)
-        compressed_bytes = spool.read()
-    variants = generate_variants(compressed_bytes, content_type)
-    spool.seek(0)
-
-    thumb_key = ""
-    small_key = ""
     try:
         reuse = existing_key(db, auth.family_id, sha)
         if reuse:  # 家庭内已存过这份字节：新台账行直接复用同一对象路径
             storage_key = reuse
-            # 复用原图对象时，缩略图 key 也从已有行的 meta 里取
-            existing_row = (
-                db.query(FileObject)
-                .filter(FileObject.family_id == auth.family_id,
-                        FileObject.sha256 == sha,
-                        FileObject.deleted_at.is_(None),
-                        FileObject.storage_key == reuse)
-                .order_by(FileObject.created_at.asc(), FileObject.id.asc())
-                .first()
-            )
-            if existing_row and isinstance(existing_row.meta, dict):
-                thumb_key = existing_row.meta.get("thumb_key", "") or ""
-                small_key = existing_row.meta.get("small_key", "") or ""
         else:
             storage_key = get_store().save_stream(
                 spool, size, sha, ext, content_type,
                 family_id=auth.family_id, filename=name,
                 baby_id=baby_id, user_id=auth.user_id)
-            # 把缩略图变体也存进对象存储（独立对象，下载时按 variant 参数取）
-            if variants:
-                from io import BytesIO
-                stem = name.rsplit(".", 1)[0] if "." in name else name
-                if "thumb" in variants:
-                    thumb_key = get_store().save_stream(
-                        BytesIO(variants["thumb"]), len(variants["thumb"]),
-                        sha, ".jpg", "image/jpeg",
-                        family_id=auth.family_id, filename=stem + ".thumb.jpg",
-                        baby_id=baby_id, user_id=auth.user_id)
-                if "small" in variants:
-                    small_key = get_store().save_stream(
-                        BytesIO(variants["small"]), len(variants["small"]),
-                        sha, ".jpg", "image/jpeg",
-                        family_id=auth.family_id, filename=stem + ".small.jpg",
-                        baby_id=baby_id, user_id=auth.user_id)
     finally:
         spool.close()
 
     meta: dict = {}
-    if thumb_key:
-        meta["thumb_key"] = thumb_key
-    if small_key:
-        meta["small_key"] = small_key
     # 视频：把客户端上报的时长（秒）写进 meta，详情/列表页直接显示，避免每次播放再 probe
     if is_video and dur > 0:
         meta["duration"] = round(dur, 2)
 
-    return _insert_row(db, auth, storage_key, name, content_type, ext, sha, size,
-                       business_type, business_id, baby_id, meta=meta)
+    out = _insert_row(db, auth, storage_key, name, content_type, ext, sha, size,
+                      business_type, business_id, baby_id, meta=meta)
+    if content_type.startswith("image/"):
+        # 两张缩略图（12MP 实测 708ms，占请求线程 CPU 的近六成）交给后台线程池。
+        # 下载端点在 meta 里没有变体 key 时自动回落原图，所以响应可以立刻返回。
+        jobs.submit(out["id"], auth.family_id)
+    return out
 
 
 def upload_many(db: Session, auth: AuthContext, uploads: list[UploadFile], business_type: str = "",
@@ -356,7 +317,8 @@ def register_uploaded(db: Session, auth: AuthContext, storage_key: str, sha256_h
     meta 用于附加元信息（如缩略图 key），与已有 meta 合并。
     """
     business_type = (business_type or "").strip().lower()
-    dup = _existing(db, auth.family_id, sha256_hex, business_type, business_id)
+    # sha 为空（直传骨架暂不算摘要）时不做内容去重复用：否则多个空 sha 行会互相误判为同一份内容
+    dup = _existing(db, auth.family_id, sha256_hex, business_type, business_id) if sha256_hex else None
     if dup is not None:
         if meta:  # 已有行：合并缩略图 key
             changed = False
@@ -384,6 +346,141 @@ def register_uploaded(db: Session, auth: AuthContext, storage_key: str, sha256_h
     db.add(row)
     db.flush()
     return row
+
+
+def issue_presign(db: Session, auth: AuthContext, payload: dict) -> dict:
+    """为直传签发短时 PUT 预签名 URL（骨架：直传失败/不支持时前端回退 multipart）。
+
+    返回 `{direct: True, upload_url, storage_key, content_type, expires}`；
+    当前后端不支持直传（local 磁盘）或预签名失败时返回 `{direct: False}`。
+
+    注意：这里只做大小/时长/挂载点校验，内容类型以登记回调回源嗅探为准，
+    客户端声明的 content_type 不参与安全判定。
+    """
+    business_type = (payload.get("business_type") or "").strip().lower()
+    business_id = (payload.get("business_id") or "").strip()
+    baby_id = (payload.get("baby_id") or "").strip()
+    _check_owner(db, auth, business_type, business_id, baby_id)
+
+    name = str(payload.get("original_name") or payload.get("filename") or "").strip()
+    size = int(payload.get("size") or 0)
+    try:
+        duration = float(payload.get("duration") or 0)
+    except (TypeError, ValueError):
+        duration = 0.0
+    ct = str(payload.get("content_type") or "").split(";")[0].strip().lower()
+
+    if size > settings.file_max_bytes:
+        raise HTTPException(status_code=422,
+                            detail=f"文件超过 {settings.file_max_bytes // (1024 * 1024)}MB 上限")
+    if ct.startswith("video/"):
+        if size > settings.video_max_bytes:
+            raise HTTPException(status_code=422,
+                                detail=f"视频超过 {settings.video_max_bytes // (1024 * 1024)}MB 上限")
+        if duration > settings.video_max_seconds:
+            raise HTTPException(status_code=422,
+                                detail=f"视频最长 {settings.video_max_seconds} 秒，请剪辑后再传")
+
+    # 直传阶段还没有 sha256：文件名追加随机短码保证 key 唯一，登记时直接复用该 key
+    suffix = safety.normalize_ext(name)
+    rand = gen_id("d")[:8]
+    stem = name.rsplit(".", 1)[0] if "." in name else name
+    stem = stem.strip() or "direct"
+    fname = f"{stem}_{rand}{suffix}" if suffix else f"{stem}_{rand}"
+
+    key = object_key(auth.family_id, fname, suffix, sha256_hex="",
+                     content_type=ct, baby_id=baby_id, user_id=auth.user_id)
+    store = get_store()
+    # COS 走 PostObject 表单直传（uni.uploadFile 三端兼容）；其他后端维持 PUT 预签名（H5）。
+    if isinstance(store, CosMediaStore):
+        post = store.presigned_post(key, ct, size=size, expires=settings.media_url_expires)
+        if not post:
+            return {"direct": False}
+        return {
+            "direct": True,
+            **post,
+            "storage_key": key,
+            "content_type": ct or "application/octet-stream",
+            "expires": settings.media_url_expires,
+        }
+    upload_url = store.presigned_put(key, ct, expires=settings.media_url_expires)
+    if not upload_url:
+        return {"direct": False}
+    return {
+        "direct": True,
+        "method": "put",
+        "upload_url": upload_url,
+        "storage_key": key,
+        "content_type": ct or "application/octet-stream",
+        "expires": settings.media_url_expires,
+    }
+
+
+def register_direct(db: Session, auth: AuthContext, payload: dict) -> dict:
+    """直传完成后登记台账：回源读头字节做 magic bytes 嗅探，复用 register_uploaded 写行。
+
+    storage_key 必须由预签名接口下发；路径首段必须是本家庭目录（纵深防御，挡住跨家庭登记）。
+    """
+    business_type = (payload.get("business_type") or "").strip().lower()
+    business_id = (payload.get("business_id") or "").strip()
+    baby_id = (payload.get("baby_id") or "").strip()
+    _check_owner(db, auth, business_type, business_id, baby_id)
+
+    key = str(payload.get("storage_key") or "").strip().replace("\\", "/")
+    if not key:
+        raise HTTPException(status_code=422, detail="缺少 storage_key")
+    first = key.split("/", 1)[0]
+    if first != auth.family_id:
+        raise HTTPException(status_code=403, detail="无权访问该文件")
+
+    store = get_store()
+    if not store.exists(key):
+        raise HTTPException(status_code=409, detail="直传对象不存在，请重新上传")
+
+    # 回源读头 32 字节嗅探：不信客户端声明的类型，与 multipart 上传同一套安全判定
+    head = b""
+    stream = store.open_stream(key, 0, 31)
+    if stream is not None:
+        head = b"".join(stream)[:32]
+    if not head:
+        raise HTTPException(status_code=409, detail="直传对象不可读，请重新上传")
+
+    name = str(payload.get("original_name") or "")
+    try:
+        duration = float(payload.get("duration") or 0)
+    except (TypeError, ValueError):
+        duration = 0.0
+
+    # 体积以对象存储的权威统计为准，不采信客户端上报值：
+    # presign 时还没字节，客户端报 0 就能绕过 200MB/100MB 上限，直传通道等于开后门。
+    size = store.size(key) or 0
+    if size <= 0:
+        raise HTTPException(status_code=409, detail="直传对象不可读，请重新上传")
+    if size > settings.file_max_bytes:
+        raise HTTPException(status_code=422,
+                            detail=f"文件超过 {settings.file_max_bytes // (1024 * 1024)}MB 上限")
+    kind_ct = safety.inline_policy(safety.sniff(head))[1]
+    if kind_ct.startswith("video/"):
+        if size > settings.video_max_bytes:
+            raise HTTPException(status_code=422,
+                                detail=f"视频超过 {settings.video_max_bytes // (1024 * 1024)}MB 上限")
+        if duration > settings.video_max_seconds:
+            raise HTTPException(status_code=422,
+                                detail=f"视频最长 {settings.video_max_seconds} 秒，请剪辑后再传")
+    meta: dict = {"direct": True}
+    if kind_ct.startswith("video/") and duration > 0:
+        meta["duration"] = round(duration, 2)
+
+    row = register_uploaded(
+        db, auth, storage_key=key, sha256_hex="", size=size,
+        original_name=name, content_type=kind_ct,
+        business_type=business_type, business_id=business_id, baby_id=baby_id,
+        head=head, meta=meta)
+    db.commit()
+    if kind_ct.startswith("image/"):
+        # 直传绕过了服务端的图片管线，缩略图同样靠后台补齐（缺失期间下载回落原图）
+        jobs.submit(row.id, auth.family_id)
+    return file_row(row)
 
 
 def list_files(db: Session, auth: AuthContext, business_type: str = "", business_id: str = "",

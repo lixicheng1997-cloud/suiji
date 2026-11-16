@@ -21,6 +21,7 @@ import { vaccineStatus, vaccineTip, daysToPlan, planDateFor, VACCINE_STATUS_TEXT
 import { PARENT_INFO, REMIND_DEFAULT, VACCINE_PROGRAM } from '@/utils/mock.js'
 import { error as uiError, toast as uiToast } from '@/utils/ui.js'
 import { SERVERS, MESSAGE_POLL_INTERVAL } from '@/config/app.js'
+import * as queue from '@/utils/uploadQueue.js'
 
 /* ---------- 内存缓存（= GET /bootstrap 响应镜像，契约 §3） ---------- */
 const cache = {
@@ -38,6 +39,39 @@ const cache = {
   trash: []                // 已软删 entry 行（含 deleted_at/deleted_by）
 }
 
+/**
+ * entry_id → 台账行（cache.media 的倒排索引）。
+ * 列表/相册每条记录都要取自己那几行照片，直接对 cache.media 做 filter 是每条一趟全表：
+ * 千条级家庭一次刷新就是上千万次比较（实测备份页 onShow 174ms、日记页 20 篇 1527ms）。
+ * 只在台账整表更换（bootstrap）或某条记录自身变更（saveEntry）时重建，读侧恒为 O(1)。
+ */
+const mediaIdx = new Map()
+const EMPTY_MEDIA = []
+
+function reindexMedia() {
+  mediaIdx.clear()
+  for (let i = 0; i < cache.media.length; i++) {
+    const m = cache.media[i]
+    if (!m || !m.entry_id) continue
+    const bucket = mediaIdx.get(m.entry_id)
+    if (bucket) bucket.push(m)
+    else mediaIdx.set(m.entry_id, [m])
+  }
+}
+
+/** 单条记录重建（saveEntry 摘旧行 + 挂新行之后调，代价一次全表扫，但只在保存那一下） */
+function reindexMediaOf(entryId) {
+  if (!entryId) return
+  const bucket = cache.media.filter(m => m.entry_id === entryId)
+  if (bucket.length) mediaIdx.set(entryId, bucket)
+  else mediaIdx.delete(entryId)
+}
+
+/** 台账行只读：调用方一律 .map 出 url，不许就地改这个数组 */
+function mediaRowsOf(entryId) {
+  return mediaIdx.get(entryId) || EMPTY_MEDIA
+}
+
 function resetCache() {
   cache.user = null
   cache.family = null
@@ -51,6 +85,7 @@ function resetCache() {
   cache.journals = []
   cache.settings = {}
   cache.trash = []
+  mediaIdx.clear()
 }
 
 function fillCache(s) {
@@ -66,6 +101,7 @@ function fillCache(s) {
   cache.journals = Array.isArray(s.journals) ? s.journals : []
   cache.settings = s.settings && typeof s.settings === 'object' ? s.settings : {}
   cache.trash = Array.isArray(s.trash) ? s.trash : []
+  reindexMedia()
 }
 
 /**
@@ -83,6 +119,7 @@ export function resetFamilyCache() {
   cache.vaccines = []
   cache.journals = []
   cache.trash = []
+  mediaIdx.clear()
 }
 
 /* 服务端列表端点兼容裸数组、{rows:[...]}、{items:[...]} 三种包装 */
@@ -459,10 +496,12 @@ function matchBabyEntry(e, babyId) {
 /**
  * 头像/文件展示源：/api/ 相对路径（文件行 url）→ 带 token 的绝对 URL；
  * 本地临时路径（blob:/wxfile:/_doc: 等）与 dataURL 原样透传，供选图后即时预览。
+ * 一律走 400px 缩略图变体：调用方全是几十 px 的头像位，拿原图等于为了一个圆头像拉几 MB；
+ * 变体还没生成时服务端回退原图，不会空图。
  */
 export function fileSrc(u) {
   if (!u) return ''
-  return /^\/api\//.test(String(u)) ? http.resolveUrl(u) : u
+  return /^\/api\//.test(String(u)) ? http.resolveThumb(u) : u
 }
 /** 建档：服务端同时初始化里程碑与疫苗排期（契约 §5），返回 Promise<row> */
 export function createBaby(data) {
@@ -521,20 +560,29 @@ const toViewItem = e => ({
   /* 记录人账号 ID：展示口径的可靠依据（creator 只是历史名字串） */
   creator_id: e.creator_id || '',
   badge: e.badge || (e.is_backfilled ? 'backfill' : ''), note: e.note || '',
-  /* 列表用缩略图（400px 宽 JPEG，~100KB）；点进详情后再用原图 */
+  /* 列表用缩略图（400px 宽 JPEG，~100KB）；详情页条带用 800px 变体，点开放大才用原图 */
   photo: http.resolveThumb(e.photo || ''),
   /* 原始 photo URL 保留，详情页/大图预览用原图 */
   photo_full: http.resolveUrl(e.photo || ''),
-  /* 同条记录全部照片（台账优先，回退 payload.photos），供时光轴/列表多张照片预览 */
+  /* 同条记录全部照片（台账优先，回退 payload.photos）：这里是原图口径，只给全屏预览；
+     列表/条带等展示位自己在渲染时取 resolveThumb/resolveSmall 变体，别直接 src 原图 */
   photos: albumPhotosOf(e).map(u => http.resolveUrl(u)).filter(Boolean),
-  /* 视频数组（type=video）：每项 { url, duration, size, thumb }，url 已带 token */
+  /* 视频数组（type=video）：每项 { url, duration, size, thumb, status, progress }。
+     后台上传中的占位项 url 为空、带 status/progress，读侧渲染「上传中/失败」占位，不再被过滤掉 */
   videos: (Array.isArray(e.payload && e.payload.videos) ? e.payload.videos : [])
-    .map(v => v && v.url ? {
-      url: http.resolveUrl(v.url),
-      duration: Number(v.duration) || 0,
-      size: Number(v.size) || 0,
-      thumb: v.thumb ? http.resolveUrl(v.thumb) : ''
-    } : null)
+    .map(v => {
+      if (!v) return null
+      const done = !!v.url
+      return {
+        url: done ? http.resolveUrl(v.url) : '',
+        duration: Number(v.duration) || 0,
+        size: Number(v.size) || 0,
+        /* 封面本身是一张原分辨率 JPEG，列表/详情页只画满宽卡片：取 800px 变体，缺失时服务端回退原图 */
+        thumb: v.thumb ? http.resolveSmall(v.thumb) : '',
+        status: v.status || (done ? 'done' : 'pending'),
+        progress: Number(v.progress) || 0
+      }
+    })
     .filter(Boolean),
   /* 时光轴紧凑播放条只读这几个字段，不整包透出 payload（段地址保持原样，由播放端补 token） */
   voice: e.type === 'voice' ? voiceView(e.payload) : null,
@@ -643,73 +691,286 @@ function measureBadge(baby, payload) {
   return percentileBadge(percentileOf(metric, baby.gender, ageM, Number(v)))
 }
 
-/**
- * 逐张上传照片（契约 §7.5：先 POST /files 拿 url 回填，再 POST /entries；
- * 新建记录时 entry 尚未落库，先不挂 business_id，保存成功后再 PATCH 补挂）
- * @returns {Promise<{urls: string[], files: string[]}>} urls=展示用相对路径；files=本次新上传的文件 id
- */
-function uploadPhotos(paths, babyId) {
-  if (!paths || !paths.length) return Promise.resolve({ urls: [], files: [] })
-  return paths.reduce(
-    (p, path) => p.then(acc => {
-      /* 已是云端 URL（编辑回填等场景）直接保留，不重复上传 */
-      if (/^(https?:|\/api\/|data:)/i.test(path)) { acc.urls.push(path); return acc }
-      return http.uploadFile(path, { businessType: 'entry', babyId: babyId || '' })
-        .then(f => { acc.urls.push(f.url || ''); if (f.id) acc.files.push(f.id); return acc })
-    }),
-    Promise.resolve({ urls: [], files: [] })
-  )
+/* 批次上传进度聚合：total 为本批需上传的本地文件数；report(i, p) 回报第 i 个文件 0~1，
+   finish(i) 标记完成；整体按文件均分加权回调 onProgress(0~100)。无回调时为空操作。 */
+function batchProgress(total, onProgress) {
+  if (!total || typeof onProgress !== 'function') {
+    return { report() {}, finish() {} }
+  }
+  const cur = new Array(total).fill(0)
+  const emit = () => {
+    const sum = cur.reduce((a, b) => a + b, 0)
+    onProgress(Math.round((sum / total) * 100))
+  }
+  return {
+    report(i, p) { cur[i] = Math.min(1, Math.max(0, Number(p) || 0)); emit() },
+    finish(i) { cur[i] = 1; emit() }
+  }
+}
+
+const CLOUD_RE = /^(https?:|\/api\/|data:)/i
+
+/* 单批上传的并发上限。
+   实测本地同构栈的 12MP 照片：1 路服务端 1.12s、3 路 1.39s、9 路 2.59s——
+   全并发把每张的响应拖长两倍多，聚合吞吐却几乎没涨（服务端 CPU 只有那么多核），
+   限流又按客户端 IP 计数，越并发越早撞 429。3 路是拐点。 */
+const UPLOAD_CONCURRENCY = 3
+
+/* 有上限的并行 map：返回值与入参 list 同序，某项失败即整体 reject（与 Promise.all 一致） */
+function mapLimit(list, limit, fn) {
+  const out = new Array(list.length)
+  let cursor = 0
+  const width = Math.max(1, Math.min(limit, list.length))
+  const worker = async () => {
+    while (cursor < list.length) {
+      const idx = cursor++
+      out[idx] = await fn(list[idx], idx)
+    }
+  }
+  const workers = []
+  for (let i = 0; i < width; i++) workers.push(worker())
+  return Promise.all(workers).then(() => out)
+}
+
+/* 只重投「重试有可能改变结果」的失败：网络中断/超时（status 0）与 5xx。
+   422/403 是确定性拒绝，429 是配额窗口，秒级重投只是让用户多等一轮。 */
+function withRetry(fn, times) {
+  const max = Number(times) > 0 ? Number(times) : 2
+  let attempt = 0
+  const run = () => fn().catch(err => {
+    const transient = !err || err.netFail || !err.status || err.status >= 500
+    if (transient && attempt < max) {
+      attempt += 1
+      /* 指数一点的回退：第 1 次等 0.8s，第 2 次 1.6s（弱网下立即重投多半还是失败） */
+      return new Promise(r => setTimeout(r, 800 * attempt)).then(run)
+    }
+    throw err
+  })
+  return run()
+}
+
+/* 取本地路径末段文件名（剔除查询串），用于预签名 / 登记的 original_name */
+function localName(path) {
+  return String(path || '').split('?')[0].split('/').pop() || ''
+}
+
+/* ---------- 重投免传表 ----------
+ * 服务端按 (家庭, sha, 挂载点) 去重：同一份字节重传必定返回同一行台账。
+ * 所以本地路径 → 已落库的 {url, id} 记一份，弱网保存失败后用户再按一次「保存」，
+ * 已传上去的那些张就不用重传字节（9 张里成了 3 张，重投就只补剩下的 6 张）。
+ * 命中返回的就是服务端本会返回的同一行（同 id、同 url、同样要 PATCH 补挂 business_id），
+ * 台账语义与不命中完全一致，只是省掉重传。键带用户 ID，换账号/换家庭不会串到别人的文件行。 */
+const UPLOAD_MEMO_TTL = 10 * 60 * 1000
+const UPLOAD_MEMO_MAX = 64
+const uploadMemo = new Map()
+
+function memoGet(localPath) {
+  const k = (myUserId() || '?') + '|' + String(localPath || '')
+  const v = uploadMemo.get(k)
+  if (!v) return null
+  if (Date.now() - v.at > UPLOAD_MEMO_TTL) { uploadMemo.delete(k); return null }
+  return v
+}
+
+function memoSet(localPath, url, id) {
+  if (!localPath || !url) return
+  const k = (myUserId() || '?') + '|' + String(localPath || '')
+  uploadMemo.delete(k)   // 先删再插，让插入序等价于使用序（淘汰时拿最久没用的）
+  uploadMemo.set(k, { at: Date.now(), url: url, id: id || '' })
+  while (uploadMemo.size > UPLOAD_MEMO_MAX) uploadMemo.delete(uploadMemo.keys().next().value)
+}
+
+/* 直传优先：取签名凭证 → 按 method 直传（post=表单 uni.uploadFile 三端通用；put=裸 PUT 仅 H5）
+   → 登记台账；任一步不支持或失败则 reject，由回退流程走 multipart。
+   meta: { businessType, businessId, babyId, filename, size, duration, contentType } */
+function uploadDirect(path, meta, onProgress) {
+  return http.presignUpload({
+    filename: meta.filename || '',
+    content_type: meta.contentType || '',
+    size: meta.size || 0,
+    duration: meta.duration || 0,
+    business_type: meta.businessType || '',
+    business_id: meta.businessId || '',
+    baby_id: meta.babyId || ''
+  }).then(sign => {
+    if (!sign || sign.direct !== true) throw new Error('direct unavailable')
+    const deliver = sign.method === 'post'
+      ? http.postDirectObject(sign, path, { onProgress: onProgress })
+      : http.putDirectObject(sign.upload_url, path, {
+        contentType: sign.content_type,
+        onProgress: onProgress
+      })
+    return deliver.then(() => http.registerUpload({
+      storage_key: sign.storage_key,
+      original_name: meta.filename || '',
+      content_type: sign.content_type || '',
+      size: meta.size || 0,
+      duration: meta.duration || 0,
+      business_type: meta.businessType || '',
+      business_id: meta.businessId || '',
+      baby_id: meta.babyId || ''
+    }))
+  })
+}
+
+/* 单文件：直传优先，失败回退 multipart /files。
+   重投只针对 multipart：服务端按 (家庭, sha, 挂载点) 去重，同一份字节重传只会返回同一行；
+   若重投整条直传链，presign 会另发一个 key、重新 PUT，登记失败过一次就可能留下孤儿对象。 */
+function uploadWithFallback(path, meta, onProgress, multipart) {
+  return uploadDirect(path, meta, onProgress).catch(() => withRetry(multipart, 2))
 }
 
 /**
- * 逐段上传视频（同照片走 POST /files，但 formData 额外带 duration 供服务端校验）。
- * 每项形状见 sj-video-picker：{ path, duration, size, thumb }
+ * 并行上传照片（契约 §7.5：先 POST /files 拿 url 回填，再 POST /entries；
+ * 新建记录时 entry 尚未落库，先不挂 business_id，保存成功后再 PATCH 补挂）。
+ * @param {Function} [onProgress] 批次进度回调 0~100
+ * @returns {Promise<{urls: string[], files: string[]}>} urls=展示用相对路径；files=本次新上传的文件 id
+ */
+function uploadPhotos(paths, babyId, onProgress) {
+  const list = Array.isArray(paths) ? paths : []
+  if (!list.length) return Promise.resolve({ urls: [], files: [] })
+  const locals = list.filter(p => !CLOUD_RE.test(String(p || '')))
+  const prog = batchProgress(locals.length, onProgress)
+  let li = -1
+  return mapLimit(list, UPLOAD_CONCURRENCY, path => {
+    /* 已是云端 URL（编辑回填等场景）直接保留，不重复上传 */
+    if (CLOUD_RE.test(String(path || ''))) return { url: path, id: '' }
+    li += 1
+    const idx = li
+    const hit = memoGet(path)
+    if (hit) { prog.finish(idx); return { url: hit.url, id: hit.id } }
+    const meta = { businessType: 'entry', babyId: babyId || '', filename: localName(path) }
+    const multipart = () => http.uploadFile(path, {
+      businessType: 'entry',
+      babyId: babyId || '',
+      onProgress: p => prog.report(idx, (p && p.progress) / 100)
+    })
+    return uploadWithFallback(path, meta, p => prog.report(idx, (p && p.progress) / 100), multipart)
+      .then(f => {
+        prog.finish(idx)
+        memoSet(path, f.url, f.id)
+        return { url: f.url || '', id: f.id || '' }
+      })
+  }).then(arr => ({
+    urls: arr.map(x => x.url),
+    files: arr.filter(x => x && x.id).map(x => x.id)
+  }))
+}
+
+/**
+ * 并行上传视频（同照片走 POST /files，但 formData 额外带 duration 供服务端校验）。
+ * 每项形状见 sj-video-picker：{ path, duration, size, thumb, status, key }
  * @returns {Promise<{items: [{url, duration, size, file_id}], files: string[]}>}
  */
-function uploadVideos(items, babyId) {
-  if (!items || !items.length) return Promise.resolve({ items: [], files: [] })
-  return items.reduce(
-    (p, it) => p.then(acc => {
-      const path = (it && it.path) || ''
-      if (!path) return acc
-      /* 已是云端 URL（编辑回填）直接保留，不重复上传 */
-      if (/^(https?:|\/api\/)/i.test(path)) {
-        acc.items.push({
-          url: path,
-          duration: Number(it.duration) || 0,
-          size: Number(it.size) || 0,
-          thumb: it.thumb || '',
-          file_id: ''
-        })
-        return acc
+function uploadVideos(items, babyId, onProgress) {
+  const list = (items || []).filter(Boolean)
+  if (!list.length) return Promise.resolve({ items: [], files: [] })
+  const locals = list.filter(it => !CLOUD_RE.test(String((it && it.path) || '')))
+  const prog = batchProgress(locals.length, onProgress)
+  const files = []
+  let li = -1
+  return mapLimit(list, UPLOAD_CONCURRENCY, it => {
+    const path = (it && it.path) || ''
+    if (!path) return null
+    /* 已是云端 URL（编辑回填）直接保留，不重复上传 */
+    if (CLOUD_RE.test(path)) {
+      return {
+        url: path,
+        duration: Number(it.duration) || 0,
+        size: Number(it.size) || 0,
+        thumb: it.thumb || '',
+        file_id: ''
       }
-      return http.uploadFile(path, {
-        businessType: 'entry',
-        babyId: babyId || '',
-        formData: { duration: Number(it.duration) || 0 }
-      }).then(f => {
-        const item = {
-          url: f.url || '',
-          duration: Number(it.duration) || 0,
-          size: Number(f.size || it.size) || 0,
-          thumb: '',
-          file_id: f.id || ''
-        }
-        if (f.id) acc.files.push(f.id)
-        /* 本地首帧缩略图：当图片再传一次，拿到 /files/{id}/download 作为封面；
-         * 失败不阻断主流程（封面缺失时详情页用纯色占位） */
-        const thumbPath = it.thumb || ''
-        if (thumbPath && !/^(https?:|\/api\/)/i.test(thumbPath)) {
-          return http.uploadFile(thumbPath, { businessType: 'entry', babyId: babyId || '' })
-            .then(tf => { item.thumb = tf.url || ''; if (tf.id) acc.files.push(tf.id); acc.items.push(item); return acc })
-            .catch(() => { acc.items.push(item); return acc })
-        }
-        acc.items.push(item)
-        return acc
-      })
-    }),
-    Promise.resolve({ items: [], files: [] })
-  )
+    }
+    li += 1
+    const idx = li
+    /* 主文件到位（新传或免传命中）后组一项；封面体积小，不并入主进度 */
+    const build = f => {
+      prog.finish(idx)
+      if (f.id) files.push(f.id)
+      const item = {
+        url: f.url || '',
+        duration: Number(it.duration) || 0,
+        size: Number(f.size || it.size) || 0,
+        thumb: '',
+        file_id: f.id || ''
+      }
+      /* 本地首帧缩略图：当图片再传一次，拿到 /files/{id}/download 作为封面；
+         失败不阻断主流程（封面缺失时详情页用纯色占位） */
+      const thumbPath = it.thumb || ''
+      if (!thumbPath || CLOUD_RE.test(thumbPath)) return item
+      const th = memoGet(thumbPath)
+      if (th) { if (th.id) files.push(th.id); item.thumb = th.url || ''; return item }
+      return http.uploadFile(thumbPath, { businessType: 'entry', babyId: babyId || '' })
+        .then(tf => {
+          memoSet(thumbPath, tf.url, tf.id)
+          if (tf.id) files.push(tf.id)
+          item.thumb = tf.url || ''
+          return item
+        })
+        .catch(() => item)
+    }
+    const hit = memoGet(path)
+    if (hit) return build(hit)
+    const meta = {
+      businessType: 'entry', babyId: babyId || '', filename: localName(path),
+      size: Number(it.size) || 0, duration: Number(it.duration) || 0
+    }
+    const multipart = () => http.uploadFile(path, {
+      businessType: 'entry',
+      babyId: babyId || '',
+      formData: { duration: Number(it.duration) || 0 },
+      onProgress: p => prog.report(idx, (p && p.progress) / 100)
+    })
+    return uploadWithFallback(path, meta, p => prog.report(idx, (p && p.progress) / 100), multipart)
+      .then(f => { memoSet(path, f.url, f.id); return build(f) })
+  }).then(arr => ({ items: arr.filter(Boolean), files }))
+}
+
+/* 队列单段视频上传：主文件直传优先 / multipart 回退，本地首帧封面小图再传一次。
+   供 uploadQueue 调用，返回 remote { url, duration, size, thumb, fileId }；
+   文件台账在拿到 fileId 后补挂到本条记录（尽力而为，失败不阻断展示）。 */
+function uploadVideoOne(task, onProgress) {
+  const babyId = (task.ctx && task.ctx.babyId) || ''
+  const meta0 = task.meta || {}
+  const it = meta0.item || {}
+  const path = task.localPath
+  if (!path) return Promise.reject(new Error('empty local path'))
+
+  const finishMain = f => {
+    const item = {
+      url: f.url || '',
+      duration: Number(it.duration || meta0.duration) || 0,
+      size: Number(f.size || it.size || meta0.size) || 0,
+      thumb: '',
+      fileId: f.id || ''
+    }
+    if (item.fileId) {
+      http.patch('/files/' + item.fileId, { business_type: 'entry', business_id: task.entryId })
+        .catch(() => {})
+    }
+    const thumbPath = task.thumbPath || ''
+    if (!thumbPath || CLOUD_RE.test(thumbPath)) return Promise.resolve(item)
+    const th = memoGet(thumbPath)
+    if (th) { item.thumb = th.url || ''; return Promise.resolve(item) }
+    return http.uploadFile(thumbPath, { businessType: 'entry', babyId })
+      .then(tf => { memoSet(thumbPath, tf.url, tf.id); item.thumb = tf.url || ''; return item })
+      .catch(() => item)
+  }
+
+  const hit = memoGet(path)
+  if (hit) return finishMain(hit)
+  const meta = {
+    businessType: 'entry', babyId, filename: localName(path),
+    size: Number(it.size || meta0.size) || 0, duration: Number(it.duration || meta0.duration) || 0
+  }
+  const multipart = () => http.uploadFile(path, {
+    businessType: 'entry', babyId,
+    formData: { duration: Number(meta.duration) || 0 },
+    onProgress: p => onProgress(p && p.progress)
+  })
+  return uploadWithFallback(path, meta, p => onProgress(p && p.progress), multipart)
+    .then(f => { memoSet(path, f.url, f.id); return finishMain(f) })
 }
 
 /**
@@ -719,20 +980,36 @@ function uploadVideos(items, babyId) {
  * 上传后只留云端 url，本地 blob/临时路径不再写进 payload（回填时它是失效引用）。
  * @returns {Promise<{payload: {segments, url, path}, files: string[]}>}
  */
-function uploadVoice(payload, babyId) {
+function uploadVoice(payload, babyId, onProgress) {
   const src = (Array.isArray(payload.segments) && payload.segments.length)
     ? payload.segments
     : (payload.url || payload.path ? [{ start: 0, dur: payload.duration || 0, url: payload.url, path: payload.path }] : [])
   if (!src.length) return Promise.resolve({ payload: { segments: [], url: '', path: '' }, files: [] })
   const out = []
   const files = []
+  const locals = src.filter(s => !CLOUD_RE.test(String((s && (s.url || s.path)) || '')))
+  const prog = batchProgress(locals.length, onProgress)
+  let li = -1
   return src.reduce(
     (p, s) => p.then(() => {
       const local = String((s && (s.url || s.path)) || '')
       if (!local) return undefined
-      if (/^(https?:|\/api\/)/i.test(local)) { out.push(Object.assign({}, s, { url: local, path: '' })); return undefined }
-      return http.uploadFile(local, { businessType: 'entry', babyId: babyId || '' })
-        .then(f => { out.push(Object.assign({}, s, { url: f.url || '', path: '' })); if (f.id) files.push(f.id) })
+      if (CLOUD_RE.test(local)) { out.push(Object.assign({}, s, { url: local, path: '' })); return undefined }
+      li += 1
+      const idx = li
+      const done = f => {
+        prog.finish(idx)
+        memoSet(local, f.url, f.id)
+        out.push(Object.assign({}, s, { url: f.url || '', path: '' }))
+        if (f.id) files.push(f.id)
+      }
+      const hit = memoGet(local)
+      if (hit) return done(hit)
+      return withRetry(() => http.uploadFile(local, {
+        businessType: 'entry',
+        babyId: babyId || '',
+        onProgress: pg => prog.report(idx, (pg && pg.progress) / 100)
+      }).then(done), 2)
     }),
     Promise.resolve()
   ).then(() => ({
@@ -746,10 +1023,59 @@ function uploadVoice(payload, babyId) {
   }))
 }
 
+/* 队列视频回填：按 index 合并任务结果进缓存 payload.videos，并 PATCH /entries/{id}/media。
+   items 为 uploadQueue serialize 清单：{ index, status, progress, remote, meta }。
+   云端已有项不被任务覆盖（任务 index 只对应本地占位项）；回填失败不阻断本地展示，下次 bootstrap 对齐。 */
+function settleVideo(entryId, _kind, items) {
+  const i = cache.entries.findIndex(e => e.id === entryId)
+  if (i < 0) return
+  if (!Array.isArray(items)) return
+  const row = cache.entries[i]
+  const payload = Object.assign({}, row.payload || {})
+  const videos = Array.isArray(payload.videos) ? payload.videos.slice() : []
+  ;items.forEach(t => {
+    const idx = Number(t.index)
+    if (isNaN(idx) || idx < 0) return
+    const meta = t.meta || {}
+    if (t.status === 'done' && t.remote) {
+      videos[idx] = {
+        url: t.remote.url || '',
+        duration: Number(t.remote.duration || meta.duration) || 0,
+        size: Number(t.remote.size || meta.size) || 0,
+        thumb: t.remote.thumb || '',
+        status: 'done'
+      }
+    } else {
+      videos[idx] = {
+        url: '',
+        duration: Number(meta.duration) || 0,
+        size: Number(meta.size) || 0,
+        thumb: '',
+        status: t.status,
+        progress: Number(t.progress) || 0
+      }
+    }
+  })
+  payload.videos = videos
+  const nextRow = Object.assign({}, row, { payload })
+  const firstDone = videos.find(v => v && v.status === 'done' && v.url)
+  if (firstDone) nextRow.photo = firstDone.url
+  cache.entries[i] = nextRow
+  /* 进度中途只更新本地缓存；全部任务到终态（done/failed）后才同步后端，避免进度刷 PATCH */
+  const allSettled = items.every(t => t.status === 'done' || t.status === 'failed')
+  if (allSettled) {
+    http.patch('/entries/' + entryId + '/media', { videos }, { silent: true }).catch(() => {})
+  }
+}
+
+queue.bindQueue({ uploadOne: uploadVideoOne, onSettle: settleVideo })
+
 /**
  * 保存一条记录（新建 POST /entries 带 Idempotency-Key=客户端 entry UUID；编辑 PUT）
  * @param {{ type, id?, occurred_at?, payload?, note?, photos?, backfill? }} entry
- */export function saveEntry(entry) {
+ * @param {{ onProgress?: Function }} [opts] onProgress(0~100) 上传批次进度回调
+ */export function saveEntry(entry, opts) {
+  const onProgress = (opts && typeof opts.onProgress === 'function') ? opts.onProgress : null
   const baby = getBaby()
   const old = entry.id ? cache.entries.find(e => e.id === entry.id) : null
   const occurred = entry.occurred_at || (old ? old.occurred_at : now())
@@ -776,34 +1102,47 @@ function uploadVoice(payload, babyId) {
   }
   if (!row.created_at) row.created_at = now()
 
-  /* 本条记录新上传的文件 id（照片 + 视频 + 语音段），落库后统一 PATCH 补挂 */
+  /* 本条记录新上传的文件 id（照片 + 语音段），落库后统一 PATCH 补挂；
+     视频改由队列后台上传，fileId 在回填时补挂，不在这里收集 */
   let urls = []
   let newFiles = []
-  let videoItems = []
-  return uploadPhotos(entry.photos || [], row.baby_id).then(res => {
+  let videoQueueItems = []
+  return uploadPhotos(entry.photos || [], row.baby_id, onProgress).then(res => {
     urls = res.urls
     newFiles = res.files
     if (urls.length) {
       row.photo = urls[0]
       row.payload = Object.assign({}, payload, { photos: urls })
     }
-    /* 视频：逐段传 /files 换云端地址，formData 带 duration 让服务端硬限 30s */
-    if (!entry.videos || !entry.videos.length) return null
-    return uploadVideos(entry.videos, row.baby_id).then(v => {
-      videoItems = v.items
-      newFiles = newFiles.concat(v.files)
-      row.payload = Object.assign({}, row.payload, { videos: v.items.map(x => ({
-        url: x.url, duration: x.duration, size: x.size, thumb: x.thumb || ''
-      })) })
-      /* 视频记录：封面取第一段视频（时光轴/列表用），后端 <video> 直接播 */
-      if (!row.photo && v.items.length && v.items[0].url) {
-        row.photo = v.items[0].url
+    /* 视频：不在保存阶段上行。云端已有项保留；本地项先以占位落库，交队列后台上传后回填。
+       表单不等待视频字节，落库即返回；进度/结果由队列回填缓存与 PATCH /media。 */
+    const rawVideos = Array.isArray(entry.videos) ? entry.videos : []
+    const placeholders = rawVideos.map((it, idx) => {
+      const path = (it && it.path) || ''
+      if (path && CLOUD_RE.test(path)) {
+        return {
+          url: path,
+          duration: Number(it.duration) || 0,
+          size: Number(it.size) || 0,
+          thumb: it.thumb || '',
+          status: 'done'
+        }
       }
+      videoQueueItems.push({
+        index: idx,
+        localPath: path,
+        thumbPath: it.thumb || '',
+        meta: { duration: Number(it.duration) || 0, size: Number(it.size) || 0, item: it }
+      })
+      return { url: '', duration: Number(it.duration) || 0, size: Number(it.size) || 0, thumb: '', status: 'pending', progress: 0 }
     })
+    if (placeholders.length) {
+      row.payload = Object.assign({}, row.payload, { videos: placeholders })
+    }
   }).then(() => {
     /* 语音：逐段传 /files 换云端地址（服务端不做合并，段与段各自成文件） */
     if (row.type !== 'voice') return null
-    return uploadVoice(row.payload, row.baby_id).then(v => {
+    return uploadVoice(row.payload, row.baby_id, onProgress).then(v => {
       row.payload = Object.assign({}, row.payload, v.payload)
       newFiles = newFiles.concat(v.files)
     })
@@ -851,6 +1190,7 @@ function uploadVoice(payload, babyId) {
     oldMedia.forEach(m => { const j = cache.media.indexOf(m); if (j > -1) cache.media.splice(j, 1) })
     mRows.forEach(m => cache.measurements.push(m))
     mediaRows.forEach(m => cache.media.push(m))
+    reindexMediaOf(row.id)
 
     const req = old
       ? http.put('/entries/' + row.id, row)
@@ -864,7 +1204,11 @@ function uploadVoice(payload, babyId) {
         const i = cache.entries.findIndex(e => e.id === row.id)
         if (i > -1) cache.entries[i] = Object.assign({}, row, r)
       }
-      return { id: row.id }
+      /* 落库成功后再把本地视频交队列后台上传：此时 entryId 已确定，回填可按 index 对位 */
+      if (videoQueueItems.length) {
+        queue.enqueue(row.id, 'video', videoQueueItems, { babyId: row.baby_id })
+      }
+      return { id: row.id, hasPendingMedia: videoQueueItems.length > 0 }
     }).catch(e => {
       /* REST 失败：回滚乐观缓存，页面提示后表单数据不丢 */
       const i = cache.entries.findIndex(x => x.id === row.id)
@@ -877,6 +1221,7 @@ function uploadVoice(payload, babyId) {
       /* 被摘掉的旧派生行放回去，曲线/照片回到编辑前的样子 */
       oldM.forEach(m => { if (!cache.measurements.includes(m)) cache.measurements.push(m) })
       oldMedia.forEach(m => { if (!cache.media.includes(m)) cache.media.push(m) })
+      reindexMediaOf(row.id)
       if (msNew) { const j = cache.milestone_records.findIndex(m => m.id === msNew.id); if (j > -1) cache.milestone_records.splice(j, 1) }
       else if (msOld) { const ms = cache.milestone_records.find(m => m.id === msOld.id); if (ms) Object.assign(ms, msOld) }
       throw e
@@ -893,7 +1238,7 @@ export function fetchEntry(id) {
   v.occurred_at = e.occurred_at
   /* 照片优先读 entry_media 台账；台账没跟上（编辑换过图、或 /files 上传不落台账）
    * 时按 payload.photos 现造一份只读行，避免详情/编辑回填丢图 */
-  const rows = cache.media.filter(m => m.entry_id === id)
+  const rows = mediaRowsOf(id)
   const mediaUrls = (rows.length ? rows : deriveMediaRows(e))
     .map(m => http.resolveUrl(m.url || m.local_path))
   v.photos = mediaUrls
@@ -901,12 +1246,18 @@ export function fetchEntry(id) {
    * 这里就地 resolve 一份给 detail.vue 的 videoList 用，编辑页回填仍走原始 payload（编辑时保持原样） */
   if (v.payload && Array.isArray(v.payload.videos)) {
     v.payload = Object.assign({}, v.payload, {
-      videos: v.payload.videos.map(x => x && x.url ? {
-        url: http.resolveUrl(x.url),
-        duration: Number(x.duration) || 0,
-        size: Number(x.size) || 0,
-        thumb: x.thumb ? http.resolveUrl(x.thumb) : ''
-      } : x)
+      videos: v.payload.videos.map(x => {
+        if (!x) return null
+        const done = !!x.url
+        return {
+          url: done ? http.resolveUrl(x.url) : '',
+          duration: Number(x.duration) || 0,
+          size: Number(x.size) || 0,
+          thumb: x.thumb ? http.resolveSmall(x.thumb) : '',
+          status: x.status || (done ? 'done' : 'pending'),
+          progress: Number(x.progress) || 0
+        }
+      }).filter(Boolean)
     })
   }
   return Promise.resolve(v)
@@ -945,6 +1296,8 @@ export function deleteEntry(id) {
   const row = Object.assign({}, e, { deleted_at: now(), deleted_by: accountName(), deleted_by_id: myUserId() })
   cache.entries.splice(i, 1)
   cache.trash.unshift(row)
+  /* 取消该记录在途的后台上传任务，避免回填到已删记录 */
+  queue.clearEntry(id)
   return http.del('/entries/' + id).then(() => ({ id })).catch(err => {
     /* 失败回滚：记录回到时光轴原位 */
     const j = cache.trash.findIndex(t => t.id === id)
@@ -952,6 +1305,11 @@ export function deleteEntry(id) {
     cache.entries.splice(Math.min(i, cache.entries.length), 0, e)
     throw err
   })
+}
+
+/** 手动重传某条记录后台上传失败的媒体段（占位失败态点击重传入口） */
+export function retryEntryMedia(id) {
+  queue.retryFailed(id)
 }
 
 /* ---------- 回收站（30 天保留 · 服务端定时物理删除） ---------- */
@@ -967,8 +1325,8 @@ export function listTrash() {
   return cache.trash
     .filter(t => trashDaysLeft(t.deleted_at) > 0)
     .map(t => {
-      /* 首项媒体封面：恢复/彻底删除前先辨认是哪张图/哪段视频 */
-      const m = entryMedia(t)[0] || null
+      /* 首项已完成媒体封面：占位上传中的段无云端地址，不作封面 */
+      const m = entryMedia(t).find(x => x.url) || null
       return {
         id: t.id,
         day: monthDay(dayKey(t.deleted_at)),
@@ -1312,7 +1670,7 @@ function colorOfMember(e) {
  * 最后兜底记录封面 e.photo。返回的都是服务端相对路径。
  */
 function albumPhotosOf(e) {
-  const rows = cache.media.filter(m => m.entry_id === e.id)
+  const rows = mediaRowsOf(e.id)
   if (rows.length) return rows.map(r => r.url).filter(Boolean)
   const ps = Array.isArray(e.payload && e.payload.photos) ? e.payload.photos : []
   const list = ps.filter(Boolean)
@@ -1353,13 +1711,16 @@ export function entryMedia(e) {
   /* 视频：payload.videos 每段一项 */
   const videos = Array.isArray(e.payload && e.payload.videos) ? e.payload.videos : []
   videos.forEach((v, i) => {
-    if (!v || !v.url) return
+    if (!v) return
+    const done = !!v.url
     items.push(Object.assign({}, base, {
       id: e.id + '-vid-' + i,
       type: 'video',
-      url: http.resolveUrl(v.url),
-      thumb: v.thumb ? http.resolveUrl(v.thumb) : '',
-      duration: Number(v.duration) || 0
+      url: done ? http.resolveUrl(v.url) : '',
+      thumb: v.thumb ? http.resolveSmall(v.thumb) : '',
+      duration: Number(v.duration) || 0,
+      status: v.status || (done ? 'done' : 'pending'),
+      progress: Number(v.progress) || 0
     }))
   })
   return items
@@ -1378,10 +1739,13 @@ export function getAllMedia(filter = {}) {
     .slice()
     .sort((a, b) => (a.occurred_at < b.occurred_at ? 1 : -1))
     .forEach(e => { items.push(...entryMedia(e)) })
+  /* 相册/日记流只展示已完成媒体：后台上传中的占位项无云端地址，过滤掉避免空壳格子；
+     占位态在时光轴卡片与详情页单独渲染 */
+  const ready = items.filter(m => m.url)
   if (filter.type && filter.type !== 'all') {
-    return items.filter(m => m.type === filter.type)
+    return ready.filter(m => m.type === filter.type)
   }
-  return items
+  return ready
 }
 
 /**
