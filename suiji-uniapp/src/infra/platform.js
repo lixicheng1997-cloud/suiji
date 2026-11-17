@@ -19,63 +19,30 @@ export function kvRemove(key) {
 }
 
 /* ---------- 敏感 KV（令牌）----------
- * 令牌必须持久化（否则每次冷启动都要重新登录），但明文落在 Storage 里，
- * 一旦设备被 root / 越狱、或被同机其它应用读到 Storage 文件，凭证就直接泄露。
- * 这里用「设备标识 + 应用内盐」派生的密钥做一层 AES 落盘，读时解密。
+ * 令牌必须持久化（否则每次冷启动都要重新登录）。
  *
- * 必须说清楚边界：密钥仍在本机，这层加密防的是「顺手读 Storage / 备份文件」，
- * 防不住拿到完整设备权限的攻击者——那需要系统级 Keystore/Keychain，
- * uni-app 无统一接口，这里做不到。
- * 解密失败一律按「没有令牌」处理：宁可让用户重新登录，也不要存下坏值。 */
+ * 历史教训（2026-11-16 排查报告）：早期这里用「设备标识 + 应用内盐」做 XOR
+ * 混淆落盘，但混淆密钥掺了 uni.getSystemInfoSync().deviceId——该标识由框架本地
+ * 随机生成、清 Storage 即变，存/读两次密钥不一致时令牌会被还原成含控制字符的
+ * 坏串，拼进 Authorization 头被 webview 拒绝（setRequestHeader 抛错、请求中断）。
+ * 故方案 A 直接明文落盘，不再做这层可逆混淆：它本就防不住拿到完整设备权限的
+ * 攻击者（那需要系统级 Keystore/Keychain，uni-app 无统一接口），安全收益有限，
+ * 却引入了往返损坏风险。令牌合法性/字符集校验在 api/http.js 出口统一兜底。
+ */
+/* 旧版本混淆存储使用的前缀键，仅在清理时一并删除遗留数据，新代码不再读取 */
 const SECRET_PREFIX = 'sj_sec_'
-const SECRET_SALT = 'suiji.token.v1'
-
-function secretKey() {
-  let seed = SECRET_SALT
-  try {
-    const info = uni.getSystemInfoSync() || {}
-    seed += '|' + (info.deviceId || '') + '|' + (info.brand || '') + '|' + (info.model || '')
-  } catch (e) { /* 拿不到设备信息时退化为固定盐，仍好过明文 */ }
-  return seed
-}
-
-/** 轻量可逆混淆：XOR + 前缀，不引入加密库依赖（令牌本身已是高熵随机串） */
-function obfuscate(text, key) {
-  const s = String(text)
-  let out = ''
-  for (let i = 0; i < s.length; i++) {
-    out += String.fromCharCode(s.charCodeAt(i) ^ key.charCodeAt(i % key.length))
-  }
-  return out
-}
 
 export function kvSetSecret(key, val) {
   const s = String(val == null ? '' : val)
-  if (!s) { kvRemove(SECRET_PREFIX + key); return }
-  try {
-    kvSet(SECRET_PREFIX + key, 'v1:' + encodeURIComponent(obfuscate(s, secretKey())))
-  } catch (e) { /* 存储失败按未保存处理 */ }
+  if (!s) { kvRemove(key); kvRemove(SECRET_PREFIX + key); return }
+  try { kvSet(key, s) } catch (e) { /* 存储失败按未保存处理 */ }
 }
 export function kvGetSecret(key) {
-  const raw = kvGet(SECRET_PREFIX + key)
-  if (raw) {
-    if (String(raw).indexOf('v1:') !== 0) return ''   // 坏值：丢弃
-    try {
-      return obfuscate(decodeURIComponent(String(raw).slice(3)), secretKey())
-    } catch (e) { return '' }
-  }
-  /* 旧版本把令牌明文存在同名键里：就地迁移到加密键并删掉明文，
-   * 否则升级后读不到令牌，用户会被迫重新登录、图片也全部加载失败。 */
-  const legacy = kvGet(key)
-  if (legacy && String(legacy).split('.').length === 3) {   // 粗判 JWT 形态
-    kvSetSecret(key, legacy)
-    kvRemove(key)
-    return legacy
-  }
-  return ''
+  try { return kvGet(key) || '' } catch (e) { return '' }
 }
 export function kvRemoveSecret(key) {
-  kvRemove(SECRET_PREFIX + key)
+  kvRemove(key)
+  kvRemove(SECRET_PREFIX + key)   // 清掉旧版本遗留的混淆键
 }
 
 /* ---------- 文件导出（备份包） ----------

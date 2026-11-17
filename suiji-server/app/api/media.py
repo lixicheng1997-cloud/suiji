@@ -192,7 +192,7 @@ def download(media_id: str, request: Request, token: str = Query(""),
 
     # 选择对象 key：默认原图；variant 时从 FileObject 台账反查缩略图 key
     effective_key = row.storage_key or ""
-    if variant in ("thumb", "small"):
+    if variant in ("thumb", "small", "cover"):
         vk = _variant_key_of(db, effective_key, variant)
         if vk:
             effective_key = vk
@@ -227,7 +227,7 @@ def download(media_id: str, request: Request, token: str = Query(""),
 
 def _variant_key_of(db: Session, storage_key: str, variant: str) -> str:
     """从 FileObject 台账反查同 storage_key 对应的缩略图对象 key。"""
-    if not storage_key or variant not in ("thumb", "small"):
+    if not storage_key or variant not in ("thumb", "small", "cover"):
         return ""
     from ..models import FileObject
     frow = (db.query(FileObject)

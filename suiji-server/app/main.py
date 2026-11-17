@@ -6,8 +6,22 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
+
+
+class UTF8JSONResponse(JSONResponse):
+    """JSON 响应统一显式声明 UTF-8 编码。
+
+    Starlette 的 JSONResponse 默认 media_type 仅为 ``application/json``，且只对
+    ``text/*`` 类型自动追加 charset；application/json 不带 charset。App / 小程序
+    内嵌 webview 的网络栈在响应无 charset 时会按 Latin1 解码 UTF-8 字节，中文
+    提示因此变成 mojibake（如 ``ç¨æ·å…ç¨‹…``）。这里在 media_type 上显式带上
+    ``charset=utf-8``，响应体本身仍是 ensure_ascii=False 的 UTF-8 字节。
+    """
+
+    media_type = "application/json; charset=utf-8"
 
 # 日志配置放在业务导入之前：导入期的降级告警也能正常输出
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -139,7 +153,12 @@ async def lifespan(app: FastAPI):
                 pass
 
 
-app = (FastAPIOffline or FastAPI)(title="岁记服务端", version="3.0.0", lifespan=lifespan)
+app = (FastAPIOffline or FastAPI)(
+    title="岁记服务端",
+    version="3.0.0",
+    lifespan=lifespan,
+    default_response_class=UTF8JSONResponse,
+)
 
 # CORS：默认不开放。
 #
@@ -224,6 +243,22 @@ async def metrics_and_access_log(request, call_next):
     return resp
 
 
+# 异常响应同样走 UTF8JSONResponse：HTTPException 与 422 校验错误的默认处理器
+# 直接用裸 JSONResponse（不带 charset），中文 detail 在 App 端会乱码，这里覆盖。
+@app.exception_handler(HTTPException)
+async def _http_exception_handler(request, exc: HTTPException):
+    return UTF8JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=getattr(exc, "headers", None),
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_exception_handler(request, exc: RequestValidationError):
+    return UTF8JSONResponse(status_code=422, content={"detail": exc.errors()})
+
+
 app.include_router(api_router, prefix="/api/v1")
 
 # 传输加密中间件放在最后注册 = 最外层（Starlette 的 add_middleware 是往头部插）：
@@ -247,7 +282,7 @@ def healthz():
 def readyz():
     """就绪探针：数据库等硬依赖不可用时 503；Redis/存储异常在明细中标注为 warning。"""
     ready, details = check_readiness()
-    return JSONResponse(status_code=200 if ready else 503, content={"ready": ready, **details})
+    return UTF8JSONResponse(status_code=200 if ready else 503, content={"ready": ready, **details})
 
 
 @app.get("/metrics")

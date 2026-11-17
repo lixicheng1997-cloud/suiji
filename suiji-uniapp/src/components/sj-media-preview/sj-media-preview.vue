@@ -33,17 +33,21 @@
 
     <!-- 顶部栏：关闭 + 计数（cover-view 才能盖在 App 端原生 video 之上） -->
     <cover-view class="smp-top" :style="{ paddingTop: (statusBarHeight + 12) + 'px' }" @click.stop>
-      <cover-view class="smp-count">{{ idx + 1 }} / {{ items.length }}</cover-view>
-      <cover-view class="smp-close" @click="close">×</cover-view>
+      <cover-view class="smp-count">
+        <cover-view class="smp-count-tx">{{ idx + 1 }} / {{ items.length }}</cover-view>
+      </cover-view>
+      <cover-view class="smp-close" @click="close">
+        <cover-view class="smp-close-tx">×</cover-view>
+      </cover-view>
     </cover-view>
 
-    <!-- 多段视频：底部切换条（cover-view） -->
-    <cover-view v-if="items.length > 1 && currentItem.type === 'video'" class="smp-bar" :style="{ bottom: (safeBottom + 16) + 'px' }" @click.stop>
+    <!-- 多段视频：底部切换条（cover-view）；上移避让原生 video 底部控制条（进度条/播放钮） -->
+    <cover-view v-if="items.length > 1 && currentItem.type === 'video'" class="smp-bar" :style="{ bottom: (safeBottom + 56) + 'px' }" @click.stop>
       <cover-view class="smp-bar-btn" :class="{ off: idx === 0 }" @click="prev">
-        <cover-view>‹ 上一段</cover-view>
+        <cover-view class="smp-bar-tx">‹ 上一段</cover-view>
       </cover-view>
       <cover-view class="smp-bar-btn" :class="{ off: idx === items.length - 1 }" @click="next">
-        <cover-view>下一段 ›</cover-view>
+        <cover-view class="smp-bar-tx">下一段 ›</cover-view>
       </cover-view>
     </cover-view>
   </view>
@@ -159,23 +163,34 @@ export default {
   z-index: 2;
 }
 .smp-count {
-  color: #fff;
-  font-size: 26rpx;
-  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 4rpx 20rpx;
   border-radius: 20rpx;
   background: rgba(255, 255, 255, 0.15);
+}
+.smp-count-tx {
+  color: #fff;
+  font-size: 26rpx;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
 }
 .smp-close {
   width: 64rpx;
   height: 64rpx;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.2);
-  color: #fff;
-  font-size: 44rpx;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.smp-close-tx {
+  color: #fff;
+  font-size: 44rpx;
+  line-height: 1;
+  text-align: center;
 }
 
 .smp-bar {
@@ -191,12 +206,17 @@ export default {
   height: 80rpx;
   border-radius: 40rpx;
   background: rgba(255, 255, 255, 0.2);
-  color: #fff;
-  font-size: 28rpx;
-  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.smp-bar-tx {
+  width: 100%;
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: 700;
+  line-height: 80rpx;
+  text-align: center;
 }
 .smp-bar-btn.off { opacity: 0.4; }
 </style>

@@ -441,6 +441,7 @@
         block
         size="lg"
         :loading="saving"
+        :disabled="submitDisabled"
         text="保存记录"
         @click="onSave"
       />
@@ -612,6 +613,30 @@ export default {
       const h = Math.floor(mins / 60)
       const m = mins % 60
       return h > 0 ? h + ' 小时 ' + (m > 0 ? m + ' 分' : '') : m + ' 分'
+    },
+    /* 视频本地压缩中：压缩产物未就绪前禁止保存，避免拿到半压缩 / 即将失效的临时路径 */
+    videoCompressing() {
+      return (this.videos || []).some(v => v && v.status === 'compressing')
+    },
+    /* 仍在压缩的视频段数：驱动压缩阶段横幅通知 */
+    videoBusyCount() {
+      return (this.videos || []).filter(v => v && v.status === 'compressing').length
+    },
+    /* 保存按钮禁用：提交中 / 已提交待返回 / 视频压缩中，任一成立即置灰且不响应点击 */
+    submitDisabled() {
+      return this.saving || this.submitted || this.videoCompressing
+    }
+  },
+
+  watch: {
+    /* 压缩阶段通知：进入压缩 / 段数变化刷新进行中文案，全部完成提示可保存 */
+    videoBusyCount(n, o) {
+      if (this.type !== 'video' || !this.$refs.ntf) return
+      if (n > 0) {
+        this.$refs.ntf.show({ type: 'warn', message: '正在压缩 ' + n + ' 段视频…' })
+      } else if (o > 0) {
+        this.$refs.ntf.show({ type: 'ok', message: '视频压缩完成，可以保存' })
+      }
     }
   },
 
@@ -898,7 +923,7 @@ export default {
           return { photos: this.photos, video: 0 }
         case 'video':
           /* videos 数组形状由 sj-video-picker 决定；保存时 api.saveEntry 会把本地段传 /files 换云端 url */
-          return { videos: this.videos.map(v => ({ path: v.path, duration: v.duration || 0, size: v.size || 0 })) }
+          return { videos: this.videos.map(v => ({ path: v.path, duration: v.duration || 0, size: v.size || 0, thumb: v.thumb || '' })) }
         case 'measure':
           return {
             height: n('height'),
@@ -938,7 +963,7 @@ export default {
       }
     },
     async onSave() {
-      if (this.saving || this.submitted) return
+      if (this.saving || this.submitted || this.videoCompressing) return
       if (this.type === 'voice' && !(this.voice && this.voice.duration)) {
         this.$refs.ntf.show({ type: 'warn', message: '先录一段宝宝的声音再保存' })
         /* 表单校验失败拦截保存时播音效 */
@@ -986,21 +1011,34 @@ export default {
         play('S04')
         return
       }
-      /* 视频可能仍在后台压缩：上传前等压缩产物就绪，避免拿原片/即将失效的临时路径上传 */
+      /* 视频可能仍在本地压缩：上传前等压缩产物就绪；等待期间浮层告知用户
+         （压缩中保存按钮通常已禁用，此浮层为兜底） */
+      let compressLd = null
       if (this.type === 'video' && this.videos.length && this.$refs.videoPicker) {
+        const st = this.$refs.videoPicker.compressStats()
+        if (st.busy > 0) {
+          compressLd = ui.loading('正在压缩视频…', { sub: st.ready + '/' + st.total + ' 段完成', timeout: 0 })
+        }
         await this.$refs.videoPicker.whenReady()
+        if (compressLd) { compressLd.close(); compressLd = null }
       }
       const localPhotos = this.photos.filter(p => !/^(https?:|\/api\/|data:|blob:)/i.test(String(p || '')))
       /* 语音分段同理：blob:/temp 路径都要先传 /files 换云端地址 */
       const localVoice = this.type === 'voice'
         ? (this.voice.segments || []).filter(s => s && !/^(https?:|\/api\/)/i.test(String(s.url || s.path || '')))
         : []
+      /* 视频段同理：本地临时路径先传 /files 换云端地址，全部成功后才落库 */
+      const localVideos = this.type === 'video'
+        ? this.videos.filter(v => v && !/^(https?:|\/api\/|data:|blob:)/i.test(String(v.path || '')))
+        : []
       this.saving = true
-      /* 照片/语音仍在保存阶段同步上行；视频交队列后台上传，不阻塞落库与返回 */
+      /* 照片 / 语音 / 视频都在保存阶段同步上行，上传完成才落库并返回 */
       const busy = localPhotos.length
         ? '正在上传 ' + localPhotos.length + ' 张照片…'
-        : (localVoice.length ? '正在上传 ' + localVoice.length + ' 段语音…' : '正在保存记录…')
-      const ld = ui.loading(busy, { sub: (localPhotos.length || localVoice.length) ? '保持应用打开，勿切后台' : '', timeout: 300000 })
+        : (localVideos.length ? '正在上传 ' + localVideos.length + ' 段视频…'
+          : (localVoice.length ? '正在上传 ' + localVoice.length + ' 段语音…' : '正在保存记录…'))
+      const keepOpen = localPhotos.length || localVideos.length || localVoice.length
+      const ld = ui.loading(busy, { sub: keepOpen ? '保持应用打开，勿切后台' : '', timeout: 300000 })
       const entry = {
         type: this.type,
         /* 保存 payload 时一并带上各时间行的当前值 */
@@ -1037,14 +1075,14 @@ export default {
         if (this.type === 'measure') play('E03')
         /* 里程碑类型首次达成叠加 E01（key 绑定变体）；普通记录只播 S03 不叠加 */
         if (msFirst) play('E01', { key: msKey })
-        /* 成功提示走 sj-notify 顶部横幅；有待上传视频时如实标注「上传中」，不宣称媒体已就位 */
-        const msg = (res && res.hasPendingMedia) ? '已保存，视频上传中' : '已保存'
-        this.$refs.ntf.show({ type: 'ok', message: msg })
-        /* 置提交拦截标志：返回倒计时内不再响应点击，避免落成两条重复记录；
-           按钮 spinner 不在此处保留——先去掉 loading，再延时返回列表 */
+        /* 成功提示：视频已在落库前同步上传完成，媒体就位。
+           不入页内横幅（页面随即销毁看不到），改入跨页队列，由返回页 onShow 弹出。 */
+        const msg = '已保存'
+        /* 置提交拦截标志：离开前不再响应点击，避免落成两条重复记录 */
         this.submitted = true
-        /* 延迟返回让「已保存」提示可见；goBack 内含无上级页面时的兜底 */
-        setTimeout(() => this.goBack(), 1600)
+        /* 不做固定等待：立即返回列表，成功提示交返回页 onShow 弹出 */
+        ui.queueToast(msg, 2200, 'ok')
+        this.goBack()
       } catch (e) {
         /* 失败保留表单（无归属权限时服务端返回 403） */
         ui.error(e, '保存失败')

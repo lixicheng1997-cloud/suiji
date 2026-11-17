@@ -20,12 +20,15 @@ from ..core.config import settings
 from ..core.db import SessionLocal
 from ..media.thumbnails import generate_variants
 from ..models import FileObject
+from . import cover
 from .store import get_store
 
 logger = logging.getLogger(__name__)
 
 _pool: ThreadPoolExecutor | None = None
 _lock = Lock()
+_cover_pool: ThreadPoolExecutor | None = None
+_cover_lock = Lock()
 
 
 def _now() -> str:
@@ -42,12 +45,29 @@ def _executor() -> ThreadPoolExecutor:
     return _pool
 
 
-def submit(file_id: str, family_id: str) -> None:
-    """排队生成该行的缩略图变体；队列满/进程异常只记日志，不影响已完成的上传。"""
+def _cover_executor() -> ThreadPoolExecutor:
+    """视频封面独立小池：抽帧是 CPU+IO 混合，与图片缩略图池隔离限流。"""
+    global _cover_pool
+    if _cover_pool is None:
+        with _cover_lock:
+            if _cover_pool is None:
+                _cover_pool = ThreadPoolExecutor(max_workers=max(1, settings.cover_workers),
+                                                 thread_name_prefix="suiji-cover")
+    return _cover_pool
+
+
+def submit(file_id: str, family_id: str, kind: str = "image") -> None:
+    """排队生成该行的后台变体；队列满/进程异常只记日志，不影响已完成的上传。
+
+    kind=image → 图片缩略图池；kind=video → 视频封面独立池。
+    """
     try:
-        _executor().submit(_run, file_id, family_id)
+        if kind == "video":
+            _cover_executor().submit(_run_cover, file_id, family_id)
+        else:
+            _executor().submit(_run, file_id, family_id)
     except Exception as exc:
-        logger.warning("缩略图任务排队失败 file=%s：%s", file_id, exc)
+        logger.warning("后台变体任务排队失败 file=%s（kind=%s）：%s", file_id, kind, exc)
 
 
 def _sibling_keys(db, row: FileObject) -> dict:
@@ -131,5 +151,71 @@ def _run(file_id: str, family_id: str) -> None:
     except Exception as exc:
         db.rollback()
         logger.warning("缩略图生成失败 file=%s：%s", file_id, exc)
+    finally:
+        db.close()
+
+
+def _sibling_cover_key(db, row: FileObject) -> str:
+    """同家庭同 storage_key 的其他行已生成封面：直接复用 cover_key，不重复抽帧。"""
+    if not row.storage_key:
+        return ""
+    rows = (db.query(FileObject)
+              .filter(FileObject.family_id == row.family_id,
+                      FileObject.storage_key == row.storage_key,
+                      FileObject.id != row.id,
+                      FileObject.deleted_at.is_(None))
+              .all())
+    for other in rows:
+        meta = other.meta if isinstance(other.meta, dict) else {}
+        if meta.get("cover_key"):
+            return meta["cover_key"]
+    return ""
+
+
+def _run_cover(file_id: str, family_id: str) -> None:
+    """后台为视频抽一帧封面 JPEG，对象 key 写入 meta.cover_key。
+
+    失败/无 ffmpeg/对象不可读一律静默跳过：下载端回落原图或前端占位，不阻断上传。
+    """
+    db = SessionLocal()
+    try:
+        row = db.get(FileObject, file_id)
+        if row is None or row.family_id != family_id or row.deleted_at:
+            return
+        content_type = (row.content_type or "").lower()
+        if not content_type.startswith("video/"):
+            return
+        meta = dict(row.meta or {})
+        if meta.get("cover_key"):
+            return
+
+        reuse = _sibling_cover_key(db, row)
+        if reuse:
+            meta["cover_key"] = reuse
+        else:
+            data = _read_object(row.storage_key)
+            if not data:
+                logger.warning("封面生成跳过 file=%s：对象不可读", file_id)
+                return
+            blob = cover.extract_cover(
+                data, width=settings.cover_width,
+                quality=settings.cover_quality, seek=settings.cover_seek)
+            if not blob:
+                return
+            # 直传登记的行没有 sha256，同名冲突消解需要它：按真实字节补算，
+            # 只用于给封面 key 去重，不回写台账（回写会撞 uq_file_dedup）。
+            sha = row.sha256 or hashlib.sha256(data).hexdigest()
+            stem = _stem(row)
+            meta["cover_key"] = get_store().save_stream(
+                BytesIO(blob), len(blob), sha, ".jpg", "image/jpeg",
+                family_id=row.family_id, filename=f"{stem}.cover.jpg",
+                baby_id=row.baby_id or "", user_id=row.uploader_id or "")
+
+        row.meta = meta          # JSON 列要整体赋值才算变更
+        row.updated_at = _now()
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.warning("封面生成失败 file=%s：%s", file_id, exc)
     finally:
         db.close()

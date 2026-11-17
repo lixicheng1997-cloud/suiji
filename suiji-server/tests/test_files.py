@@ -311,3 +311,45 @@ def test_video_default_limit_is_50mb():
     from app.core.config import settings
     assert settings.video_max_bytes == 50 * 1024 * 1024
     assert settings.video_max_seconds == 30
+
+
+def test_download_cover_variant_returns_jpeg(client):
+    """meta.cover_key 存在时 variant=cover 返回封面对象，Content-Type 固定 image/jpeg。"""
+    import hashlib
+    import io
+    from app.core.db import SessionLocal
+    from app.media.store import get_store
+    from app.models import FileObject
+
+    headers, body = register(client, prefix="filecover")
+    family_id = body["family"]["id"]
+    f = _upload(client, headers, name="clip.mp4", data=_MP4_HEAD,
+                ctype="video/mp4").json()
+
+    cover_jpeg = b"\xff\xd8\xff\xe0" + b"K" * 64
+    store = get_store()
+    key = store.save_stream(
+        io.BytesIO(cover_jpeg), len(cover_jpeg),
+        hashlib.sha256(cover_jpeg).hexdigest(), ".jpg", "image/jpeg",
+        family_id=family_id, filename="clip.cover.jpg")
+
+    with SessionLocal() as db:
+        row = db.get(FileObject, f["id"])
+        meta = dict(row.meta or {})
+        meta["cover_key"] = key
+        row.meta = meta
+        db.commit()
+
+    r = client.get(f["url"], headers=headers, params={"variant": "cover"})
+    assert r.status_code == 200, r.text
+    assert r.content == cover_jpeg
+    assert r.headers["content-type"].startswith("image/jpeg")
+
+
+def test_cover_variant_falls_back_to_original_when_missing(client):
+    """历史视频无 cover_key：variant=cover 回退原图，不报错。"""
+    headers = _auth(client, "filecoverfb")
+    f = _upload(client, headers, name="报告.pdf").json()
+    r = client.get(f["url"], headers=headers, params={"variant": "cover"})
+    assert r.status_code == 200, r.text
+    assert r.content == PDF

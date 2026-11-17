@@ -7,6 +7,8 @@ import { kvGet, kvSet, kvRemove, kvGetSecret, kvSetSecret, kvRemoveSecret } from
 import { DEFAULT_BASE, LEGACY_PORT, CURRENT_PORT, LOCAL_DEV_PORT } from '@/config/app.js'
 import { toast as uiToast } from '@/utils/ui.js'
 import { clearPublicKey, hasPublicKey, sealRequest, setPublicKey, supported } from '@/infra/crypto.js'
+import { netInfo, netLabel } from '@/infra/net.js'
+import logger from '@/utils/logger.js'
 
 const BASE_KEY = 'sj_api_base'
 /* 「已选服务器」记录键：api.js 复用同一份，避免两处各写一个字符串 */
@@ -108,10 +110,26 @@ export function hasSavedBase() {
  * access 2 小时 / refresh 30 天（服务端一次性轮换）/ media 7 天（仅下载）。
  * 三件套必须一起换：refresh 是轮换式的，老 refresh 用过即废，
  * 只更新 access 会导致下次刷新被判定重放并强制下线。
- * 落盘走 kv*Secret：不明文写 Storage（见 infra/platform.js 的说明）。 */
-export function getAccessToken() { return kvGetSecret(ACCESS_KEY) || '' }
-export function getRefreshToken() { return kvGetSecret(REFRESH_KEY) || '' }
-export function getMediaToken() { return kvGetSecret(MEDIA_KEY) || '' }
+ * 落盘走 kv*Secret（见 infra/platform.js 说明）；读回时统一过形态校验，
+ * 本地损坏/污染的令牌按「没有令牌」处理，绝不带到请求头里。 */
+
+/* JWT 形态校验：三段 base64url、纯可见 ASCII。本地损坏/污染的令牌（含控制字符、
+ * 非 Latin1）一律判无效——HTTP 头值禁止控制字符，否则 App webview 的 XHR
+ * setRequestHeader 会直接抛错、中断整个请求（2026-11-16 排查报告）。 */
+const TOKEN_SEG_RE = /^[A-Za-z0-9_-]+$/
+function isValidToken(t) {
+  if (typeof t !== 'string' || !t) return false
+  const parts = t.split('.')
+  if (parts.length !== 3) return false
+  return parts.every(p => p.length > 0 && TOKEN_SEG_RE.test(p))
+}
+function readValidToken(key) {
+  const t = kvGetSecret(key)
+  return isValidToken(t) ? t : ''
+}
+export function getAccessToken() { return readValidToken(ACCESS_KEY) }
+export function getRefreshToken() { return readValidToken(REFRESH_KEY) }
+export function getMediaToken() { return readValidToken(MEDIA_KEY) }
 export function setTokens(access, refresh, media) {
   if (access) kvSetSecret(ACCESS_KEY, access)
   if (refresh) kvSetSecret(REFRESH_KEY, refresh)
@@ -179,6 +197,14 @@ export function resolveSmall(u) {
   return _withVariant(u, 'small')
 }
 
+/**
+ * 视频封面地址：服务端后台抽帧的 400px JPEG（variant=cover）。
+ * 封面尚未生成时服务端回落原图，前端封面组件加载失败会再回占位底。
+ */
+export function resolveCover(u) {
+  return _withVariant(u, 'cover')
+}
+
 /* ---------- 传输加密：敏感接口端到端加密（详见 infra/crypto.js 头注释） ----------
  * 客户端与服务端之间是明文 HTTP：口令、令牌三件套、邀请码、导出数据在链路上裸奔，
  * 这一层让「链路被看穿」也不等于「明文被拿走」：
@@ -214,6 +240,7 @@ function ensurePublicKey() {
   loadKeyCache()
   if (hasPublicKey()) return Promise.resolve(true)
   if (keyFetching) return keyFetching
+  const t0 = Date.now()
   keyFetching = new Promise(resolve => {
     uni.request({
       url: baseUrl() + '/crypto/public-key',
@@ -221,15 +248,20 @@ function ensurePublicKey() {
       timeout: 15000,
       success: res => {
         const d = res && res.data
-        if (res && res.statusCode === 200 && d && d.n && d.e) {
+        const ok = !!(res && res.statusCode === 200 && d && d.n && d.e)
+        if (ok) {
           setPublicKey(d)
           try { kvSet(RSA_KEY, JSON.stringify({ kid: d.kid, n: d.n, e: d.e })) } catch (e) { /* 存不下就每次重取 */ }
-          resolve(true)
-        } else {
-          resolve(false)
         }
+        logger[ok ? 'debug' : 'warn']('crypto', '拉取公钥 ' + (ok ? '成功' : '失败') + ' · ' + (Date.now() - t0) + 'ms',
+          reqMeta({ ms: Date.now() - t0, status: res && res.statusCode }))
+        resolve(ok)
       },
-      fail: () => resolve(false)
+      fail: err => {
+        logger.error('crypto', '拉取公钥网络失败 · ' + (Date.now() - t0) + 'ms',
+          reqMeta({ ms: Date.now() - t0, raw: err && (err.errMsg || String(err)) }))
+        resolve(false)
+      }
     })
   }).then(ok => { keyFetching = null; return ok })
   return keyFetching
@@ -271,9 +303,25 @@ async function sealFor(method, path, data) {
 }
 
 /* ---------- 底层请求 ---------- */
+/* 这些接口本身不需要登录态：不注入本地 access 令牌，避免旧/坏令牌污染未认证请求。
+ * logout 仍需 access 鉴权（撤销当前会话），不在此列。 */
+const NO_AUTH_RE = /^\/auth\/(login|register|refresh)$/
+
+/* 头值只保留可见 Latin1（0x20–0x7E）；含控制字符/非 Latin1 的头值直接跳过，
+ * 不让 XHR setRequestHeader 抛异常把整个请求打断。 */
+const HEADER_VALUE_RE = /^[\x20-\x7E]*$/
+function sanitizeHeaders(h) {
+  const out = {}
+  Object.keys(h || {}).forEach(k => {
+    const v = h[k]
+    if (typeof v === 'string' && HEADER_VALUE_RE.test(v)) out[k] = v
+  })
+  return out
+}
+
 async function rawRequest(method, path, data, header) {
   const sealed = await sealFor(method, path, data).catch(() => null)
-  const token = getAccessToken()
+  const token = NO_AUTH_RE.test(path) ? '' : getAccessToken()
   const res = await new Promise((resolve, reject) => {
     uni.request({
       url: baseUrl() + path,
@@ -281,12 +329,12 @@ async function rawRequest(method, path, data, header) {
       // 加密时 body 换成密文信封（无 body 的请求 data 保持 undefined）
       data: sealed ? sealed.data : (data === undefined ? undefined : JSON.parse(JSON.stringify(data))),
       timeout: 30000,
-      header: Object.assign(
+      header: sanitizeHeaders(Object.assign(
         { 'Content-Type': 'application/json' },
         token ? { Authorization: 'Bearer ' + token } : {},
         header || {},
         sealed ? sealed.header : {}
-      ),
+      )),
       // uni.request 响应字段为 statusCode，统一补 status 供上层判断
       success: res => resolve(Object.assign({}, res, { status: res.statusCode })),
       fail: err => reject(Object.assign(new Error('NET_FAIL'), { netFail: true, raw: err }))
@@ -311,7 +359,8 @@ function tryRefresh() {
   if (refreshing) return refreshing
   const refresh = getRefreshToken()
   if (!refresh) return Promise.resolve(false)
-  refreshing = rawRequest('POST', '/auth/refresh', { refresh }, { Authorization: '' })
+  const t0 = Date.now()
+  refreshing = rawRequest('POST', '/auth/refresh', { refresh })
     .then(res => {
       if (res.status >= 200 && res.status < 300 && res.data && res.data.access) {
         const d = res.data
@@ -321,7 +370,12 @@ function tryRefresh() {
       return false
     })
     .catch(() => false)
-    .then(ok => { refreshing = null; return ok })
+    .then(ok => {
+      refreshing = null
+      logger[ok ? 'info' : 'warn']('http', '令牌刷新' + (ok ? '成功' : '失败') + ' · ' + (Date.now() - t0) + 'ms',
+        reqMeta({ ms: Date.now() - t0, ok }))
+      return ok
+    })
   return refreshing
 }
 
@@ -502,32 +556,81 @@ function flushNotify() {
  */
 const AUTH_NO_RETRY_RE = /^\/auth\/(login|refresh)$/
 
+/* 从 baseUrl 提取 origin（协议+主机+端口），日志里区分连的是云端还是本地 */
+function originOf(url) {
+  const m = String(url || '').match(/^(https?:\/\/[^/]+)/i)
+  return m ? m[1] : ''
+}
+
+/* 响应体估算字符数（仅日志用：对象先序列化；不展开大报文） */
+function bodyBytes(d) {
+  try {
+    const s = typeof d === 'string' ? d : JSON.stringify(d == null ? '' : d)
+    return s ? s.length : 0
+  } catch (e) { return 0 }
+}
+
+/* 请求日志公共字段：网络快照 + 目标 host + 重试标记 */
+function reqMeta(extra) {
+  const n = netInfo()
+  return Object.assign({
+    net: n.type,
+    connected: n.connected,
+    host: originOf(baseUrl())
+  }, extra || {})
+}
+
 export function request(method, path, data, opts) {
   const o = opts || {}
+  const start = Date.now()
+  const elapsed = () => Date.now() - start
+  const retryFlag = { retried: !!o._retried, keyRotated: !!o._keyRetried }
+  logger.debug('http', '→ ' + method + ' ' + path, reqMeta(retryFlag))
   return rawRequest(method, path, data, o.header)
     .then(res => {
       if (res.status === 409 && isKeyRotated(res) && !o._keyRetried) {
+        logger.warn('http', '服务端轮换密钥，重取公钥后重试', reqMeta({ path }))
         return refreshPublicKey()
           .then(() => request(method, path, data, Object.assign({}, o, { _keyRetried: true })))
       }
       if (res.status === 401 && !o._retried && !AUTH_NO_RETRY_RE.test(path)) {
+        logger.warn('http', '401 登录态过期，尝试刷新令牌', reqMeta({ path }))
         return tryRefresh().then(ok => {
-          if (!ok) { expireSession(); throw mutedError('登录已过期，请重新登录') }
+          if (!ok) {
+            logger.error('http', '令牌刷新失败，会话过期', reqMeta({ path }))
+            expireSession(); throw mutedError('登录已过期，请重新登录')
+          }
           return request(method, path, data, Object.assign({}, o, { _retried: true }))
         })
       }
       if (res.status === 409 && isNeedFamily(res)) {
+        logger.warn('http', '账号未关联家庭，引导创建/加入', reqMeta({ path }))
         const e = needFamilyError()
         notify(e, o)
         if (needFamilyHandler) needFamilyHandler()
         else uni.reLaunch({ url: FAMILY_SETUP })
         throw e
       }
-      if (res.status >= 200 && res.status < 300) return res.data
-      throw mapError(res)
+      if (res.status >= 200 && res.status < 300) {
+        const ms = elapsed()
+        const bytes = bodyBytes(res.data)
+        const dlKbps = ms > 0 ? Math.round(bytes / (ms / 1000) / 1024 * 10) / 10 : 0
+        logger.debug('http', '← ' + method + ' ' + path + ' ' + res.status + ' · ' + netLabel() + ' · ' + ms + 'ms · ' + dlKbps + 'KB/s',
+          reqMeta(Object.assign({ ms, status: res.status, bytes, dlKbps }, retryFlag)))
+        return res.data
+      }
+      const e = mapError(res)
+      if (res.status >= 500) logger.error('http', '服务端错误 ' + res.status + ' ' + method + ' ' + path + ' · ' + elapsed() + 'ms',
+        reqMeta(Object.assign({ ms: elapsed(), status: res.status, err: e, raw: e.raw }, retryFlag)))
+      else logger.warn('http', '请求被拒 ' + res.status + ' ' + method + ' ' + path + ' · ' + elapsed() + 'ms',
+        reqMeta(Object.assign({ ms: elapsed(), status: res.status, err: e, raw: e.raw }, retryFlag)))
+      throw e
     })
     .catch(err => {
       const e = (err && err.netFail) ? netError(err) : err
+      /* then 内主动抛出的业务错误（need_family / 401 / 4xx / 5xx）已在上方记过，这里只补网络失败 */
+      if (err && err.netFail) logger.error('http', '网络失败 ' + method + ' ' + path + ' · ' + netLabel() + ' · ' + elapsed() + 'ms',
+        reqMeta(Object.assign({ ms: elapsed(), err: err, raw: e.raw }, retryFlag)))
       notify(e, o)
       throw e
     })
@@ -595,7 +698,7 @@ export function uploadFile(filePath, opts) {
         baby_id: o.babyId || ''
       }, o.formData || {}),
       timeout: 180000,
-      header: token ? { Authorization: 'Bearer ' + token } : {},
+      header: sanitizeHeaders(token ? { Authorization: 'Bearer ' + token } : {}),
       /* 上传进度透传：progressEvent = { progress, totalBytesWritten, totalBytesExpectedToWrite } */
       onProgressUpdate: p => { if (typeof o.onProgress === 'function') o.onProgress(p) },
       success: res => {

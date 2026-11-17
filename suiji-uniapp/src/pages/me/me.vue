@@ -117,6 +117,7 @@
 <script>
 import * as api from '@/utils/api.js'
 import * as ui from '@/utils/ui.js'
+import logger from '@/utils/logger.js'
 import tabSwipe, { pullRefresh } from '@/utils/tabSwipe.js'
 import { THEME_LABELS } from '@/theme/theme.js'
 import { play, vibrate, isSoundOn, setSoundOn, isVibrateOn, setVibrateOn, debugSnapshot } from '@/utils/sound.js'
@@ -217,6 +218,7 @@ export default {
           label: '通用与账号',
           rows: [
             { png: '23-fn-privacy', label: '修改密码', val: '定期更换更安全', chev: true, act: 'password' },
+            { png: '35-fn-audit', label: '调试日志', sd: '本机链路记录 · 分层查看 · 可清空', chev: true, go: '/pages/dev-log/dev-log' },
             { png: '32-fn-card', label: '关于岁记', val: 'v3.0', chev: true, act: 'about' },
             { png: '33-fn-video', label: '启动加载动画（演示）', val: '品牌开场 · 轻点跳过', chev: true, go: '/pages/splash/splash?from=me', adminOnly: true },
             { png: '27-fn-trash', label: '退出登录', val: '切换账号 / 换机', chev: true, act: 'logout' }
@@ -257,7 +259,14 @@ export default {
         })
       }
       if (r.go) {
-        uni.navigateTo({ url: r.go })
+        uni.navigateTo({
+          url: r.go,
+          fail: err => {
+            const msg = (err && err.errMsg) || '未知错误'
+            logger.error('app', '页面跳转失败', { url: r.go, msg })
+            this.$refs.ntf.show({ type: 'err', message: '页面打开失败：' + msg })
+          }
+        })
         return
       }
       this.$refs.ntf.show({ type: 'warn', message: r.label + '：功能开发中，敬请期待' })

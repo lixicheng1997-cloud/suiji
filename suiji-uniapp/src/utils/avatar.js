@@ -9,14 +9,35 @@
 const MAX_EDGE = 400
 const JPEG_QUALITY = 80
 
+/* App 端运行时权限：相机 / 相册分别申请；未声明或被拒也放行，交由系统或宿主提示 */
+function grant(sourceType) {
+  // #ifdef APP-PLUS
+  const perms = sourceType === 'camera'
+    ? ['android.permission.CAMERA', 'android.permission.RECORD_AUDIO']
+    : ['android.permission.READ_MEDIA_IMAGES', 'android.permission.READ_EXTERNAL_STORAGE']
+  return new Promise(resolve => {
+    try {
+      if (typeof plus === 'undefined' || !plus.android || !plus.android.requestPermissions) { resolve(true); return }
+      plus.android.requestPermissions(perms, () => resolve(true), () => resolve(true))
+    } catch (e) { resolve(true) }
+  })
+  // #endif
+  // #ifndef APP-PLUS
+  return Promise.resolve(true)
+  // #endif
+}
+
 /**
  * 调起相册 / 相机选一张图并返回可上传的本地临时路径
+ * @param {'album'|'camera'} [sourceType] 来源；缺省由系统弹默认来源选择
  * @returns {Promise<string>} 临时文件路径；用户取消时 reject
  */
-export function pickAvatar() {
-  return new Promise((resolve, reject) => {
+export function pickAvatar(sourceType) {
+  const source = sourceType ? [sourceType] : ['album', 'camera']
+  return grant(sourceType).then(() => new Promise((resolve, reject) => {
     uni.chooseImage({
       count: 1,
+      sourceType: source,
       sizeType: ['compressed'],
       success: res => {
         const path = (res.tempFilePaths || [])[0]
@@ -38,5 +59,5 @@ export function pickAvatar() {
       },
       fail: reject
     })
-  })
+  }))
 }

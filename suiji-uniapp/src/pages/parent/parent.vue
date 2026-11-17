@@ -95,6 +95,24 @@
       />
     </view>
 
+    <!-- 头像来源选择：项目内 modal（拍摄 / 相册），与宝宝档案页同款 -->
+    <sj-modal v-model:show="avatarSrcShow" title="更换头像" confirmText="取消">
+      <view class="src-row" hover-class="hover-press" @click="chooseAvatar('camera')">
+        <sj-icon class="src-ic" name="04-photo" :size="72" />
+        <view class="src-txt">
+          <text class="src-label">拍摄照片</text>
+          <text class="src-sub">调用相机拍一张新头像</text>
+        </view>
+      </view>
+      <view class="src-row" hover-class="hover-press" @click="chooseAvatar('album')">
+        <sj-icon class="src-ic" name="31-fn-compare" :size="72" />
+        <view class="src-txt">
+          <text class="src-label">从相册选择</text>
+          <text class="src-sub">从已有照片里挑一张</text>
+        </view>
+      </view>
+    </sj-modal>
+
     <sj-notify ref="ntf" />
     <sj-ui-host />
   </view>
@@ -113,6 +131,8 @@ export default {
       statusBarHeight: 20,
       TYPES,
       avatar: '',
+      /* 头像来源选择弹窗显隐 */
+      avatarSrcShow: false,
       name: '',
       account: '',
       relation: '妈妈',
@@ -182,9 +202,14 @@ export default {
         uni.reLaunch({ url: '/pages/index/index' })
       }
     },
+    /* 点击头像：先弹项目内来源选择（拍摄 / 相册），不直接调系统选图 */
     onAvatar() {
-      /* 与宝宝档案页一致：pickAvatar 选图并压缩，保存时上传 /files（契约 §7.5） */
-      pickAvatar().then(path => {
+      this.avatarSrcShow = true
+    },
+    /* 来源选定：关弹窗后调起对应渠道选图，选中后本地路径即时预览，保存时上传 /files（契约 §7.5） */
+    chooseAvatar(sourceType) {
+      this.avatarSrcShow = false
+      pickAvatar(sourceType).then(path => {
         if (!path) { this.$refs.ntf.show({ type: 'err', message: '未能读取该图片，请重试' }); return }
         this.avatar = path
         this.$refs.ntf.show({ type: 'ok', message: '头像已选择 · 保存后生效' })
@@ -445,4 +470,19 @@ export default {
   display: flex;
   margin-top: 40rpx;
 }
+
+/* 头像来源选择行（与宝宝档案页 src-row 同款） */
+.src-row {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 20rpx 24rpx;
+  border-radius: 28rpx;
+  border: 2rpx solid var(--sj-line);
+  background: rgba(255, 253, 251, 0.9);
+}
+.src-ic { flex: none; border-radius: 20rpx; overflow: hidden; }
+.src-txt { display: flex; flex-direction: column; gap: 4rpx; }
+.src-label { font-size: 28rpx; font-weight: 800; color: var(--sj-ink); }
+.src-sub { font-size: 22rpx; font-weight: 600; color: var(--sj-sub); }
 </style>

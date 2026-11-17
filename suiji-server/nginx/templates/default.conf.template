@@ -19,16 +19,23 @@ map $http_upgrade $connection_upgrade {
     ''      '';
 }
 
-# 容器网络内固定端口：api 容器 uvicorn 监听 8000，与宿主机映射端口无关
-upstream suiji_api {
-    server api:8000 max_fails=3 fail_timeout=10s;
-    keepalive 32;
-}
+# 上游交给运行期动态解析（resolver 与 $api_upstream 在 server 块内定义）。
+# 不能把 api:8000 写进 upstream 块或 proxy_pass 字面量：那样 nginx 只在启动/reload
+# 时解析一次域名并缓存内网 IP；api 容器重建后换了内网 IP，nginx 仍连旧地址，
+# 报 connect() failed (113: Host is unreachable) -> 全部 502。
+# 用变量 + resolver 后，nginx 按 valid 周期向 Docker 内置 DNS(127.0.0.11) 重新解析，
+# 容器重建换 IP 也无需 reload nginx。
+# 代价：变量化后无法使用 upstream 块的 keepalive 连接池与 max_fails 健康摘除；
+# 同机房小流量，每次新建 TCP 的成本可接受。
 
 server {
     # 容器内监听端口（与 compose 的 "${NGINX_PORT}:${NGINX_LISTEN_PORT}" 右半部分一致）
     listen ${NGINX_LISTEN_PORT};
     server_name _;
+
+    # Docker 内嵌 DNS：运行期解析 api 容器名，容器重建换内网 IP 后自动跟随（见文件头注释）
+    resolver 127.0.0.11 valid=30s ipv6=off;
+    set $api_upstream api:8000;
 
     # 与 FILE_MAX_BYTES（默认 209715200 = 200MB）对齐，改 FILE_MAX_BYTES 时同步改这里，
     # 否则 nginx 默认 1m 会让上传直接 413（会覆盖 nginx.conf 中 http 级的同名兜底值）
@@ -70,14 +77,14 @@ server {
     # 否则等于把撞库通道敞开（后端还有一层配额，这里是第一道）
     location /api/v1/auth/ {
         limit_req                zone=auth_limit burst=10 nodelay;
-        proxy_pass               http://suiji_api;
+        proxy_pass               http://$api_upstream;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;
     }
 
     location /api/v1/family/join {
         limit_req                zone=auth_limit burst=10 nodelay;
-        proxy_pass               http://suiji_api;
+        proxy_pass               http://$api_upstream;
     }
 
     # 业务接口：
@@ -85,7 +92,7 @@ server {
     #    开缓冲会先在 nginx 落临时文件，视频/大图首字节延迟明显；
     #  - proxy_request_buffering off：200MB 上传边收边转给 api，避免 nginx 本地落盘。
     location /api/ {
-        proxy_pass               http://suiji_api;
+        proxy_pass               http://$api_upstream;
         proxy_buffering          off;
         proxy_request_buffering  off;
         proxy_set_header Upgrade $http_upgrade;
@@ -126,7 +133,7 @@ server {
         add_header Referrer-Policy           "no-referrer" always;
         add_header Permissions-Policy        "geolocation=(), microphone=(), camera=()" always;
         add_header Content-Security-Policy   "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'self'" always;
-        proxy_pass http://suiji_api;
+        proxy_pass http://$api_upstream;
     }
 
     # 指标与就绪探针：暴露后端内部状态（后端/缓存/存储后端、请求计数与耗时），
@@ -138,11 +145,39 @@ server {
         allow 192.168.0.0/16;
         allow ${NGINX_ADMIN_ALLOW};
         deny  all;
-        proxy_pass http://suiji_api;
+        proxy_pass http://$api_upstream;
     }
 
+    # ---- H5 网页版（岁记 web 版，产物资源为根绝对路径 /assets、/static，hash 路由）----
+    # 入口页不缓存，改版即时生效；内联 viewport 脚本需要 script-src 'unsafe-inline'
     location = / {
-        proxy_pass http://suiji_api;
+        root /usr/share/nginx/html/suiji-web;
+        try_files /index.html =502;
+        add_header Cache-Control "no-cache";
+        add_header X-Content-Type-Options    "nosniff" always;
+        add_header Referrer-Policy           "no-referrer" always;
+        add_header Permissions-Policy        "geolocation=(), microphone=(), camera=()" always;
+        add_header Content-Security-Policy   "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'self'" always;
+    }
+
+    # H5 打包产物 JS/CSS（文件名带内容哈希，长缓存 7 天）
+    location /assets/ {
+        alias /usr/share/nginx/html/suiji-web/assets/;
+        expires 7d;
+        add_header Cache-Control "public, max-age=604800";
+        add_header X-Content-Type-Options    "nosniff" always;
+        add_header Referrer-Policy           "no-referrer" always;
+        add_header Content-Security-Policy   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'self'" always;
+    }
+
+    # H5 静态素材（图标 / 动画 / 音效 / tabbar，长缓存 7 天）
+    location /static/ {
+        alias /usr/share/nginx/html/suiji-web/static/;
+        expires 7d;
+        add_header Cache-Control "public, max-age=604800";
+        add_header X-Content-Type-Options    "nosniff" always;
+        add_header Referrer-Policy           "no-referrer" always;
+        add_header Content-Security-Policy   "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; frame-ancestors 'self'" always;
     }
 
     # ---- 官网静态站（岁记官网，随容器挂载在 /usr/share/nginx/html/suiji-website）----
@@ -189,8 +224,11 @@ server {
         add_header Content-Security-Policy   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'self'" always;
     }
 
-    # 兜底：未匹配的路径一律拒绝，避免误暴露内部服务
+    # 兜底：H5 hash 路由未匹配的路径回退入口页；/api、/suiji-website、/docs 等前缀已在上面优先匹配
     location / {
-        return 404;
+        root /usr/share/nginx/html/suiji-web;
+        try_files $uri $uri/ /index.html;
+        add_header X-Content-Type-Options    "nosniff" always;
+        add_header Referrer-Policy           "no-referrer" always;
     }
 }

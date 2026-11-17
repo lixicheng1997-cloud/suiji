@@ -114,6 +114,14 @@ class Settings:
         # 缩略图后台生成线程数：请求线程只落原图，变体交给这几个核慢慢做。
         # 设太大会和大文件上传请求抢 CPU（Pillow 解码一张 12MP 约 36MB 峰值内存）。
         self.media_workers = int(os.getenv("MEDIA_WORKERS", "2") or 2)
+        # 视频封面后台生成：独立小线程池（抽帧是 CPU+IO 混合，与图片缩略图池隔离限流，
+        # 避免和上传请求 / 图片变体抢核）。2C 小机器默认单并发。
+        self.cover_workers = int(os.getenv("COVER_WORKERS", "1") or 1)
+        # 封面帧规格：宽度 px、JPEG 质量（ffmpeg -q:v，2 最佳 ~31 最差）、取帧偏移秒数
+        # （偏移避开片头黑帧；失败任务内部会退回 0s 再试一次）。
+        self.cover_width = int(os.getenv("COVER_WIDTH", "400") or 400)
+        self.cover_quality = int(os.getenv("COVER_QUALITY", "5") or 5)
+        self.cover_seek = float(os.getenv("COVER_SEEK", "0.3") or 0.3)
         # 无损重压的像素闸（COMPRESS_MAX_PIXELS）：重压省 4%~10% 字节，代价按像素走
         # （实测 12MP 0.28s、48MP 1.2s，都在请求线程里排队）。默认 2000 万像素：
         # 常见手机照片（12~20MP）照压，只把 48MP 这类巨型图排除——多留约 10% 字节，

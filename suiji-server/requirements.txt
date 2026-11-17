@@ -20,6 +20,9 @@ boto3==1.44.3
 Pillow==11.1.0
 # HEIC/HEIF 转 JPEG（iPhone 照片兼容性）；缺失时 HEIC 原样存储
 pillow-heif==0.16.0
+# 视频封面抽帧：自带 ffmpeg 静态二进制（Linux wheel 含 ffmpeg-linux 可执行文件）；
+# 缺失或二进制不可用时封面任务静默跳过，不影响上传主流程
+imageio-ffmpeg==0.8.1
 # 应用层传输加密：RSA-OAEP-256 + AES-256-CBC/HMAC-SHA256（core/crypto.py）
 # 缺失时服务照常启动，只是敏感接口退回明文（启动日志会告警）
 cryptography==44.0.2

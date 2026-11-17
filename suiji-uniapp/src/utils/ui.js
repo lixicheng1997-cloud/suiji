@@ -143,6 +143,19 @@ export function toast(title, duration = 2200, type = 'ok') {
   if (toastAck === before) uni.showToast({ title: text, icon: 'none', duration })
 }
 
+/* 跨页待提示：保存等场景先离开当前页（不做固定等待），把提示存入队列，
+   由返回页 onShow 调 consumeToast() 弹出；页面栈内只有栈顶 host 会接管横幅。 */
+let pendingToast = null
+export function queueToast(title, duration = 2200, type = 'ok') {
+  pendingToast = { title: String(title || ''), duration, type: type || 'ok' }
+}
+export function consumeToast() {
+  if (!pendingToast) return
+  const t = pendingToast
+  pendingToast = null
+  toast(t.title, t.duration, t.type)
+}
+
 /**
  * 错误提示（接口报错统一入口）：同一条错误只提示一次。
  * api/http.js 会在请求失败时排队兜底提示，页面 catch 内先调用本函数

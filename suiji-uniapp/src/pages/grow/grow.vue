@@ -136,6 +136,7 @@
 
 <script>
 import * as api from '@/utils/api.js'
+import * as ui from '@/utils/ui.js'
 import tabSwipe, { pullRefresh } from '@/utils/tabSwipe.js'
 import { palette } from '@/theme/theme.js'
 
@@ -184,6 +185,8 @@ export default {
   },
 
   onShow() {
+    /* 消费编辑器跨页回传的「已保存」提示 */
+    ui.consumeToast()
     this.reload()
   },
 

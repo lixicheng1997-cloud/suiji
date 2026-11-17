@@ -1,6 +1,6 @@
 <template>
   <!-- 有封面图：铺满；无封面：暖灰占位底，避免 App 原生 video 未播放时露出纯黑首帧 -->
-  <image v-if="thumb" class="vc-img" :src="thumb" mode="aspectFill" lazy-load />
+  <image v-if="cover" class="vc-img" :src="cover" mode="aspectFill" lazy-load @error="onError" />
   <view v-else class="vc-ph" />
 </template>
 
@@ -11,7 +11,8 @@
  * 仍由各父页面叠加。点击行为也在父级（全屏预览保留原生 <video>）。
  *
  * 背景：App 端原生 <video> 未播放时不解码首帧，poster 为空会露出卡片黑底；
- * 选片阶段 App 通常拿不到首帧缩略图、后端暂不抽帧，故无 thumb 时用占位兜底。
+ * 服务端后台抽帧未完成期间，封面地址可能回退到视频流，<image> 加载失败时
+ * 置空走占位兜底，避免露出破图。
  * 用法：<sj-video-cover :thumb="video.thumb" class="xxx" />
  */
 export default {
@@ -19,6 +20,24 @@ export default {
   props: {
     /* 封面图路径（本地临时或云端带 token 地址）；空字符串表示无封面 */
     thumb: { type: String, default: '' }
+  },
+  data() {
+    return { failed: false }
+  },
+  computed: {
+    cover() {
+      return this.failed ? '' : this.thumb
+    }
+  },
+  watch: {
+    thumb() {
+      this.failed = false
+    }
+  },
+  methods: {
+    onError() {
+      this.failed = true
+    }
   }
 }
 </script>

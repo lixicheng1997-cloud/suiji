@@ -39,8 +39,8 @@
       <view class="src-row" hover-class="hover-press" @click="chooseSource('album')">
         <sj-icon class="src-ic" name="31-fn-compare" :size="72" />
         <view class="src-txt">
-          <text class="src-label">从相册选择</text>
-          <text class="src-sub">已有视频 · 超 {{ maxSeconds }} 秒或 {{ maxSizeMB }}MB 将被拒绝</text>
+          <text class="src-label">从相册选择（可多选）</text>
+          <text class="src-sub">已有视频 · 超 {{ maxSeconds }} 秒或 {{ maxSizeMB }}MB 将被跳过</text>
         </view>
       </view>
     </sj-modal>
@@ -101,8 +101,11 @@ export default {
   data() {
     return {
       srcShow: false,
-      /* 是否有压缩任务在跑：仅用于节流连续添加，不再阻塞卡片先上屏 */
-      compressing: false,
+      /* 压缩并发上限：同批最多 3 路本地转码，避免 App 端内存 / 编码压力 */
+      COMPRESS_CONCURRENCY: 3,
+      /* 在跑压缩任务数 + 等待队列；whenReady 仍按 compressJobs 汇总全部任务 */
+      compressActive: 0,
+      compressQueue: [],
       /* 在途压缩任务 Promise（whenReady 汇总等待）；完成后保留在数组内（已 settle，无副作用） */
       compressJobs: [],
       /* 已删除项的 key：后台压缩结果回来时直接丢弃，不回写 */
@@ -115,7 +118,9 @@ export default {
     maxSizeMB() { return Math.round(this.maxSizeBytes / 1024 / 1024) },
     uploadSrc() {
       return `/static/icons/ctl/${this.__theme}/96/58-ctl-upload.png`
-    }
+    },
+    /* 是否有压缩任务在跑（含排队）：供外部判断保存禁用态 */
+    compressing() { return this.compressActive > 0 || this.compressQueue.length > 0 }
   },
   methods: {
     isCloud(p) { return /^\/api\//.test(String(p || '')) },
@@ -135,27 +140,53 @@ export default {
     },
     chooseSource(sourceType) {
       this.srcShow = false
-      if (this.compressing) return
       this.grant(sourceType)
         .then(() => this.pick(sourceType))
-        .then(item => {
-          if (!item) return
-          if (item.size && item.size > this.maxBytes) {
+        .then(items => {
+          if (!items || !items.length) return
+          /* 截断到剩余额度，超出提示 */
+          const left = this.max - this.list.length
+          const accepted = items.slice(0, Math.max(0, left))
+          if (accepted.length < items.length) {
+            this.$refs.ntf.show({ type: 'warn', message: '最多添加 ' + this.max + ' 段视频，已保留前 ' + this.max + ' 段' })
+          }
+          if (!accepted.length) return
+          /* 含大原片时统一提示一次本地压缩，不逐条刷屏 */
+          if (accepted.some(it => it.size && it.size > this.maxBytes)) {
             this.$refs.ntf.show({ type: 'warn', message: '原片较大，正在本地压缩…' })
           }
-          const key = this.genKey()
-          /* 先以原片立即上屏（compressing 态）；压缩放到后台 Promise，完成再回写，
-             避免 App 端转码数十秒期间卡片一直不出现 */
-          this.append(Object.assign({ key, status: 'compressing' }, item))
-          this.compressing = true
-          const job = Promise.resolve()
-            .then(() => this.compressIfNeeded(item))
-            .then(compressed => this.applyResult(key, this.asReady(compressed)))
-            .catch(() => this.applyResult(key, this.asReady(item)))
-            .finally(() => { this.compressing = false })
-          this.compressJobs.push(job)
+          accepted.forEach(item => {
+            const key = this.genKey()
+            /* 先以原片立即上屏（compressing 态）；压缩走并发调度，完成再回写，
+               避免 App 端转码数十秒期间卡片一直不出现 */
+            this.append(Object.assign({ key, status: 'compressing' }, item))
+            this.enqueueCompress(key, item)
+          })
         })
         .catch(e => this.onFail(e))
+    },
+    /* 压缩任务入队：并发上限内立即开跑，其余排队；任务 Promise 汇总进 compressJobs 供 whenReady 等待 */
+    enqueueCompress(key, item) {
+      const job = new Promise(resolve => {
+        this.compressQueue.push({ key, item, resolve })
+        this.drainCompress()
+      })
+      this.compressJobs.push(job)
+    },
+    drainCompress() {
+      while (this.compressActive < this.COMPRESS_CONCURRENCY && this.compressQueue.length) {
+        const task = this.compressQueue.shift()
+        this.compressActive += 1
+        Promise.resolve()
+          .then(() => this.compressIfNeeded(task.item))
+          .then(compressed => this.applyResult(task.key, this.asReady(compressed)))
+          .catch(() => this.applyResult(task.key, this.asReady(task.item)))
+          .finally(() => {
+            this.compressActive -= 1
+            task.resolve()
+            this.drainCompress()
+          })
+      }
     },
     /* 本地唯一标识：压缩回写按 key 定位，不依赖可能重复/缺失的临时路径 */
     genKey() {
@@ -180,6 +211,11 @@ export default {
     whenReady() {
       if (!this.compressJobs.length) return Promise.resolve()
       return Promise.all(this.compressJobs.slice()).catch(() => {})
+    },
+    /* 压缩进度统计：busy=仍在压缩的段数，供外层展示「正在压缩 x/N」 */
+    compressStats() {
+      const busy = this.list.filter(v => v && v.status === 'compressing').length
+      return { total: this.list.length, busy, ready: this.list.length - busy }
     },
     /* 选片后本地压缩：App 走 uni.compressVideo，微信小程序走 wx.compressVideo；
        其余平台（H5 等）无可靠本地转码能力，原样回退。压缩失败也回退原片，不阻断选择。 */
@@ -231,39 +267,44 @@ export default {
     },
     pick(sourceType) {
       return new Promise((resolve, reject) => {
+        /* 本次最多还能选几段：与已选数量凑满 max；至少 1 段保证入口可用 */
+        const left = Math.max(1, this.max - this.list.length)
+        const normalize = res => {
+          if (res.tempFiles && res.tempFiles.length) return res.tempFiles
+          if (res.tempFilePath) return [res]
+          return Array.isArray(res) ? res : [res]
+        }
         const done = (res) => {
-          const f = (res.tempFiles && res.tempFiles[0])
-            || (res.tempFilePath ? { path: res.tempFilePath, duration: res.duration, size: res.size } : null)
-            || res
-          if (!f) return resolve(null)
-          /* chooseMedia 在 App/小程序返回 tempFilePath（H5 才是 path）；两者都要认，
-             否则真机选完/拍完 path 为空，视频不进列表 */
-          const path = f.path || f.tempFilePath || ''
-          if (!path) return resolve(null)
-          const dur = Number(f.duration || 0)
-          if (dur > this.maxSeconds) {
-            this.$refs.ntf.show({ type: 'warn', message: '视频 ' + Math.round(dur) + ' 秒，超过 ' + this.maxSeconds + ' 秒上限' })
-            return resolve(null)
-          }
-          const size = Number(f.size || 0)
-          /* size 取不到（0）时不拦，交由服务端兜底校验；有值且超硬上限则选片即拒 */
-          if (size > 0 && size > this.maxSizeBytes) {
-            const mb = Math.round(this.maxSizeBytes / 1024 / 1024)
-            this.$refs.ntf.show({ type: 'warn', message: '视频 ' + (size / 1024 / 1024).toFixed(1) + 'MB，超过 ' + mb + 'MB 上限' })
-            return resolve(null)
-          }
-          /* chooseMedia 返回 thumbTempFilePath（首帧缩略图）；chooseVideo 在部分平台返回 thumb 字段 */
-          const thumb = f.thumbTempFilePath || f.thumbUrl || f.thumb || ''
-          resolve({
-            path,
-            duration: dur,
-            size,
-            thumb: thumb
+          const files = normalize(res)
+          const items = []
+          let skipped = 0
+          let tooLong = 0
+          let tooBig = 0
+          files.forEach(f => {
+            if (!f) return
+            /* chooseMedia 在 App/小程序返回 tempFilePath（H5 才是 path）；两者都要认，
+               否则真机选完/拍完 path 为空，视频不进列表 */
+            const path = f.path || f.tempFilePath || ''
+            if (!path) return
+            const dur = Number(f.duration || 0)
+            if (dur > this.maxSeconds) { skipped += 1; tooLong += 1; return }
+            const size = Number(f.size || 0)
+            /* size 取不到（0）时不拦，交由服务端兜底校验；有值且超硬上限则跳过 */
+            if (size > 0 && size > this.maxSizeBytes) { skipped += 1; tooBig += 1; return }
+            /* chooseMedia 返回 thumbTempFilePath（首帧缩略图）；chooseVideo 在部分平台返回 thumb 字段 */
+            const thumb = f.thumbTempFilePath || f.thumbUrl || f.thumb || ''
+            items.push({ path, duration: dur, size, thumb })
           })
+          if (skipped > 0) {
+            const mb = Math.round(this.maxSizeBytes / 1024 / 1024)
+            const reason = tooLong && tooBig ? `超 ${this.maxSeconds} 秒或 ${mb}MB` : (tooLong ? `超 ${this.maxSeconds} 秒` : `超 ${mb}MB`)
+            this.$refs.ntf.show({ type: 'warn', message: skipped + ' 段视频' + reason + '，已跳过' })
+          }
+          resolve(items)
         }
         if (typeof uni.chooseMedia === 'function') {
           uni.chooseMedia({
-            count: 1,
+            count: left,
             mediaType: ['video'],
             sourceType: [sourceType],
             maxDuration: this.maxSeconds,
@@ -273,6 +314,7 @@ export default {
             fail: reject
           })
         } else if (typeof uni.chooseVideo === 'function') {
+          /* 老接口不支持多选：单选后由 done 包成单元素数组 */
           uni.chooseVideo({
             sourceType: [sourceType],
             maxDuration: this.maxSeconds,
@@ -305,6 +347,8 @@ export default {
     append(item) {
       if (!item || !item.path) return
       const next = this.list.slice()
+      /* 同一路径去重：多选 / 重复进入相册时不重复上卡 */
+      if (next.some(x => x && x.path === item.path)) return
       next.push(item)
       this.emit(next)
     },

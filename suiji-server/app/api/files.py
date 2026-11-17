@@ -159,9 +159,9 @@ def download(file_id: str, request: Request, token: str = Query(""),
     store = get_store()
     media_type = row.content_type or "application/octet-stream"
 
-    # 选择要返回的对象 key：默认原图；variant=thumb/small 时从 meta 取预生成的变体 key
+    # 选择要返回的对象 key：默认原图；variant=thumb/small/cover 时从 meta 取预生成的变体 key
     effective_key = row.storage_key
-    if variant in ("thumb", "small"):
+    if variant in ("thumb", "small", "cover"):
         vk = (row.meta or {}).get(f"{variant}_key", "") if isinstance(row.meta, dict) else ""
         if vk:
             effective_key = vk

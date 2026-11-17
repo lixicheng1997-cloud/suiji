@@ -40,7 +40,7 @@
         <text class="fc-title">共享相册</text>
         <view class="fc-more" hover-class="hover-press" :hover-stay-time="80" @click="goAlbum">
           <text>查看全部</text>
-          <image class="fc-more-ic" :src="'/static/icons/ctl/' + __theme + '/56/60-ctl-nav-more.png'" mode="aspectFit" />
+          <!-- <image class="fc-more-ic" :src="'/static/icons/ctl/' + __theme + '/56/60-ctl-nav-more.png'" mode="aspectFit" /> -->
         </view>
       </view>
       <view class="album-grid" v-if="albumList.length">

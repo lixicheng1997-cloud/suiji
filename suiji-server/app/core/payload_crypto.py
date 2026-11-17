@@ -103,7 +103,7 @@ async def _json_response(send, status: int, payload: dict, cors: list | None = N
     """
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     headers = [
-        (b"content-type", b"application/json"),
+        (b"content-type", b"application/json; charset=utf-8"),
         (b"content-length", str(len(body)).encode("ascii")),
     ]
     if cors:

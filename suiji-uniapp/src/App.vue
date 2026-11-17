@@ -2,10 +2,15 @@
 import { init, startEventsPolling, stopEventsPolling } from '@/utils/api.js'
 import { installFamilyGuard } from '@/utils/first-run.js'
 import { paintNavigationBar } from '@/infra/platform.js'
+import { initNetWatch, netLabel } from '@/infra/net.js'
 import * as notify from '@/infra/notify.js'
+import logger from '@/utils/logger.js'
 
 export default {
   onLaunch() {
+    initNetWatch()
+    logger.info('app', '应用启动', { env: logger.appEnv, platform: logger.platform, net: netLabel() })
+    this.bindGlobalError()
     // 手势导航真机的底部白带落在 webview 之外，只能把原生导航条底色设成页面底色（见 infra/platform.js）
     paintNavigationBar('#FFF8F0')
     // 家庭强制门控：已登录但未关联家庭的账号，任何跳转都会被改写到 pages/family-setup
@@ -21,6 +26,7 @@ export default {
     try {
       init({ silent: true })
     } catch (e) {
+      logger.error('app', '启动初始化同步异常', e)
       // 崩溃保护：异常写本地日志，下次启动提示（TDD §12）
       try { uni.setStorageSync('sj_crash_log', String(e && e.message || e)) } catch (err) { /* ignore */ }
     }
@@ -29,6 +35,7 @@ export default {
     try { notify.init() } catch (e) { /* ignore */ }
   },
   onShow() {
+    logger.debug('app', '回到前台')
     // 回前台按未读通知数刷新应用图标角标
     notify.refreshBadge()
     // 家人动态前台轮询（方案 A）：按 config/app.js 的 MESSAGE_POLL_INTERVAL 探测 /events/count，
@@ -36,8 +43,35 @@ export default {
     startEventsPolling()
   },
   onHide() {
+    logger.debug('app', '退入后台')
     // 退后台停轮询：省电省流量；被杀场景靠下次启动补弹兜底
     stopEventsPolling()
+  },
+
+  /* 未捕获同步异常：App / 小程序框架钩子；H5 由 bindGlobalError 挂 window 兜底 */
+  onError(err) {
+    logger.error('crash', '未捕获异常', { err })
+  },
+
+  /* 未处理的 Promise 拒绝：App / 小程序框架钩子 */
+  onUnhandledRejection(res) {
+    logger.error('crash', '未处理的 Promise 拒绝', { reason: res && res.reason })
+  },
+
+  methods: {
+    /* H5 额外挂 window 级兜底，捕获框架钩子未转发的脚本错误与未处理拒绝 */
+    bindGlobalError() {
+      // #ifdef H5
+      try {
+        window.onerror = (msg, src, line, col, e) => {
+          logger.error('crash', 'window.onerror', { msg: String(msg), src: src || '', line: line, col: col, err: e })
+        }
+        window.addEventListener('unhandledrejection', ev => {
+          logger.error('crash', '未处理的 Promise 拒绝(H5)', { reason: ev && ev.reason })
+        })
+      } catch (e) { /* ignore */ }
+      // #endif
+    }
   }
 }
 </script>

@@ -122,7 +122,7 @@
                 <view class="rvp-tri" />
               </view>
               <view v-else class="rec-pending">
-                <view v-if="!(e.videos[0] && e.videos[0].status === 'failed')" class="rp-spinner" />
+                <view class="rp-spinner" />
                 <text class="rec-pending-txt">{{ firstVideoText(e) }}</text>
               </view>
               <text v-if="e.videos && e.videos.length" class="rec-video-count">{{ e.videos.length }} 段</text>
@@ -443,6 +443,8 @@ export default {
   },
 
   onShow() {
+    /* 消费编辑器跨页回传的「已保存」提示（队列无待提示时直接返回） */
+    ui.consumeToast()
     /* 每次回到主页，主行/副行各顺一句，文案常换常新（不按天固定） */
     this.helloIdx = (this.helloIdx + 1) % this.helloList.length
     this.cheerIdx = (this.cheerIdx + 1) % this.cheerList.length
@@ -627,11 +629,7 @@ export default {
       const v = e.videos && e.videos[0]
       return !!(v && v.url)
     },
-    firstVideoText(e) {
-      const v = e.videos && e.videos[0]
-      if (!v) return '等待上传'
-      if (v.status === 'failed') return '上传失败'
-      if (v.status === 'uploading') return '上传中 ' + (v.progress || 0) + '%'
+    firstVideoText() {
       return '等待上传'
     },
     /* 点缩略图直接全屏预览：视频走 e.videos（后台上传中的占位段无云端地址，跳过不预览）；

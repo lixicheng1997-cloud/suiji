@@ -297,6 +297,9 @@ def upload_file(db: Session, auth: AuthContext, upload: UploadFile, business_typ
         # 两张缩略图（12MP 实测 708ms，占请求线程 CPU 的近六成）交给后台线程池。
         # 下载端点在 meta 里没有变体 key 时自动回落原图，所以响应可以立刻返回。
         jobs.submit(out["id"], auth.family_id)
+    elif is_video:
+        # 视频封面（首帧 JPEG）走独立封面池后台抽帧；未生成期间前端占位兜底。
+        jobs.submit(out["id"], auth.family_id, kind="video")
     return out
 
 
@@ -493,6 +496,9 @@ def register_direct(db: Session, auth: AuthContext, payload: dict) -> dict:
     if kind_ct.startswith("image/"):
         # 直传绕过了服务端的图片管线，缩略图同样靠后台补齐（缺失期间下载回落原图）
         jobs.submit(row.id, auth.family_id)
+    elif kind_ct.startswith("video/"):
+        # 直传视频封面同样后台补齐；未生成期间前端占位兜底
+        jobs.submit(row.id, auth.family_id, kind="video")
     return file_row(row)
 
 
