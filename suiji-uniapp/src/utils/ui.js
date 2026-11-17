@@ -65,7 +65,16 @@ function renderLoading() {
  *                        percent 不传则不显示进度条；timeout 传 0 表示不自动收起
  * @returns {{ id:number, close:Function, update:Function }} 句柄
  */
+/* 临时禁用全屏遮罩：所有 loading() 直接返回空句柄，close/update 空跑，
+ * 不入栈、不广播、不弹原生遮罩；各页面的按钮禁用状态（saving/busy 等）原样保留。
+ * 恢复遮罩时：删除下方空句柄导出，把 _loadingImpl 改回 export function loading 即可。 */
+const noop = () => {}
 export function loading(text, opts) {
+  return { id: ++loadingSeq, close: noop, update: noop }
+}
+
+/* 原全屏加载实现（保留以便恢复） */
+function _loadingImpl(text, opts) {
   const o = opts || {}
   const item = {
     id: ++loadingSeq,

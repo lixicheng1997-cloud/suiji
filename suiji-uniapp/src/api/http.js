@@ -252,9 +252,11 @@ function ensurePublicKey() {
         if (ok) {
           setPublicKey(d)
           try { kvSet(RSA_KEY, JSON.stringify({ kid: d.kid, n: d.n, e: d.e })) } catch (e) { /* 存不下就每次重取 */ }
+        } else {
+          /* 公钥拉取是 GET 读取：成功不记日志；仅失败留 warn 便于排障 */
+          logger.warn('crypto', '拉取公钥失败 · ' + (Date.now() - t0) + 'ms',
+            reqMeta({ ms: Date.now() - t0, status: res && res.statusCode, method: 'GET', path: '/crypto/public-key', op: resolveOp('GET', '/crypto/public-key') }))
         }
-        logger[ok ? 'debug' : 'warn']('crypto', '拉取公钥 ' + (ok ? '成功' : '失败') + ' · ' + (Date.now() - t0) + 'ms',
-          reqMeta({ ms: Date.now() - t0, status: res && res.statusCode, method: 'GET', path: '/crypto/public-key', op: resolveOp('GET', '/crypto/public-key') }))
         resolve(ok)
       },
       fail: err => {
@@ -702,26 +704,30 @@ export function request(method, path, data, opts) {
   const baseMeta = Object.assign({
     seq, op, method, path, entryType: entryType || '', bodyBytes: bodySize(data), silent: !!o.silent
   }, retryFlag)
-  logger.debug('http', '→ #' + seq + ' ' + method + ' ' + path + ' 〔' + op + '〕', reqMeta(baseMeta))
+  /* 只记录增删改（POST/PUT/PATCH/DELETE）的接口日志；GET 读取一律静默，不写调试日志。
+   * 重试、错误提示、会话过期处理照常执行，只是不落日志。 */
+  const isWrite = method !== 'GET'
+  const log = (level, msg, meta) => { if (isWrite) logger[level]('http', msg, reqMeta(meta)) }
+  log('debug', '→ #' + seq + ' ' + method + ' ' + path + ' 〔' + op + '〕', baseMeta)
   return rawRequest(method, path, data, o.header)
     .then(res => {
       if (res.status === 409 && isKeyRotated(res) && !o._keyRetried) {
-        logger.warn('http', '#' + seq + ' 〔' + op + '〕 服务端轮换密钥，重取公钥后重试', reqMeta(baseMeta))
+        log('warn', '#' + seq + ' 〔' + op + '〕 服务端轮换密钥，重取公钥后重试', baseMeta)
         return refreshPublicKey()
           .then(() => request(method, path, data, Object.assign({}, o, { _keyRetried: true })))
       }
       if (res.status === 401 && !o._retried && !AUTH_NO_RETRY_RE.test(path)) {
-        logger.warn('http', '#' + seq + ' 〔' + op + '〕 401 登录态过期，尝试刷新令牌', reqMeta(baseMeta))
+        log('warn', '#' + seq + ' 〔' + op + '〕 401 登录态过期，尝试刷新令牌', baseMeta)
         return tryRefresh().then(ok => {
           if (!ok) {
-            logger.error('http', '#' + seq + ' 〔' + op + '〕 令牌刷新失败，会话过期', reqMeta(baseMeta))
+            log('error', '#' + seq + ' 〔' + op + '〕 令牌刷新失败，会话过期', baseMeta)
             expireSession(); throw mutedError('登录已过期，请重新登录')
           }
           return request(method, path, data, Object.assign({}, o, { _retried: true }))
         })
       }
       if (res.status === 409 && isNeedFamily(res)) {
-        logger.warn('http', '#' + seq + ' 〔' + op + '〕 账号未关联家庭，引导创建/加入', reqMeta(baseMeta))
+        log('warn', '#' + seq + ' 〔' + op + '〕 账号未关联家庭，引导创建/加入', baseMeta)
         const e = needFamilyError()
         notify(e, o)
         if (needFamilyHandler) needFamilyHandler()
@@ -736,24 +742,23 @@ export function request(method, path, data, opts) {
         const respType = res.data && typeof res.data === 'object' && res.data.type ? res.data.type : ''
         const meta = Object.assign(baseMeta, { ms, status: res.status, bytes, dlKbps })
         if (respType && !meta.entryType) meta.entryType = respType
-        logger.debug('http', '← #' + seq + ' ' + method + ' ' + path + ' 〔' + op + '〕 ' + res.status +
-          ' · ' + netLabel() + ' · ' + ms + 'ms · 响应 ' + bytes + 'B · ' + dlKbps + 'KB/s',
-          reqMeta(meta))
+        log('debug', '← #' + seq + ' ' + method + ' ' + path + ' 〔' + op + '〕 ' + res.status +
+          ' · ' + netLabel() + ' · ' + ms + 'ms · 响应 ' + bytes + 'B · ' + dlKbps + 'KB/s', meta)
         return res.data
       }
       const e = mapError(res)
       const ms = elapsed()
-      if (res.status >= 500) logger.error('http', '✕ #' + seq + ' ' + method + ' ' + path + ' 〔' + op + '〕 服务端错误 ' + res.status + ' · ' + ms + 'ms',
-        reqMeta(Object.assign(baseMeta, { ms, status: res.status, err: e, raw: e.raw })))
-      else logger.warn('http', '⚠ #' + seq + ' ' + method + ' ' + path + ' 〔' + op + '〕 请求被拒 ' + res.status + ' · ' + ms + 'ms',
-        reqMeta(Object.assign(baseMeta, { ms, status: res.status, err: e, raw: e.raw })))
+      if (res.status >= 500) log('error', '✕ #' + seq + ' ' + method + ' ' + path + ' 〔' + op + '〕 服务端错误 ' + res.status + ' · ' + ms + 'ms',
+        Object.assign(baseMeta, { ms, status: res.status, err: e, raw: e.raw }))
+      else log('warn', '⚠ #' + seq + ' ' + method + ' ' + path + ' 〔' + op + '〕 请求被拒 ' + res.status + ' · ' + ms + 'ms',
+        Object.assign(baseMeta, { ms, status: res.status, err: e, raw: e.raw }))
       throw e
     })
     .catch(err => {
       const e = (err && err.netFail) ? netError(err) : err
       /* then 内主动抛出的业务错误（need_family / 401 / 4xx / 5xx）已在上方记过，这里只补网络失败 */
-      if (err && err.netFail) logger.error('http', '✕ #' + seq + ' ' + method + ' ' + path + ' 〔' + op + '〕 网络失败 · ' + netLabel() + ' · ' + elapsed() + 'ms',
-        reqMeta(Object.assign(baseMeta, { ms: elapsed(), err: err, raw: e.raw })))
+      if (err && err.netFail) log('error', '✕ #' + seq + ' ' + method + ' ' + path + ' 〔' + op + '〕 网络失败 · ' + netLabel() + ' · ' + elapsed() + 'ms',
+        Object.assign(baseMeta, { ms: elapsed(), err: err, raw: e.raw }))
       notify(e, o)
       throw e
     })
