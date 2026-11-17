@@ -100,7 +100,6 @@
 import * as api from '@/utils/api.js'
 import * as ui from '@/utils/ui.js'
 import tabSwipe, { pullRefresh } from '@/utils/tabSwipe.js'
-import { play } from '@/utils/sound.js'
 
 /* 角色 → v2 role-* 配色类（两态：创建者 / 成员） */
 function roleClass(r) {
@@ -206,7 +205,6 @@ export default {
           const cur = api.getFamilyInfo()
           /* 一个用户仅关联一个家庭：加入其他家庭会与当前家庭解绑，先让用户确认 */
           if (!cur || !cur.id) return this.doJoin(code)
-          play('S08') // 与当前家庭解绑危险确认弹出音效
           return ui.confirm({
             title: '加入其他家庭',
             content: '加入后将与当前家庭「' + (cur.name || '当前家庭') + '」解绑，该家庭的宝宝与记录将不再可见；你的个人资料不受影响。',
@@ -221,8 +219,6 @@ export default {
     doJoin(code) {
       return api.joinFamily(code).then(r => {
         this.refreshView()
-        /* 家人成功加入家庭空间：播 E10（生成邀请码成功不播） */
-        play('E10')
         const left = r && r.left_family
         this.$refs.ntf.show({ type: 'ok', message: left && left.name ? '已加入新家庭 · 已与「' + left.name + '」解绑' : '已加入家庭空间' })
       })

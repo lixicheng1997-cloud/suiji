@@ -113,7 +113,6 @@
 import * as api from '@/utils/api.js'
 import { CARD_TYPES } from '@/utils/mock.js'
 import { palette, cardSkin, withAlpha, THEME_LABELS } from '@/theme/theme.js'
-import { play } from '@/utils/sound.js'
 import * as ui from '@/utils/ui.js'
 import { resolveSmall } from '@/api/http.js'
 
@@ -308,8 +307,6 @@ export default {
         const path = await this.renderCard()
         ld.update({ text: '正在写入相册…' })
         await this.saveToAlbum(path)
-        /* 纪念卡生成完成：百日/周岁各绑 E07 变体，里程碑卡不传 key */
-        play('E07', this.type === 0 ? { key: 'hundred' } : this.type === 1 ? { key: 'year' } : {})
         this.$refs.ntf.show({ type: 'ok', message: '纪念卡已保存到相册' })
       } catch (e) {
         this.onGenFail(e)

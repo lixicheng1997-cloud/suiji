@@ -65,7 +65,6 @@
 <script>
 import * as api from '@/utils/api.js'
 import * as ui from '@/utils/ui.js'
-import { play } from '@/utils/sound.js'
 
 export default {
   data() {
@@ -121,8 +120,6 @@ export default {
         }
         this.editId = d.id
         this.apply(d)
-        /* AI 日记生成成功、进入草稿待确认：播 E04 */
-        play('E04')
       }
     } catch (e) {
       ui.error(e, '日记加载失败')
@@ -198,8 +195,6 @@ export default {
       let saved = false
       try {
         await api.updateDiary(this.diary.id, { paras: this.buildParas(), status: 'archived' })
-        /* 日记归档成功：播 E06 */
-        play('E06')
         this.$refs.ntf.show({ type: 'ok', message: '已归档 · 进入成长档案并标注「AI 生成」' })
         saved = true
       } catch (e) {

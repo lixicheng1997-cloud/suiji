@@ -142,7 +142,6 @@
 import { TYPES, BADGES } from '@/utils/mock.js'
 import * as api from '@/utils/api.js'
 import * as ui from '@/utils/ui.js'
-import { play } from '@/utils/sound.js'
 import { resolveSmall, resolveCover } from '@/api/http.js'
 
 export default {
@@ -342,7 +341,6 @@ export default {
       this.$refs.ntf.show({ type: 'warn', message: '分享到家庭动态需接入后端（开发中）' })
     },
     onDelete() {
-      play('S08') // 删除记录危险确认弹出音效
       ui.showModal({
         title: '删除记录',
         content: '确定删除这条记录吗？删除后进入回收站，保留 30 天。',

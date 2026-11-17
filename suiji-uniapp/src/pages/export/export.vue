@@ -66,7 +66,6 @@
 import * as api from '@/utils/api.js'
 import { EXPORT_SECS } from '@/utils/mock.js'
 import * as ui from '@/utils/ui.js'
-import { play } from '@/utils/sound.js'
 
 export default {
   data() {
@@ -134,8 +133,6 @@ export default {
       const ld = ui.loading('正在生成档案文件…', { sub: '保持应用打开，勿切后台' })
       try {
         await api.exportArchive()
-        /* PDF 成长档案导出完成：播 E09 */
-        play('E09')
         this.$refs.ntf.show({ type: 'ok', message: '档案已生成 · 已保存到文件' })
       } catch (e) {
         /* 失败时进度条已跑到 100，不能再显示「已完成」误导用户 */

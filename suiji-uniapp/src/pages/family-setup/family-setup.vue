@@ -61,7 +61,6 @@
 import * as api from '@/utils/api.js'
 import * as ui from '@/utils/ui.js'
 import * as guide from '@/utils/first-run.js'
-import { play } from '@/utils/sound.js'
 
 /* 登录后家庭门控页（强制流程）：账号没有关联家庭时只能做两件事——
  * ① 输入家庭名称创建 ② 输入家庭邀请码加入；完成前前端禁止进入任何业务页面、
@@ -116,8 +115,6 @@ export default {
       req
         .then(() => {
           this.busy = false
-          /* 凭码加入家庭成功（创建家庭不算）：播 E10 */
-          if (this.mode === 'join') play('E10')
           this.$refs.ntf.show({ type: 'ok', message: this.mode === 'create' ? '家庭创建成功' : '已加入家庭' })
           setTimeout(() => guide.goAfterLogin(), 600)
         })

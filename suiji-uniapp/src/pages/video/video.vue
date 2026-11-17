@@ -76,7 +76,6 @@
 
 <script>
 import { VIDEO_RANGES, VIDEO_MUSIC } from '@/utils/mock.js'
-import { play } from '@/utils/sound.js'
 
 export default {
   data() {
@@ -133,8 +132,6 @@ export default {
         if (this.progress >= 100) {
           clearInterval(this.timer)
           this.timer = null
-          /* 视频合成完成：播 E08（合成过程中不播任何进度音） */
-          play('E08')
           this.$refs.ntf.show({ type: 'ok', message: '视频已合成 · 已保存到相册' })
         }
       }, 300)

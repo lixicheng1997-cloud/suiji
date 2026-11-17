@@ -68,7 +68,6 @@
 import { TYPES } from '@/utils/mock.js'
 import * as api from '@/utils/api.js'
 import * as ui from '@/utils/ui.js'
-import { play } from '@/utils/sound.js'
 
 export default {
   data() {
@@ -124,7 +123,6 @@ export default {
     async restore(t) {
       try {
         await api.restoreEntry(t.id)
-        play('S09') // 恢复成功音效（震动自动配对）
         this.refresh()
         this.$refs.ntf.show({ type: 'ok', message: '已恢复到时光轴' })
       } catch (e) {
@@ -134,7 +132,6 @@ export default {
 
     /* 彻底删除：二次确认 */
     purge(t) {
-      play('S08') // 危险确认弹出音效
       ui.showModal({
         title: '彻底删除',
         content: '彻底删除后不可恢复',
@@ -157,7 +154,6 @@ export default {
     /* 一键清空：无数据不响应，有数据二次确认 */
     clearAll() {
       if (!this.trash.length) return
-      play('S08') // 清空回收站危险确认弹出音效
       ui.showModal({
         title: '清空回收站',
         content: '将彻底删除 ' + this.trash.length + ' 条记录 · 不可恢复',

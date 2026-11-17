@@ -456,8 +456,6 @@
 import { TYPES } from '@/utils/mock.js'
 import * as api from '@/utils/api.js'
 import * as ui from '@/utils/ui.js'
-import { play } from '@/utils/sound.js'
-import { logger } from '@/utils/logger.js'
 
 /* 当前时间 HH:mm；plusMin 可选，为睡眠结束等场景提供偏移（跨日自动归到 23:59 前循环） */
 function nowHHmm(plusMin) {
@@ -882,8 +880,6 @@ export default {
       if (!this.timerStart) {
         this.timerStart = Date.now()
         this.$refs.ntf.show({ type: 'ok', message: '已开始计时' })
-        /* 计时开始播音效 */
-        play('T01')
         return
       }
       const now = Date.now()
@@ -893,9 +889,6 @@ export default {
       this.times.sleepEnd = hhmm(now)
       this.timerStart = null
       this.$refs.ntf.show({ type: 'ok', message: '计时结束 · 已回填睡眠区间' })
-      /* 计时结束音效：夜间时段（22:00–07:00）只振动不发声，其余时段正常播 */
-      const nh = new Date().getHours()
-      play('T04', (nh >= 22 || nh < 7) ? { vibrateOnly: true } : {})
     },
     /* 选图由 sj-photo-picker 内部完成（拍照/相册 + 缩略图回显），页面只持有 photos 数组 */
     /* 'YYYY-MM-DD'（用于睡眠区间等需要日期的 payload） */
@@ -1059,14 +1052,11 @@ export default {
       if (this.saving || this.submitted) return
       if (this.type === 'voice' && !(this.voice && this.voice.duration)) {
         this.$refs.ntf.show({ type: 'warn', message: '先录一段宝宝的声音再保存' })
-        /* 表单校验失败拦截保存时播音效 */
-        play('S04')
         return
       }
       /* 视频：至少录/选一段，且每段时长已由 picker 硬限 30s */
       if (this.type === 'video' && !(this.videos && this.videos.length)) {
         this.$refs.ntf.show({ type: 'warn', message: '先录制或选择一段视频' })
-        play('S04')
         return
       }
       /* 视频就绪校验：压缩中 / 待上传 / 上传中均禁止保存；失败段需删除重选。
@@ -1074,12 +1064,10 @@ export default {
       if (this.type === 'video' && this.videos.length) {
         if (this.videoFailedCount > 0) {
           this.$refs.ntf.show({ type: 'err', message: '有视频上传失败，请删除后重选' })
-          play('S04')
           return
         }
         if (this.videoPendingCount > 0) {
           this.$refs.ntf.show({ type: 'warn', message: '视频还在准备中，请稍候' })
-          play('S04')
           return
         }
       }
@@ -1091,31 +1079,26 @@ export default {
       /* 测量日期不能晚于今天 */
       if (this.type === 'measure' && this.measureDate > todayKeyStr()) {
         this.$refs.ntf.show({ type: 'warn', message: '测量日期不能晚于今天' })
-        play('S04')
         return
       }
       /* 里程碑达成日期不能晚于今天 */
       if (this.type === 'milestone' && this.milestoneDate > todayKeyStr()) {
         this.$refs.ntf.show({ type: 'warn', message: '达成日期不能晚于今天' })
-        play('S04')
         return
       }
       /* 测量三项全 0 = 没填：直接落库会生成一条空记录点，曲线上看不出区别 */
       if (this.type === 'measure' && !Number(this.nums.height) && !Number(this.nums.weight) && !Number(this.nums.head)) {
         this.$refs.ntf.show({ type: 'warn', message: '至少填写身高、体重或头围其中一项' })
-        play('S04')
         return
       }
       /* 用药：药名是这条记录的唯一标识，空着保存以后无法辨认吃的是什么 */
       if (this.type === 'med' && !(this.medName || '').trim()) {
         this.$refs.ntf.show({ type: 'warn', message: '请填写药品名称' })
-        play('S04')
         return
       }
       /* 睡眠：起止相同（或没填）会存出 0 分钟记录，多半是误触 */
       if (this.type === 'sleep' && this.times.sleepStart === this.times.sleepEnd) {
         this.$refs.ntf.show({ type: 'warn', message: '睡眠的开始与结束时间相同，请检查' })
-        play('S04')
         return
       }
       /* 视频可能仍在本地压缩：上传前等压缩产物就绪；等待期间浮层告知用户
@@ -1169,23 +1152,8 @@ export default {
           : this.milestoneDate + ' ' + nowHHmm()
       }
       if (this.type === 'milestone' && this.switches.dateUncertain) entry.backfill = true
-      /* 里程碑首次达成判定：必须在调用 saveEntry 前采样缓存——
-         saveEntry 内部会先乐观更新把 done 置 true，调用后再查就永远"已达成"；
-         编辑已有记录（entryId）不算首次 */
-      const msKey = this.type === 'milestone' && !this.entryId ? String(this.single.milestonePick || '') : ''
-      const msFirst = !!msKey && !api.getMilestones().some(m => m.name === msKey && m.done)
-      const tTrace = Date.now()
       try {
         const res = await api.saveEntry(entry, { onProgress: p => ld.update({ percent: p }) })
-        logger.info('entry-trace', '续体恢复', { ms: Date.now() - tTrace })
-        /* NFR-06：保存成功音效只在服务端确认（上方 await 的 REST 成功 resolve）之后播 */
-        logger.info('entry-trace', '音效前', { ms: Date.now() - tTrace })
-        play('S03')
-        /* 测量记录：生长曲线新数据点落位音效（音量极低，S03 之后顺序叠加一次 E03） */
-        if (this.type === 'measure') play('E03')
-        /* 里程碑类型首次达成叠加 E01（key 绑定变体）；普通记录只播 S03 不叠加 */
-        if (msFirst) play('E01', { key: msKey })
-        logger.info('entry-trace', '音效后', { ms: Date.now() - tTrace })
         /* 成功提示：视频已在落库前同步上传完成，媒体就位。
            不入页内横幅（页面随即销毁看不到），改入跨页队列，由返回页 onShow 弹出。 */
         const msg = '已保存'
@@ -1193,18 +1161,12 @@ export default {
         this.submitted = true
         /* 不做固定等待：立即返回列表，成功提示交返回页 onShow 弹出 */
         ui.queueToast(msg, 2200, 'ok')
-        logger.info('entry-trace', '返回前', { ms: Date.now() - tTrace })
         this.goBack()
-        logger.info('entry-trace', '返回后', { ms: Date.now() - tTrace })
       } catch (e) {
         /* 失败保留表单（无归属权限时服务端返回 403） */
         ui.error(e, '保存失败')
-        /* 保存失败/无网络时播音效 */
-        play('S05')
       } finally {
-        logger.info('entry-trace', '遮罩关闭前', { ms: Date.now() - tTrace })
         ld.close()
-        logger.info('entry-trace', '遮罩关闭后', { ms: Date.now() - tTrace })
         this.saving = false
       }
     }

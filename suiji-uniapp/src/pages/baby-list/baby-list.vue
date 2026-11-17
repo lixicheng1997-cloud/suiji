@@ -75,7 +75,6 @@
 
 <script>
 import * as api from '@/utils/api.js'
-import { play } from '@/utils/sound.js'
 
 export default {
   data() {
@@ -119,7 +118,6 @@ export default {
       api.setActiveBaby(b.id)
       this.$refs.ntf.show({ type: 'ok', message: '已切换为「' + b.name + '」' })
       this.refresh()
-      play('S10') // 宝宝切换完成音效（震动自动配对）
       /* ensureVaccineSchedule 变异步：后台刷新该宝宝疫苗/里程碑缓存 */
       api.ensureVaccineSchedule()
     },

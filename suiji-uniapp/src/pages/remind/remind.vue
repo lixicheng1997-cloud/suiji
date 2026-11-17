@@ -67,7 +67,6 @@
 <script>
 import * as api from '@/utils/api.js'
 import * as ui from '@/utils/ui.js'
-import { play } from '@/utils/sound.js'
 
 export default {
   data() {
@@ -129,13 +128,11 @@ export default {
 
     toggleRow(k) {
       this.r = api.setRemind({ [k]: !this.r[k] })
-      play('S11') // 提醒开关拨动音效
     },
 
     /* sj-switch 适配器：以事件新值直写持久化（与 toggleRow 同效，不改原方法） */
     setRow(k, v) {
       this.r = api.setRemind({ [k]: v })
-      play('S11') // 提醒开关拨动音效
     },
 
     onTimeChange(e) {

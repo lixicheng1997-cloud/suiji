@@ -266,7 +266,6 @@ import * as api from '@/utils/api.js'
 import * as ui from '@/utils/ui.js'
 import tabSwipe, { pullRefresh } from '@/utils/tabSwipe.js'
 import { palette } from '@/theme/theme.js'
-import { play } from '@/utils/sound.js'
 
 /* 左滑删除：露出的删除块宽度（rpx→px），与模板 .swipe-del 宽度一致 */
 const SWIPE_DEL_PX = uni.upx2px(150)
@@ -585,15 +584,11 @@ export default {
     },
     toggleSheet() {
       this.sheetOpen = !this.sheetOpen
-      /* 仅面板展开时播音效，收起不播 */
-      if (this.sheetOpen) play('S01')
     },
     closeSheet() {
       this.sheetOpen = false
     },
     pickType(k) {
-      /* 选中记录类型时播音效 */
-      play('S02')
       this.sheetOpen = false
       uni.navigateTo({ url: '/pages/editor/editor?type=' + k })
     },

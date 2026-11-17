@@ -46,7 +46,6 @@
  * 上传仍由调用方保存时统一走 http.uploadFile（POST /files），本组件只产出本地路径。
  */
 import { resolveUrl, resolveThumb } from '@/api/http.js'
-import { play } from '@/utils/sound.js'
 
 export default {
   name: 'SjPhotoPicker',
@@ -95,8 +94,6 @@ export default {
         .then(() => this.pick(sourceType))
         .then(paths => {
           if (paths && paths.length) {
-            /* 仅「拍照」来源完成、照片进入预览时播快门音；从相册选择不播 */
-            if (sourceType === 'camera') play('S06')
             this.append(paths)
           }
         })

@@ -42,13 +42,6 @@
           @click.stop
           @change="setSwitch(r.sw, $event)"
         />
-        <sj-switch
-          v-else-if="r.swKey"
-          class="row-sw"
-          :checked="flags[r.swKey]"
-          @click.stop
-          @change="setFlag(r.swKey, $event)"
-        />
         <image v-else-if="r.chev" class="sr-chev" src="/static/icons/chevron-right.svg" />
       </view>
     </view>
@@ -120,7 +113,6 @@ import * as ui from '@/utils/ui.js'
 import logger from '@/utils/logger.js'
 import tabSwipe, { pullRefresh } from '@/utils/tabSwipe.js'
 import { THEME_LABELS } from '@/theme/theme.js'
-import { play, vibrate, isSoundOn, setSoundOn, isVibrateOn, setVibrateOn, debugSnapshot } from '@/utils/sound.js'
 
 /* 开关行下标 → 持久化键（模板以数组下标消费 switches，形状保持不变） */
 const SWITCH_KEYS = ['checkup', 'anniversary', 'notify']
@@ -139,8 +131,6 @@ export default {
       avatarUrl: '',
       /* 开关状态：体检提醒 / 纪念日提醒 / 消息通知 */
       switches: [true, true, true],
-      /* 音效/震动为本地持久化开关 */
-      flags: { soundOn: true, vibrateOn: true },
       /* 消息中心未读通知数（待办不计入） */
       unread: 0,
       /* 服务器地址选择面板（sj-popup） */
@@ -173,7 +163,6 @@ export default {
       if (p.avatar) this.avatarUrl = api.fileSrc(p.avatar) || p.avatar
       const s = api.getSwitches()
       this.switches = SWITCH_KEYS.map(k => !!s[k])
-      this.flags = { soundOn: isSoundOn(), vibrateOn: isVibrateOn() }
       this.unread = api.getUnreadTotal()
       const babies = api.getBabies()
       this.babyCount = babies.length
@@ -205,13 +194,6 @@ export default {
           rows: [
             { mascot: true, label: '主题切换（' + THEME_LABELS[this.__theme] + '）', val: '轻点换肤', chev: true, act: 'theme' },
             { png: '22-fn-backup', label: '服务器地址', sd: '当前：' + api.serverUrl(), val: server, chev: true, act: 'server', adminOnly: true },
-          ]
-        },
-        {
-          label: '声音与振动',
-          rows: [
-            { png: '25-fn-notify', label: '音效', sd: '记录保存、危险确认等场景播放提示音', swKey: 'soundOn' },
-            { png: '21-fn-remind', label: '手机震动', sd: '音效播放时同步震动反馈（音效关闭仍可独立振动）', swKey: 'vibrateOn' },
           ]
         },
         {
@@ -352,31 +334,7 @@ export default {
     setSwitch(i, v) {
       this.switches[i] = v
       api.setSwitch(SWITCH_KEYS[i], v)
-      play('S11') // 提醒开关拨动音效
       this.$refs.ntf.show({ type: 'ok', message: v ? '提醒已开启' : '提醒已关闭' })
-    },
-
-    /* sj-switch 适配器：乐观写入 + 失败回滚，副作用与 toggleFlag 一致（不改原方法） */
-    setFlag(key, v) {
-      this.flags[key] = v
-      /* 音效开关：本地持久化；打开时试听一次保存成功音（force 跳过去重） */
-      if (key === 'soundOn') {
-        setSoundOn(v)
-        if (v) play('S03', { force: true })
-        this.$refs.ntf.show({ type: 'ok', message: v ? '音效已开启 · 刚为你播放了一段试听' : '音效已关闭' })
-        /* 临时诊断：900ms 后回显 API 回调结果（定位后删除） */
-        if (v) setTimeout(() => this.$refs.ntf.show({ type: 'warn', message: '诊断 ' + debugSnapshot() }), 900)
-        return
-      }
-      /* 震动开关：本地持久化；打开时立即震一次作为反馈 */
-      if (key === 'vibrateOn') {
-        setVibrateOn(v)
-        if (v) vibrate('confirm_light')
-        this.$refs.ntf.show({ type: 'ok', message: v ? '手机震动已开启' : '手机震动已关闭' })
-        /* 临时诊断：500ms 后回显震动 API 结果（定位后删除） */
-        if (v) setTimeout(() => this.$refs.ntf.show({ type: 'warn', message: '诊断 vib=' + debugSnapshot().split(' | ')[0] }), 500)
-        return
-      }
     },
 
     /* AI 配置简化：模型 Key 由服务端环境变量持有，客户端仅保留自动生成开关（契约 §11） */
