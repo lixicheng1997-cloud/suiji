@@ -873,7 +873,7 @@ function uploadPhotos(paths, babyId, onProgress) {
  * 每项形状见 sj-video-picker：{ path, duration, size, thumb, status, key }
  * @returns {Promise<{items: [{url, duration, size, file_id}], files: string[]}>}
  */
-function uploadVideos(items, babyId, onProgress) {
+export function uploadVideos(items, babyId, onProgress) {
   const list = (items || []).filter(Boolean)
   if (!list.length) return Promise.resolve({ items: [], files: [] })
   const locals = list.filter(it => !CLOUD_RE.test(String((it && it.path) || '')))

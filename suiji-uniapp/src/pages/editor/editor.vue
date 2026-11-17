@@ -208,7 +208,7 @@
       <!-- ========== 视频 ========== -->
       <block v-else-if="type === 'video'">
         <view class="pg-sec"><text>视频片段</text><text class="hint-chip">单段 ≤30 秒 · ≤50MB · 最多 9 段</text></view>
-        <sj-video-picker ref="videoPicker" v-model="videos" :max="9" :max-seconds="30" :max-size-bytes="52428800" />
+        <sj-video-picker ref="videoPicker" v-model="videos" :max="9" :max-seconds="30" :max-size-bytes="52428800" @retry="onRetryVideo" />
 
         <view class="pg-sec"><text>拍摄时间</text></view>
         <sj-datetime-picker class="pk-wrap" mode="time" :value="times.photo" @change="onTimeChange('photo', $event)">
@@ -457,6 +457,7 @@ import { TYPES } from '@/utils/mock.js'
 import * as api from '@/utils/api.js'
 import * as ui from '@/utils/ui.js'
 import { play } from '@/utils/sound.js'
+import { logger } from '@/utils/logger.js'
 
 /* 当前时间 HH:mm；plusMin 可选，为睡眠结束等场景提供偏移（跨日自动归到 23:59 前循环） */
 function nowHHmm(plusMin) {
@@ -481,8 +482,15 @@ export default {
       type: 'feeding',
       entryId: '',
       photos: [],
-      /* 视频段列表（sj-video-picker v-model）：[{ path, duration, size, thumb, status, key }] */
+      /* 视频段列表（sj-video-picker v-model）：[{ path, duration, size, thumb, status, key }]
+         status：compressing 压缩中 → ready 待上传 → uploading 上传中 → done 云端 / failed 失败 */
       videos: [],
+      /* 视频自动上传调度：在传 key 集合、在传数、待传队列（并发限 3） */
+      videoUploadKeys: {},
+      videoUploadActive: 0,
+      videoUploadQueue: [],
+      /* 页面已销毁：在途上传结果回来后丢弃，不回写表单（已传服务器的文件交服务端兜底清理） */
+      videoDestroyed: false,
       /* 语音录入结果（sj-voice-sheet v-model）：{ duration, wave, segments, url, path, platform } */
       voice: null,
       /* 保存中：照片上传期间禁止重复提交 */
@@ -614,29 +622,25 @@ export default {
       const m = mins % 60
       return h > 0 ? h + ' 小时 ' + (m > 0 ? m + ' 分' : '') : m + ' 分'
     },
-    /* 视频本地压缩中：压缩产物未就绪前禁止保存，避免拿到半压缩 / 即将失效的临时路径 */
-    videoCompressing() {
-      return (this.videos || []).some(v => v && v.status === 'compressing')
+    /* 尚未拿到云端 url 的段：压缩中 / 待上传 / 上传中，保存时拦截 */
+    videoPendingCount() {
+      return (this.videos || []).filter(v => v && ['compressing', 'ready', 'uploading'].includes(v.status)).length
     },
-    /* 仍在压缩的视频段数：驱动压缩阶段横幅通知 */
-    videoBusyCount() {
-      return (this.videos || []).filter(v => v && v.status === 'compressing').length
+    /* 自动上传失败的段：保存时拦截，需删除重选 */
+    videoFailedCount() {
+      return (this.videos || []).filter(v => v && v.status === 'failed').length
     },
-    /* 保存按钮禁用：提交中 / 已提交待返回 / 视频压缩中，任一成立即置灰且不响应点击 */
+    /* 保存按钮禁用：提交中 / 已提交待返回 / 视频未就绪（压缩·待传·上传中·失败），任一成立即置灰且不响应点击 */
     submitDisabled() {
-      return this.saving || this.submitted || this.videoCompressing
+      return this.saving || this.submitted || this.videoPendingCount > 0 || this.videoFailedCount > 0
     }
   },
 
   watch: {
-    /* 压缩阶段通知：进入压缩 / 段数变化刷新进行中文案，全部完成提示可保存 */
-    videoBusyCount(n, o) {
-      if (this.type !== 'video' || !this.$refs.ntf) return
-      if (n > 0) {
-        this.$refs.ntf.show({ type: 'warn', message: '正在压缩 ' + n + ' 段视频…' })
-      } else if (o > 0) {
-        this.$refs.ntf.show({ type: 'ok', message: '视频压缩完成，可以保存' })
-      }
+    /* 视频段变更：压缩完成回写 ready 后，立即触发自动上传调度 */
+    videos: {
+      deep: true,
+      handler() { this.syncVideosUpload() }
     }
   },
 
@@ -683,11 +687,12 @@ export default {
          * sj-video-picker 接受 path=云端 url 的项（isCloud 分支内联播放） */
         if (e.type === 'video' && e.payload && Array.isArray(e.payload.videos)) {
           this.videos = e.payload.videos.map(v => ({
+            key: 'v' + Math.random().toString(36).slice(2, 8),
             path: v.url || '',
             duration: Number(v.duration) || 0,
             size: Number(v.size) || 0,
             thumb: v.thumb || '',
-            status: 'ready'
+            status: 'done'
           })).filter(v => v.path)
         }
         /* 语音回填：payload.voice（旧数据）或 type=voice 的顶层语音字段，切到试听态 */
@@ -699,7 +704,95 @@ export default {
     }
   },
 
+  /* 页面卸载：标记销毁，在途上传 Promise 回来后不再回写表单；
+     已发出的请求无法中断、已传文件无客户端删除接口，孤儿文件交服务端兜底清理 */
+  onUnload() {
+    this.videoDestroyed = true
+  },
+
   methods: {
+    /* ---------- 视频自动上传：压缩完成(ready)后立即上行换云端 url，保存只落库 ---------- */
+    /* 云端路径判定（与 api.js CLOUD_RE 对齐：http(s)、/api/、data: 为云端；
+       blob: 是 H5 本地临时文件引用，属于本地待上传，不算云端） */
+    isCloudVideoPath(p) {
+      return /^(https?:|\/api\/|data:)/i.test(String(p || ''))
+    },
+    /* 扫描待上传段：ready 且本地路径、未入队；入队后并发 3 调度 */
+    syncVideosUpload() {
+      if (this.type !== 'video') return
+      /* 清理已被删除段的上传残留键，避免内存堆积 */
+      Object.keys(this.videoUploadKeys).forEach(k => {
+        if (!this.videos.some(v => v.key === k)) delete this.videoUploadKeys[k]
+      })
+      this.videos.forEach(v => {
+        if (!v || !v.path || this.isCloudVideoPath(v.path)) return
+        /* 仅 ready（压缩完成、本地产物）段入队；压缩中 / 上传中 / 已完成 / 失败均跳过 */
+        if (['compressing', 'uploading', 'done', 'failed'].includes(v.status)) return
+        if (!v.key || this.videoUploadKeys[v.key]) return
+        this.videoUploadKeys[v.key] = true
+        this.videoUploadQueue.push(v.key)
+      })
+      const baby = api.getBaby()
+      this.drainVideoUpload(baby ? baby.id : '')
+    },
+    drainVideoUpload(babyId) {
+      if (this.videoDestroyed) return
+      while (this.videoUploadActive < 3 && this.videoUploadQueue.length) {
+        const key = this.videoUploadQueue.shift()
+        const item = this.videos.find(v => v && v.key === key)
+        if (!item) { delete this.videoUploadKeys[key]; continue }
+        this.videoUploadActive += 1
+        this.patchVideo(key, { status: 'uploading', progress: 0 })
+        const local = { path: item.path, duration: item.duration, size: item.size, thumb: item.thumb }
+        api.uploadVideos([local], babyId, p => {
+          if (this.videoDestroyed) return
+          const percent = Math.max(0, Math.min(100, Number(p) || 0))
+          this.patchVideo(key, { progress: percent })
+        })
+          .then(res => {
+            if (this.videoDestroyed) return
+            const cloud = res && res.items && res.items[0]
+            if (cloud && cloud.url) {
+              this.patchVideo(key, {
+                path: cloud.url,
+                thumb: cloud.thumb || local.thumb || '',
+                duration: cloud.duration,
+                size: cloud.size,
+                status: 'done',
+                progress: 0
+              })
+            } else {
+              this.patchVideo(key, { status: 'failed', progress: 0 })
+            }
+          })
+          .catch(() => { if (!this.videoDestroyed) this.patchVideo(key, { status: 'failed', progress: 0 }) })
+          .finally(() => {
+            this.videoUploadActive -= 1
+            delete this.videoUploadKeys[key]
+            if (!this.videoDestroyed) this.drainVideoUpload(babyId)
+          })
+      }
+    },
+    /* 失败段手动重试：清除调度标记并重新入队上行（不自动重试，由用户点按触发） */
+    onRetryVideo(key) {
+      if (this.videoDestroyed) return
+      const item = this.videos.find(v => v && v.key === key)
+      if (!item || item.status !== 'failed') return
+      delete this.videoUploadKeys[key]
+      this.patchVideo(key, { status: 'ready', progress: 0 })
+      this.videoUploadQueue.push(key)
+      const baby = api.getBaby()
+      this.drainVideoUpload(baby ? baby.id : '')
+    },
+    /* 不可变回写某段（按 key 定位），保持 v-model 引用变更触发 watch；页面销毁后丢弃所有回写 */
+    patchVideo(key, patch) {
+      if (this.videoDestroyed || !key) return
+      const next = this.videos.slice()
+      const idx = next.findIndex(v => v && v.key === key)
+      if (idx < 0) return
+      next[idx] = Object.assign({}, next[idx], patch)
+      this.videos = next
+    },
     /**
      * 返回上级页面：栈内只有本页时（分享链接/刷新直达编辑页）navigateBack 会静默失败，
      * 此时回退到首页；正常入栈时用 navigateBack，失败同样兜底回首页。
@@ -963,7 +1056,7 @@ export default {
       }
     },
     async onSave() {
-      if (this.saving || this.submitted || this.videoCompressing) return
+      if (this.saving || this.submitted) return
       if (this.type === 'voice' && !(this.voice && this.voice.duration)) {
         this.$refs.ntf.show({ type: 'warn', message: '先录一段宝宝的声音再保存' })
         /* 表单校验失败拦截保存时播音效 */
@@ -975,6 +1068,20 @@ export default {
         this.$refs.ntf.show({ type: 'warn', message: '先录制或选择一段视频' })
         play('S04')
         return
+      }
+      /* 视频就绪校验：压缩中 / 待上传 / 上传中均禁止保存；失败段需删除重选。
+         视频在选片后已自动压缩并上传，保存只做落库，不再上行媒体 */
+      if (this.type === 'video' && this.videos.length) {
+        if (this.videoFailedCount > 0) {
+          this.$refs.ntf.show({ type: 'err', message: '有视频上传失败，请删除后重选' })
+          play('S04')
+          return
+        }
+        if (this.videoPendingCount > 0) {
+          this.$refs.ntf.show({ type: 'warn', message: '视频还在准备中，请稍候' })
+          play('S04')
+          return
+        }
       }
       /* 里程碑自定义面板里已输入但没点「添加」的名称：保存时自动落选，
          否则 buildPayload 仍取旧选中值，用户以为已改成自定义、实际保存的还是原选项 */
@@ -1022,14 +1129,14 @@ export default {
         await this.$refs.videoPicker.whenReady()
         if (compressLd) { compressLd.close(); compressLd = null }
       }
-      const localPhotos = this.photos.filter(p => !/^(https?:|\/api\/|data:|blob:)/i.test(String(p || '')))
+      const localPhotos = this.photos.filter(p => !/^(https?:|\/api\/|data:)/i.test(String(p || '')))
       /* 语音分段同理：blob:/temp 路径都要先传 /files 换云端地址 */
       const localVoice = this.type === 'voice'
         ? (this.voice.segments || []).filter(s => s && !/^(https?:|\/api\/)/i.test(String(s.url || s.path || '')))
         : []
-      /* 视频段同理：本地临时路径先传 /files 换云端地址，全部成功后才落库 */
+      /* 视频段同理：本地临时路径（含 H5 blob:）先传 /files 换云端地址，全部成功后才落库 */
       const localVideos = this.type === 'video'
-        ? this.videos.filter(v => v && !/^(https?:|\/api\/|data:|blob:)/i.test(String(v.path || '')))
+        ? this.videos.filter(v => v && !/^(https?:|\/api\/|data:)/i.test(String(v.path || '')))
         : []
       this.saving = true
       /* 照片 / 语音 / 视频都在保存阶段同步上行，上传完成才落库并返回 */
@@ -1067,14 +1174,18 @@ export default {
          编辑已有记录（entryId）不算首次 */
       const msKey = this.type === 'milestone' && !this.entryId ? String(this.single.milestonePick || '') : ''
       const msFirst = !!msKey && !api.getMilestones().some(m => m.name === msKey && m.done)
+      const tTrace = Date.now()
       try {
         const res = await api.saveEntry(entry, { onProgress: p => ld.update({ percent: p }) })
+        logger.info('entry-trace', '续体恢复', { ms: Date.now() - tTrace })
         /* NFR-06：保存成功音效只在服务端确认（上方 await 的 REST 成功 resolve）之后播 */
+        logger.info('entry-trace', '音效前', { ms: Date.now() - tTrace })
         play('S03')
         /* 测量记录：生长曲线新数据点落位音效（音量极低，S03 之后顺序叠加一次 E03） */
         if (this.type === 'measure') play('E03')
         /* 里程碑类型首次达成叠加 E01（key 绑定变体）；普通记录只播 S03 不叠加 */
         if (msFirst) play('E01', { key: msKey })
+        logger.info('entry-trace', '音效后', { ms: Date.now() - tTrace })
         /* 成功提示：视频已在落库前同步上传完成，媒体就位。
            不入页内横幅（页面随即销毁看不到），改入跨页队列，由返回页 onShow 弹出。 */
         const msg = '已保存'
@@ -1082,14 +1193,18 @@ export default {
         this.submitted = true
         /* 不做固定等待：立即返回列表，成功提示交返回页 onShow 弹出 */
         ui.queueToast(msg, 2200, 'ok')
+        logger.info('entry-trace', '返回前', { ms: Date.now() - tTrace })
         this.goBack()
+        logger.info('entry-trace', '返回后', { ms: Date.now() - tTrace })
       } catch (e) {
         /* 失败保留表单（无归属权限时服务端返回 403） */
         ui.error(e, '保存失败')
         /* 保存失败/无网络时播音效 */
         play('S05')
       } finally {
+        logger.info('entry-trace', '遮罩关闭前', { ms: Date.now() - tTrace })
         ld.close()
+        logger.info('entry-trace', '遮罩关闭后', { ms: Date.now() - tTrace })
         this.saving = false
       }
     }

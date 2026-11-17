@@ -12,6 +12,17 @@
         <view class="vp-spinner" />
         <text class="vp-compress-txt">压缩中…</text>
       </view>
+      <!-- 上传中：压缩产物已就绪，正在上行换云端地址；卡片显示真实上传进度 -->
+      <view v-else-if="isUploading(v)" class="vp-compress">
+        <view class="vp-spinner" />
+        <text class="vp-compress-txt">上传中 {{ v.progress || 0 }}%</text>
+        <view class="vp-bar"><view class="vp-bar-in" :style="{ width: (v.progress || 0) + '%' }" /></view>
+      </view>
+      <!-- 上传失败：保留卡片供删除重选，提供手动重试入口 -->
+      <view v-else-if="isFailed(v)" class="vp-compress vp-failed">
+        <text class="vp-compress-txt">上传失败</text>
+        <view class="vp-retry" hover-class="hover-press" @click.stop="onRetry(i)"><text>重试</text></view>
+      </view>
       <template v-else>
         <view class="vp-play">
           <view class="vp-tri" />
@@ -198,6 +209,17 @@ export default {
     isCompressing(v) {
       return !!v && v.status === 'compressing'
     },
+    isUploading(v) {
+      return !!v && v.status === 'uploading'
+    },
+    isFailed(v) {
+      return !!v && v.status === 'failed'
+    },
+    /* 失败段手动重试：把 key 抛给编辑器重新入队上行 */
+    onRetry(i) {
+      const v = this.list[i]
+      if (v && v.key) this.$emit('retry', v.key)
+    },
     /* 后台压缩结果回写：项已被删除则丢弃；否则按 key 覆盖 path/thumb/size 并置 ready */
     applyResult(key, result) {
       if (!key || this.cancelled[key]) { if (key) delete this.cancelled[key]; return }
@@ -363,8 +385,8 @@ export default {
     onPreview(i) {
       const v = this.list[i]
       if (!v) return
-      /* 压缩未完成：原片路径可能即将被压缩产物替换，禁用预览，避免播到失效/旧临时文件 */
-      if (this.isCompressing(v)) return
+      /* 压缩 / 上传未完成、或上传失败：禁用预览，避免播到失效临时文件或残缺段 */
+      if (this.isCompressing(v) || this.isUploading(v) || this.isFailed(v)) return
       /* 云端路径拼 host + token；本地临时路径原样给 video 组件 */
       const url = this.isCloud(v.path) ? this.resolve(v.path) : v.path
       const poster = v.thumb ? (this.isCloud(v.thumb) ? this.resolve(v.thumb) : v.thumb) : ''
@@ -392,20 +414,20 @@ export default {
 
 <style lang="scss" scoped>
 .sj-vp {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 20rpx;
 }
 .vp-item {
   position: relative;
-  width: 216rpx;
+  width: 100%;
   height: 162rpx;
   border-radius: $sj-r-sm;
   overflow: hidden;
   background: #000;
 }
 .vp-video {
-  width: 216rpx;
+  width: 100%;
   height: 162rpx;
 }
 .vp-mask {
@@ -431,6 +453,29 @@ export default {
   animation: vp-spin 0.8s linear infinite;
 }
 .vp-compress-txt { color: #fff; font-size: 20rpx; font-weight: 600; }
+.vp-bar {
+  width: 96rpx;
+  height: 6rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.3);
+  overflow: hidden;
+}
+.vp-bar-in {
+  height: 100%;
+  border-radius: 999rpx;
+  background: #fff;
+}
+.vp-failed { background: rgba(176, 58, 58, 0.6); }
+.vp-retry {
+  margin-top: 10rpx;
+  padding: 6rpx 22rpx;
+  border: 2rpx solid rgba(255, 255, 255, 0.85);
+  border-radius: 999rpx;
+  color: #fff;
+  font-size: 20rpx;
+  font-weight: 600;
+  line-height: 1.4;
+}
 @keyframes vp-spin { to { transform: rotate(360deg); } }
 .vp-play {
   position: absolute;
@@ -474,7 +519,7 @@ export default {
 }
 .vp-x { color: #fff; font-size: 26rpx; line-height: 1; }
 .vp-add {
-  width: 216rpx;
+  width: 100%;
   height: 162rpx;
   border: 3rpx dashed $sj-border;
   border-radius: $sj-r-sm;
