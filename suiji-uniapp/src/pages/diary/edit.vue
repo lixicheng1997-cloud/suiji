@@ -14,7 +14,7 @@
       <!-- AI 生成提示条（v2 pg-hint 虚线提示；合规文案原样保留） -->
       <view class="pg-hint">
         <text>内容由 AI 自动生成，请核对</text>
-        <text class="hint-sub">基础版 · 模型降级时按事实模板拼装</text>
+        <text class="hint-sub">基础版 · 只按你本周的记录如实整理</text>
       </view>
 
       <!-- 统计周期 + 状态徽标 -->
@@ -54,7 +54,7 @@
       </view>
 
       <!-- 底部说明（v2 pg-hint；合规文案原样保留） -->
-      <view class="pg-hint tail"><text>未归档草稿保留 30 天后自动清理 · 归档后进入成长档案并标注「AI 生成」</text></view>
+      <view class="pg-hint tail"><text>30 天没归档的草稿会自动清理 · 归档后进入成长档案，注明是 AI 生成的</text></view>
     </view>
 
     <sj-notify ref="ntf" />

@@ -21,7 +21,6 @@ import { vaccineStatus, vaccineTip, daysToPlan, planDateFor, VACCINE_STATUS_TEXT
 import { PARENT_INFO, REMIND_DEFAULT, VACCINE_PROGRAM } from '@/utils/mock.js'
 import { error as uiError, toast as uiToast } from '@/utils/ui.js'
 import { SERVERS, MESSAGE_POLL_INTERVAL } from '@/config/app.js'
-import logger from '@/utils/logger.js'
 
 /* ---------- 内存缓存（= GET /bootstrap 响应镜像，契约 §3） ---------- */
 const cache = {
@@ -204,7 +203,6 @@ export function setServer(row) {
   try {
     uni.setStorageSync(SERVER_KEY, JSON.stringify({ id: s.id || '', name: s.name || '', url }))
   } catch (e) { /* 存储失败不影响本次请求地址 */ }
-  logger.info('server', '切换服务器', { name: s.name || '', url })
 }
 /** 连通性探测：GET /crypto/public-key 为公开端点（不依赖数据库），未登录也能用来判断地址可达 */
 export function pingServer() {
@@ -298,7 +296,6 @@ export function changePassword(oldPassword, newPassword) {
  */
 export function logout() {
   return http.logoutRemote().then(() => {
-    logger.info('auth', '退出登录，已清本地会话')
     http.clearTokens()
     resetCache()
     stopEventsPolling()
@@ -332,15 +329,8 @@ export function bootstrap(opts) {
   const o = opts || {}
   const run = () => http.get('/bootstrap', o).then(s => {
     fillCache(s); syncEventsWatermark(s); syncNotify(); pullServerNotices()
-    logger.info('bootstrap', '全量快照加载成功', {
-      entries: (s.entries || []).length,
-      media: (s.media || []).length,
-      babies: (s.babies || []).length,
-      journals: (s.journals || []).length
-    })
     return s
   }).catch(e => {
-    logger.error('bootstrap', '全量快照加载失败', { err: e, raw: e && (e.friendly || e.message || e.raw) })
     throw e
   })
   if (o.force) return run()
@@ -355,7 +345,7 @@ export function bootstrap(opts) {
  * @returns {Promise<boolean>} true=缓存就绪；false=未登录或网络失败（调用方决定去登录页）
  */
 export function init(opts) {
-  if (!isLoggedIn()) { logger.debug('bootstrap', '本机无登录态，跳过启动快照'); return Promise.resolve(false) }
+  if (!isLoggedIn()) return Promise.resolve(false)
   return bootstrap(opts).then(() => true).catch(() => false)
 }
 
@@ -1046,15 +1036,6 @@ function uploadVoice(payload, babyId, onProgress) {
   }
   if (!row.created_at) row.created_at = now()
 
-  /* 保存链路总耗时：开始 / 完成 / 失败各记一条，真机日志里可对照单次 POST 的 ms */
-  const t0 = Date.now()
-  logger.info('entry', '保存记录开始', {
-    type: row.type,
-    id: row.id,
-    babyId: row.baby_id,
-    media: { photos: (entry.photos || []).length, videos: (entry.videos || []).length, voice: row.type === 'voice' }
-  })
-
   /* 本条记录新上传的文件 id（照片 + 视频 + 语音段），落库后统一 PATCH 补挂 */
   let urls = []
   let newFiles = []
@@ -1149,12 +1130,6 @@ function uploadVoice(payload, babyId, onProgress) {
         if (i > -1) cache.entries[i] = Object.assign({}, row, r)
       }
       /* 视频已在落库前同步上传完成，无在途后台任务 */
-      logger.info('entry', '保存记录完成', {
-        type: row.type,
-        id: row.id,
-        totalMs: Date.now() - t0,
-        hasPendingMedia: false
-      })
       return { id: row.id, hasPendingMedia: false }
     }).catch(e => {
       /* REST 失败：回滚乐观缓存，页面提示后表单数据不丢 */
@@ -1172,12 +1147,6 @@ function uploadVoice(payload, babyId, onProgress) {
       invalidateMediaStream()
       if (msNew) { const j = cache.milestone_records.findIndex(m => m.id === msNew.id); if (j > -1) cache.milestone_records.splice(j, 1) }
       else if (msOld) { const ms = cache.milestone_records.find(m => m.id === msOld.id); if (ms) Object.assign(ms, msOld) }
-      logger.error('entry', '保存记录失败', {
-        type: row.type,
-        id: row.id,
-        totalMs: Date.now() - t0,
-        raw: e && (e.friendly || e.message || e.raw)
-      })
       throw e
     })
   })

@@ -305,16 +305,6 @@
       "style": {
         "navigationStyle": "custom"
       }
-    },
-    {
-      "path": "pages/dev-log/dev-log",
-      "style": {
-        "navigationStyle": "custom",
-        "onReachBottomDistance": 120,
-        "backgroundColor": "#FFF6F0",
-        "backgroundColorTop": "#FFF6F0",
-        "backgroundColorBottom": "#FFF6F0"
-      }
     }
   ],
   "globalStyle": {

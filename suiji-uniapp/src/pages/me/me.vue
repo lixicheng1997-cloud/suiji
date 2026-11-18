@@ -77,10 +77,10 @@
       </scroll-view>
     </sj-popup>
 
-    <!-- 修改密码面板（sj-popup 底部弹层：当前 / 新 / 确认 三行输入） -->
+    <!-- 修改密码弹窗（sj-popup 居中 modal：当前 / 新 / 确认 三行输入） -->
     <sj-popup
       v-model:show="pwdShow"
-      mode="bottom"
+      mode="center"
       title="修改密码"
       left-text="取消"
       right-text=""
@@ -110,7 +110,6 @@
 <script>
 import * as api from '@/utils/api.js'
 import * as ui from '@/utils/ui.js'
-import logger from '@/utils/logger.js'
 import tabSwipe, { pullRefresh } from '@/utils/tabSwipe.js'
 import { THEME_LABELS } from '@/theme/theme.js'
 
@@ -200,7 +199,6 @@ export default {
           label: '通用与账号',
           rows: [
             { png: '23-fn-privacy', label: '修改密码', val: '定期更换更安全', chev: true, act: 'password' },
-            { png: '35-fn-audit', label: '调试日志', sd: '本机链路记录 · 分层查看 · 可清空', chev: true, go: '/pages/dev-log/dev-log' },
             { png: '32-fn-card', label: '关于岁记', val: 'v3.0', chev: true, act: 'about' },
             { png: '33-fn-video', label: '启动加载动画（演示）', val: '品牌开场 · 轻点跳过', chev: true, go: '/pages/splash/splash?from=me', adminOnly: true },
             { png: '27-fn-trash', label: '退出登录', val: '切换账号 / 换机', chev: true, act: 'logout' }
@@ -245,7 +243,6 @@ export default {
           url: r.go,
           fail: err => {
             const msg = (err && err.errMsg) || '未知错误'
-            logger.error('app', '页面跳转失败', { url: r.go, msg })
             this.$refs.ntf.show({ type: 'err', message: '页面打开失败：' + msg })
           }
         })
@@ -505,8 +502,8 @@ export default {
   color: var(--sj-primary-deep);
 }
 
-/* ---------- 修改密码面板（sj-popup 底部弹层内，字段行外观对齐 v2 pg-field） ---------- */
-.pwd-form { padding: 32rpx 40rpx calc(40rpx + env(safe-area-inset-bottom)); }
+/* ---------- 修改密码弹窗（sj-popup 居中 modal，字段行外观对齐 v2 pg-field） ---------- */
+.pwd-form { width: 600rpx; padding: 32rpx 40rpx 40rpx; }
 .pwd-field {
   display: flex;
   align-items: center;

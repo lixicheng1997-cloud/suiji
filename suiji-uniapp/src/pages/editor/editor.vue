@@ -61,7 +61,7 @@
           <!-- 步进器（sj-number-box：步长 1 分钟、0–180 分钟；单位放 label） -->
           <sj-number-box v-model="nums.duration" :min="0" :max="180" :step="1" class="nb-right" />
         </view>
-        <view class="pg-hint" v-if="lastFeeding">已按上次 {{ lastFeeding.amount }}ml 智能带入</view>
+        <view class="pg-hint" v-if="lastFeeding">已沿用上次的 {{ lastFeeding.amount }}ml，可随时调整</view>
 
         <!-- 辅食食材区：仅喂养方式选中“辅食”时显示 -->
         <block v-if="single.feedingMethod === '辅食'">
@@ -285,8 +285,8 @@
             @click="pickSingle('tempSite', c)"
           />
         </view>
-        <view class="pg-hint ok">正常 · 36.0–37.3℃ 显示绿色徽章</view>
-        <view class="pg-hint">体温 ≥ 38°C 时显示固定文案：体温偏高，建议咨询医生</view>
+        <view class="pg-hint ok">36.0–37.3℃ 属于正常范围</view>
+        <view class="pg-hint">38℃ 以上就偏高了，拿不准建议问问医生</view>
 
         <view class="pg-sec"><text>备注</text></view>
         <!-- 备注（sj-textarea：白底描边容器由组件自绘，上限 500 字，超出会被输入框挡在本地） -->

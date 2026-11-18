@@ -7,8 +7,6 @@ import { kvGet, kvSet, kvRemove, kvGetSecret, kvSetSecret, kvRemoveSecret } from
 import { DEFAULT_BASE, LEGACY_PORT, CURRENT_PORT, LOCAL_DEV_PORT } from '@/config/app.js'
 import { toast as uiToast } from '@/utils/ui.js'
 import { clearPublicKey, hasPublicKey, sealRequest, setPublicKey, supported } from '@/infra/crypto.js'
-import { netInfo, netLabel } from '@/infra/net.js'
-import logger from '@/utils/logger.js'
 
 const BASE_KEY = 'sj_api_base'
 /* 「已选服务器」记录键：api.js 复用同一份，避免两处各写一个字符串 */
@@ -240,7 +238,6 @@ function ensurePublicKey() {
   loadKeyCache()
   if (hasPublicKey()) return Promise.resolve(true)
   if (keyFetching) return keyFetching
-  const t0 = Date.now()
   keyFetching = new Promise(resolve => {
     uni.request({
       url: baseUrl() + '/crypto/public-key',
@@ -252,18 +249,10 @@ function ensurePublicKey() {
         if (ok) {
           setPublicKey(d)
           try { kvSet(RSA_KEY, JSON.stringify({ kid: d.kid, n: d.n, e: d.e })) } catch (e) { /* 存不下就每次重取 */ }
-        } else {
-          /* 公钥拉取是 GET 读取：成功不记日志；仅失败留 warn 便于排障 */
-          logger.warn('crypto', '拉取公钥失败 · ' + (Date.now() - t0) + 'ms',
-            reqMeta({ ms: Date.now() - t0, status: res && res.statusCode, method: 'GET', path: '/crypto/public-key', op: resolveOp('GET', '/crypto/public-key') }))
         }
         resolve(ok)
       },
-      fail: err => {
-        logger.error('crypto', '拉取公钥网络失败 · ' + (Date.now() - t0) + 'ms',
-          reqMeta({ ms: Date.now() - t0, method: 'GET', path: '/crypto/public-key', op: resolveOp('GET', '/crypto/public-key'), raw: err && (err.errMsg || String(err)) }))
-        resolve(false)
-      }
+      fail: () => resolve(false)
     })
   }).then(ok => { keyFetching = null; return ok })
   return keyFetching
@@ -361,8 +350,6 @@ function tryRefresh() {
   if (refreshing) return refreshing
   const refresh = getRefreshToken()
   if (!refresh) return Promise.resolve(false)
-  const t0 = Date.now()
-  const op = resolveOp('POST', '/auth/refresh')
   refreshing = rawRequest('POST', '/auth/refresh', { refresh })
     .then(res => {
       if (res.status >= 200 && res.status < 300 && res.data && res.data.access) {
@@ -373,13 +360,7 @@ function tryRefresh() {
       return false
     })
     .catch(() => false)
-    .then(ok => {
-      refreshing = null
-      const ms = Date.now() - t0
-      logger[ok ? 'info' : 'warn']('http', '〔' + op + '〕' + (ok ? '成功' : '失败') + ' · ' + ms + 'ms',
-        reqMeta({ ms, ok, method: 'POST', path: '/auth/refresh', op }))
-      return ok
-    })
+    .then(ok => { refreshing = null; return ok })
   return refreshing
 }
 
@@ -393,20 +374,9 @@ export function logoutRemote() {
   const refresh = getRefreshToken()
   const access = getAccessToken()
   if (!access) return Promise.resolve(false)
-  const t0 = Date.now()
-  const op = resolveOp('POST', '/auth/logout')
   return rawRequest('POST', '/auth/logout', { refresh })
-    .then(res => {
-      const ok = res.status >= 200 && res.status < 300
-      logger[ok ? 'debug' : 'warn']('http', '〔' + op + '〕' + (ok ? '成功' : '失败') + ' · ' + (Date.now() - t0) + 'ms',
-        reqMeta({ ms: Date.now() - t0, status: res.status, method: 'POST', path: '/auth/logout', op }))
-      return ok
-    })
-    .catch(err => {
-      logger.error('http', '〔' + op + '〕 网络失败 · ' + (Date.now() - t0) + 'ms',
-        reqMeta({ ms: Date.now() - t0, method: 'POST', path: '/auth/logout', op, raw: err && (err.errMsg || String(err)) }))
-      return false
-    })
+    .then(res => res.status >= 200 && res.status < 300)
+    .catch(() => false)
 }
 
 function expireSession() {
@@ -571,194 +541,34 @@ function flushNotify() {
  */
 const AUTH_NO_RETRY_RE = /^\/auth\/(login|refresh)$/
 
-/* 从 baseUrl 提取 origin（协议+主机+端口），日志里区分连的是云端还是本地 */
-function originOf(url) {
-  const m = String(url || '').match(/^(https?:\/\/[^/]+)/i)
-  return m ? m[1] : ''
-}
-
-/* 请求日志公共字段：网络快照 + 目标 host + 重试标记 */
-function reqMeta(extra) {
-  const n = netInfo()
-  return Object.assign({
-    net: n.type,
-    connected: n.connected,
-    host: originOf(baseUrl())
-  }, extra || {})
-}
-
-/* ---------- 接口 → 业务操作标注 ----------
- * 日志里除 METHOD + 路径外，再带一个中文操作名，真机排查时一眼看出这条请求在做什么。
- * 动态段（记录/宝宝/疫苗等 id）在模板里写成 :id；静态字面量（如 /entries/trash）
- * 走精确匹配，不参与模板正则，避免被 /entries/:id 这类模板抢先命中。 */
-const OP_LABELS = [
-  ['GET', '/bootstrap', '全量快照同步'],
-  ['GET', '/weather', '获取天气'],
-  ['GET', '/crypto/public-key', '拉取加密公钥'],
-  ['POST', '/auth/register', '注册账号'],
-  ['POST', '/auth/login', '登录'],
-  ['POST', '/auth/refresh', '刷新登录令牌'],
-  ['POST', '/auth/logout', '退出登录'],
-  ['POST', '/auth/password', '修改密码'],
-  ['GET', '/auth/me', '当前账号信息'],
-  ['PUT', '/settings', '保存应用设置'],
-  ['GET', '/events/count', '轮询家庭动态水位'],
-  ['POST', '/babies', '新建宝宝档案'],
-  ['PUT', '/babies/:id', '编辑宝宝档案'],
-  ['POST', '/babies/:id/activate', '切换当前宝宝'],
-  ['GET', '/entries/timeline', '主页时光轴分页'],
-  ['GET', '/entries/search', '搜索记录分页'],
-  ['POST', '/entries', '新建成长记录'],
-  ['PUT', '/entries/:id', '编辑成长记录'],
-  ['GET', '/entries/:id', '记录详情'],
-  ['DELETE', '/entries/:id', '删除记录（移入回收站）'],
-  ['POST', '/entries/:id/restore', '回收站恢复记录'],
-  ['DELETE', '/entries/trash/:id', '彻底删除单条记录'],
-  ['DELETE', '/entries/trash', '清空回收站'],
-  ['GET', '/entries/trash', '回收站列表'],
-  ['PATCH', '/entries/:id/media', '回填记录媒体'],
-  ['GET', '/vaccines', '疫苗排期列表'],
-  ['POST', '/vaccines/sync', '同步疫苗计划'],
-  ['PUT', '/vaccines/:id', '更新疫苗记录'],
-  ['GET', '/milestones', '里程碑清单'],
-  ['PUT', '/milestones/:id', '更新里程碑'],
-  ['GET', '/notifications', '家人动态通知列表'],
-  ['POST', '/notifications/read', '标记通知已读'],
-  ['POST', '/journals/generate', '生成成长日记'],
-  ['GET', '/journals', '日记列表'],
-  ['PUT', '/journals/:id', '编辑日记'],
-  ['POST', '/family', '创建家庭'],
-  ['POST', '/family/invite', '生成家庭邀请码'],
-  ['POST', '/family/join', '凭邀请码加入家庭'],
-  ['GET', '/family', '家庭信息与成员'],
-  ['GET', '/family/audit', '操作留痕列表'],
-  ['POST', '/family/audit/export', '上报导出留痕'],
-  ['PATCH', '/family/members/:id', '调整成员角色'],
-  ['DELETE', '/family/members/:id', '移除家庭成员'],
-  ['POST', '/files', '上传文件（multipart）'],
-  ['POST', '/files/batch', '批量上传文件'],
-  ['POST', '/files/presign', '申请文件直传凭证'],
-  ['POST', '/files/register', '登记直传文件台账'],
-  ['PATCH', '/files/:id', '挂载文件业务归属'],
-  ['GET', '/files/:id/download', '下载文件'],
-  ['GET', '/growth/curve', '生长曲线数据'],
-  ['GET', '/export/data', '导出全量数据'],
-  ['POST', '/import', '导入备份数据'],
-  ['DELETE', '/account/data', '清除账号数据']
-]
-
-/* 解析接口绑定的业务操作名：先静态字面量精确匹配，再用 :id 模板正则兜底，
- * 最后按资源首段给泛称。不靠段长度猜 id，避免 login/activate/register 等静态段被误归一。 */
-function resolveOp(method, path) {
-  const raw = String(path || '').split('?')[0]
-  for (let i = 0; i < OP_LABELS.length; i++) {
-    const [m, p, label] = OP_LABELS[i]
-    if (m === method && p.indexOf(':id') < 0 && p === raw) return label
-  }
-  for (let i = 0; i < OP_LABELS.length; i++) {
-    const [m, p, label] = OP_LABELS[i]
-    if (m !== method || p.indexOf(':id') < 0) continue
-    const re = new RegExp('^' + p.replace(/:id/g, '[^/]+') + '$')
-    if (re.test(raw)) return label
-  }
-  const seg = raw.split('/').filter(Boolean)[0] || ''
-  return seg ? ('操作 ' + seg) : '接口请求'
-}
-
-/* 请求序号：同一轮 → / ← 共用一个号，并发慢请求在日志里可配对 */
-let reqSeq = 0
-function nextSeq() { return ++reqSeq }
-
-/* 请求/响应体估算字符数（仅记大小，不落地报文内容；敏感值由 logger 序列化时再剔除） */
-function bodySize(d) {
-  if (d === undefined || d === null) return 0
-  try {
-    const s = typeof d === 'string' ? d : JSON.stringify(d)
-    return s ? s.length : 0
-  } catch (e) { return 0 }
-}
-
-/* 记录类型 → 中文标签；与 utils/mock.js 的 TYPES.label 保持同步（http 层只取文案，不引图标/色值） */
-const ENTRY_TYPE_LABELS = {
-  feeding: '喂养', sleep: '睡眠', milestone: '里程碑', photo: '照片',
-  measure: '测量', poop: '便便', temp: '体温', med: '用药', mood: '心情',
-  voice: '语音', video: '视频', note: '心情'
-}
-function entryTypeLabel(t) {
-  if (!t) return ''
-  return ENTRY_TYPE_LABELS[t] || String(t)
-}
-
 export function request(method, path, data, opts) {
   const o = opts || {}
-  const start = Date.now()
-  const elapsed = () => Date.now() - start
-  const seq = nextSeq()
-  const baseOp = resolveOp(method, path)
-  /* 记录类接口：把记录类型（睡眠/喂养/测量…）追加到操作名后，日志一眼看出存的是哪类记录 */
-  const entryType = data && typeof data === 'object' ? data.type : ''
-  const typeName = path.indexOf('/entries') === 0 ? entryTypeLabel(entryType) : ''
-  const op = typeName ? baseOp + '·' + typeName : baseOp
-  const retryFlag = { retried: !!o._retried, keyRotated: !!o._keyRetried }
-  /* 公共上下文字段：序号 / 操作名 / 方法路径 / 记录类型 / 请求体大小 / 是否静默 / 重试标记 */
-  const baseMeta = Object.assign({
-    seq, op, method, path, entryType: entryType || '', bodyBytes: bodySize(data), silent: !!o.silent
-  }, retryFlag)
-  /* 只记录增删改（POST/PUT/PATCH/DELETE）的接口日志；GET 读取一律静默，不写调试日志。
-   * 重试、错误提示、会话过期处理照常执行，只是不落日志。 */
-  const isWrite = method !== 'GET'
-  const log = (level, msg, meta) => { if (isWrite) logger[level]('http', msg, reqMeta(meta)) }
-  log('debug', '→ #' + seq + ' ' + method + ' ' + path + ' 〔' + op + '〕', baseMeta)
   return rawRequest(method, path, data, o.header)
     .then(res => {
       if (res.status === 409 && isKeyRotated(res) && !o._keyRetried) {
-        log('warn', '#' + seq + ' 〔' + op + '〕 服务端轮换密钥，重取公钥后重试', baseMeta)
         return refreshPublicKey()
           .then(() => request(method, path, data, Object.assign({}, o, { _keyRetried: true })))
       }
       if (res.status === 401 && !o._retried && !AUTH_NO_RETRY_RE.test(path)) {
-        log('warn', '#' + seq + ' 〔' + op + '〕 401 登录态过期，尝试刷新令牌', baseMeta)
         return tryRefresh().then(ok => {
           if (!ok) {
-            log('error', '#' + seq + ' 〔' + op + '〕 令牌刷新失败，会话过期', baseMeta)
             expireSession(); throw mutedError('登录已过期，请重新登录')
           }
           return request(method, path, data, Object.assign({}, o, { _retried: true }))
         })
       }
       if (res.status === 409 && isNeedFamily(res)) {
-        log('warn', '#' + seq + ' 〔' + op + '〕 账号未关联家庭，引导创建/加入', baseMeta)
         const e = needFamilyError()
         notify(e, o)
         if (needFamilyHandler) needFamilyHandler()
         else uni.reLaunch({ url: FAMILY_SETUP })
         throw e
       }
-      if (res.status >= 200 && res.status < 300) {
-        const ms = elapsed()
-        const bytes = bodySize(res.data)
-        const dlKbps = ms > 0 ? Math.round(bytes / (ms / 1000) / 1024 * 10) / 10 : 0
-        /* 详情 GET 等请求体不带 type 的场景，从响应体回填类型到 meta */
-        const respType = res.data && typeof res.data === 'object' && res.data.type ? res.data.type : ''
-        const meta = Object.assign(baseMeta, { ms, status: res.status, bytes, dlKbps })
-        if (respType && !meta.entryType) meta.entryType = respType
-        log('debug', '← #' + seq + ' ' + method + ' ' + path + ' 〔' + op + '〕 ' + res.status +
-          ' · ' + netLabel() + ' · ' + ms + 'ms · 响应 ' + bytes + 'B · ' + dlKbps + 'KB/s', meta)
-        return res.data
-      }
-      const e = mapError(res)
-      const ms = elapsed()
-      if (res.status >= 500) log('error', '✕ #' + seq + ' ' + method + ' ' + path + ' 〔' + op + '〕 服务端错误 ' + res.status + ' · ' + ms + 'ms',
-        Object.assign(baseMeta, { ms, status: res.status, err: e, raw: e.raw }))
-      else log('warn', '⚠ #' + seq + ' ' + method + ' ' + path + ' 〔' + op + '〕 请求被拒 ' + res.status + ' · ' + ms + 'ms',
-        Object.assign(baseMeta, { ms, status: res.status, err: e, raw: e.raw }))
-      throw e
+      if (res.status >= 200 && res.status < 300) return res.data
+      throw mapError(res)
     })
     .catch(err => {
       const e = (err && err.netFail) ? netError(err) : err
-      /* then 内主动抛出的业务错误（need_family / 401 / 4xx / 5xx）已在上方记过，这里只补网络失败 */
-      if (err && err.netFail) log('error', '✕ #' + seq + ' ' + method + ' ' + path + ' 〔' + op + '〕 网络失败 · ' + netLabel() + ' · ' + elapsed() + 'ms',
-        Object.assign(baseMeta, { ms: elapsed(), err: err, raw: e.raw }))
       notify(e, o)
       throw e
     })
@@ -814,15 +624,6 @@ export function uploadFile(filePath, opts) {
     notify(e, o)
     return Promise.reject(e)
   }
-  const t0 = Date.now()
-  const seq = nextSeq()
-  const op = resolveOp('POST', '/files')
-  let lastProgress = null
-  const uploadMeta = Object.assign({
-    seq, op, method: 'POST', path: '/files', file: base,
-    businessType: o.businessType || '', businessId: o.businessId || '', babyId: o.babyId || ''
-  }, netInfo())
-  logger.debug('http', '→ #' + seq + ' POST /files 〔' + op + '〕 · ' + base, reqMeta(uploadMeta))
   return new Promise((resolve, reject) => {
     const token = getAccessToken()
     uni.uploadFile({
@@ -837,12 +638,8 @@ export function uploadFile(filePath, opts) {
       timeout: 180000,
       header: sanitizeHeaders(token ? { Authorization: 'Bearer ' + token } : {}),
       /* 上传进度透传：progressEvent = { progress, totalBytesWritten, totalBytesExpectedToWrite } */
-      onProgressUpdate: p => {
-        lastProgress = p
-        if (typeof o.onProgress === 'function') o.onProgress(p)
-      },
+      onProgressUpdate: p => { if (typeof o.onProgress === 'function') o.onProgress(p) },
       success: res => {
-        const ms = Date.now() - t0
         let body = {}
         try { body = JSON.parse(res.data) } catch (e) { /* 非 JSON 走状态码判断 */ }
         if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -850,40 +647,27 @@ export function uploadFile(filePath, opts) {
           if (Array.isArray(body.errors) && body.errors.length) {
             const n = body.errors.length
             const e = makeError(n + ' 个文件上传失败，请重试', body.errors.map(x => x && (x.detail || x.filename)).join('；'), res.statusCode, 2)
-            logger.warn('http', '⚠ #' + seq + ' POST /files 〔' + op + '〕 部分失败 ' + res.statusCode + ' · ' + ms + 'ms',
-              reqMeta(Object.assign(uploadMeta, { ms, status: res.statusCode, err: e, raw: e.raw })))
             notify(e, o); reject(e); return
           }
-          const bytes = lastProgress && lastProgress.totalBytesExpectedToWrite
-          logger.debug('http', '← #' + seq + ' POST /files 〔' + op + '〕 ' + res.statusCode +
-            ' · ' + netLabel() + ' · ' + ms + 'ms' + (bytes ? ' · 上行 ' + bytes + 'B' : ''),
-            reqMeta(Object.assign(uploadMeta, { ms, status: res.statusCode, bytes: bodySize(body) })))
           resolve(body); return
         }
         if (res.statusCode === 401) {
-          logger.warn('http', '⚠ #' + seq + ' POST /files 〔' + op + '〕 401 登录态过期 · ' + ms + 'ms', reqMeta(Object.assign(uploadMeta, { ms, status: res.statusCode })))
           expireSession(); reject(mutedError('登录已过期，请重新登录')); return
         }
         if (res.statusCode === 409 && body && body.detail === 'need_family') {
           const e = needFamilyError()
-          logger.warn('http', '⚠ #' + seq + ' POST /files 〔' + op + '〕 409 未关联家庭 · ' + ms + 'ms', reqMeta(Object.assign(uploadMeta, { ms, status: res.statusCode })))
           notify(e, o)
           if (needFamilyHandler) needFamilyHandler()
           else uni.reLaunch({ url: FAMILY_SETUP })
           reject(e); return
         }
         const e = mapError({ status: res.statusCode, data: body })
-        logger.warn('http', '⚠ #' + seq + ' POST /files 〔' + op + '〕 上传被拒 ' + res.statusCode + ' · ' + ms + 'ms',
-          reqMeta(Object.assign(uploadMeta, { ms, status: res.statusCode, err: e, raw: e.raw })))
         notify(e, o)
         reject(e)
       },
       fail: err => {
-        const ms = Date.now() - t0
         const e = netError(Object.assign(new Error('NET_FAIL'), { netFail: true, raw: err }))
         e.friendly = '文件上传失败，请检查网络后重试'
-        logger.error('http', '✕ #' + seq + ' POST /files 〔' + op + '〕 网络失败 · ' + netLabel() + ' · ' + ms + 'ms',
-          reqMeta(Object.assign(uploadMeta, { ms, raw: e.raw })))
         notify(e, o)
         reject(e)
       }
@@ -923,11 +707,6 @@ export function putDirectObject(uploadUrl, filePath, opts) {
   return Promise.reject(new Error('direct put unsupported on app'))
   // #endif
   // #ifdef H5
-  const t0 = Date.now()
-  const seq = nextSeq()
-  const file = String(filePath || '').split('?')[0].split('/').pop()
-  const meta = { seq, channel: 'COS 裸 PUT', host: originOf(uploadUrl), file }
-  logger.debug('http', '→ #' + seq + ' COS 直传 PUT · ' + file, reqMeta(meta))
   return new Promise((resolve, reject) => {
     fetch(filePath)
       .then(r => { if (!r.ok) throw new Error('read local blob failed'); return r.blob() })
@@ -946,24 +725,11 @@ export function putDirectObject(uploadUrl, filePath, opts) {
           })
         }
         xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            logger.debug('http', '← #' + seq + ' COS 直传 PUT ' + xhr.status + ' · ' + (Date.now() - t0) + 'ms' +
-              (blob && blob.size ? ' · 上行 ' + blob.size + 'B' : ''), reqMeta(Object.assign(meta, { ms: Date.now() - t0, status: xhr.status, bytes: blob && blob.size })))
-            res()
-          } else {
-            logger.warn('http', '⚠ #' + seq + ' COS 直传 PUT 失败 ' + xhr.status + ' · ' + (Date.now() - t0) + 'ms',
-              reqMeta(Object.assign(meta, { ms: Date.now() - t0, status: xhr.status })))
-            rej(new Error('direct put failed ' + xhr.status))
-          }
+          if (xhr.status >= 200 && xhr.status < 300) res()
+          else rej(new Error('direct put failed ' + xhr.status))
         }
-        xhr.onerror = () => {
-          logger.error('http', '✕ #' + seq + ' COS 直传 PUT 网络错误 · ' + (Date.now() - t0) + 'ms', reqMeta(Object.assign(meta, { ms: Date.now() - t0 })))
-          rej(new Error('direct put network error'))
-        }
-        xhr.ontimeout = () => {
-          logger.error('http', '✕ #' + seq + ' COS 直传 PUT 超时 · ' + (Date.now() - t0) + 'ms', reqMeta(Object.assign(meta, { ms: Date.now() - t0 })))
-          rej(new Error('direct put timeout'))
-        }
+        xhr.onerror = () => { rej(new Error('direct put network error')) }
+        xhr.ontimeout = () => { rej(new Error('direct put timeout')) }
         xhr.timeout = 180000
         xhr.send(blob)
       }))
@@ -982,14 +748,8 @@ export function putDirectObject(uploadUrl, filePath, opts) {
  */
 export function postDirectObject(sign, filePath, opts) {
   const o = opts || {}
-  const t0 = Date.now()
-  const seq = nextSeq()
-  const file = String(filePath || '').split('?')[0].split('/').pop()
-  const meta = { seq, channel: 'COS PostObject', host: sign && sign.url ? originOf(sign.url) : '', file }
-  logger.debug('http', '→ #' + seq + ' COS 直传 POST · ' + file, reqMeta(meta))
   return new Promise((resolve, reject) => {
     if (!sign || !sign.url || !sign.fields) {
-      logger.warn('http', '⚠ #' + seq + ' COS 直传 POST 凭证无效 · ' + (Date.now() - t0) + 'ms', reqMeta(Object.assign(meta, { ms: Date.now() - t0 })))
       reject(new Error('post sign invalid'))
       return
     }
@@ -1001,19 +761,12 @@ export function postDirectObject(sign, filePath, opts) {
       timeout: 180000,
       onProgressUpdate: p => { if (typeof o.onProgress === 'function') o.onProgress(p) },
       success: res => {
-        const ms = Date.now() - t0
         if (res.statusCode === 200 || res.statusCode === 204) {
-          logger.debug('http', '← #' + seq + ' COS 直传 POST ' + res.statusCode + ' · ' + ms + 'ms',
-            reqMeta(Object.assign(meta, { ms, status: res.statusCode })))
           resolve(); return
         }
-        logger.warn('http', '⚠ #' + seq + ' COS 直传 POST 失败 ' + res.statusCode + ' · ' + ms + 'ms',
-          reqMeta(Object.assign(meta, { ms, status: res.statusCode })))
         reject(new Error('post direct failed ' + res.statusCode))
       },
-      fail: err => {
-        logger.error('http', '✕ #' + seq + ' COS 直传 POST 网络错误 · ' + (Date.now() - t0) + 'ms',
-          reqMeta(Object.assign(meta, { ms: Date.now() - t0, raw: err && (err.errMsg || String(err)) })))
+      fail: () => {
         reject(new Error('post direct network error'))
       }
     })

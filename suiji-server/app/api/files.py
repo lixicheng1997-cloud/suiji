@@ -178,7 +178,13 @@ def download(file_id: str, request: Request, token: str = Query(""),
     if not use_proxy:
         signed = store.url(effective_key, expires=settings.media_url_expires)
         if signed:
-            return RedirectResponse(url=signed, status_code=307, headers=_SAFE_HEADERS)
+            # 307 本身绝不能按 _SAFE_HEADERS 的 24h 缓存：预签名地址只活
+            # media_url_expires（默认 600s），浏览器若把「重定向→旧签名地址」缓存一天，
+            # 10 分钟后每次回访都会直接重放已过期的 COS 直链，稳定复现 403
+            # "Request has expired"（本地 H5 刷新图片/视频间歇 403 的根因）。
+            # 字节流式回源那条路径的内容确实不可变，仍保留 24h max-age。
+            return RedirectResponse(url=signed, status_code=307,
+                                    headers=dict(_SAFE_HEADERS, **{"Cache-Control": "no-store"}))
 
     headers = dict(_SAFE_HEADERS, **_disposition(row, inline), **_RANGE_HEADERS)
     # ETag：用 sha256 前 16 位，支持 304 协商缓存
