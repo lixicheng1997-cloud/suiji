@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 成长日记重设计 · 技术设计文档</title>
+<style>
+:root{
+  --brand:#2F6FBF; --brand-deep:#23528F; --brand-soft:#EAF2FB;
+  --ink:#26303B; --ink-2:#5E6B78; --ink-3:#93A0AC;
+  --bg:#F7FAFD; --card:#FFFFFF; --line:#DDE7F0; --line-2:#E7EEF5;
+  --ok:#2E8B57; --warn:#B8860B; --danger:#C0392B;
+  --r:14px;
+  --shadow:0 2px 14px rgba(47,111,191,.08);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:"PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+  background:var(--bg); color:var(--ink); line-height:1.75; font-size:15px;
+}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px 96px}
+header{padding:56px 0 32px;border-bottom:2px solid var(--line)}
+.doc-tag{display:inline-block;background:var(--brand-soft);color:var(--brand-deep);
+  font-size:12px;font-weight:600;padding:3px 12px;border-radius:999px;letter-spacing:.06em}
+h1{font-size:29px;font-weight:700;margin:14px 0 8px}
+.meta{color:var(--ink-3);font-size:13px}
+.meta b{color:var(--ink-2);font-weight:500}
+h2{font-size:21px;font-weight:700;margin:52px 0 6px;display:flex;align-items:center;gap:10px}
+h2 .no{color:var(--brand);font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
+h3{font-size:16.5px;font-weight:600;margin:28px 0 8px}
+p{margin:8px 0}
+.lead{color:var(--ink-2)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:20px 22px;margin:14px 0;box-shadow:var(--shadow)}
+table{width:100%;border-collapse:collapse;font-size:13.5px;margin:10px 0}
+th{text-align:left;font-weight:600;color:var(--ink-2);padding:8px 10px;border-bottom:2px solid var(--line);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--line-2);vertical-align:top}
+tr:last-child td{border-bottom:none}
+code{font-family:Consolas,Menlo,monospace;font-size:12.5px;background:var(--brand-soft);
+  color:var(--brand-deep);padding:1px 6px;border-radius:5px}
+pre{font-family:Consolas,Menlo,monospace;font-size:12.5px;background:#0F1B2A;color:#D8E4F0;
+  border-radius:10px;padding:16px 18px;overflow-x:auto;line-height:1.65;margin:12px 0}
+pre code{background:transparent;color:inherit;padding:0}
+pre .c{color:#6E87A5}
+pre .k{color:#7EB3E8}
+pre .s{color:#9FD49F}
+pre .em{color:#F2C879}
+.badge{display:inline-block;color:#fff;font-size:12px;font-weight:700;
+  padding:1px 9px;border-radius:6px;vertical-align:1px}
+.be{background:#2F6FBF}
+.bf{background:#7A5FB0}
+.bd{background:#3E9B6C}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:1px 10px;border-radius:999px;vertical-align:1px}
+.pill.brand{background:var(--brand-soft);color:var(--brand-deep)}
+.pill.ok{background:#E7F4EC;color:var(--ok)}
+.pill.warn{background:#FBF3E0;color:var(--warn)}
+.pill.gray{background:#EDF1F5;color:var(--ink-2)}
+.tbd{color:var(--warn);font-weight:600}
+ul.pl{margin:8px 0 8px 20px}
+ul.pl li{margin:5px 0}
+ol.pl{margin:8px 0 8px 20px}
+ol.pl li{margin:5px 0}
+.note{font-size:12.5px;color:var(--ink-3);margin-top:6px}
+.fr-map{font-size:12px;color:var(--brand-deep);background:var(--brand-soft);border-radius:6px;padding:1px 8px;white-space:nowrap}
+/* 流程竖排 */
+.pipe{display:flex;flex-direction:column;gap:0;margin:12px 0}
+.pipe .node{background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:10px 16px}
+.pipe .node b{font-size:14px}
+.pipe .node small{display:block;color:var(--ink-2);font-size:12.5px;line-height:1.6}
+.pipe .arr{color:var(--ink-3);font-size:13px;padding:2px 0 2px 26px}
+.pipe .node.mod{border-color:var(--brand);background:var(--brand-soft)}
+.pipe .node.keep{opacity:.75}
+/* 架构总览 */
+.arch{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0}
+.arch .col{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px}
+.arch .col h4{font-size:13.5px;margin-bottom:8px;color:var(--brand-deep)}
+.arch .col li{font-size:12.5px;color:var(--ink);margin:4px 0 4px 16px}
+/* 状态流 */
+.state-flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;margin:10px 0}
+.st-node{background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:6px 14px;font-weight:600}
+.st-node.hot{border-color:var(--brand);color:var(--brand-deep)}
+.st-arrow{color:var(--ink-3);font-size:12px}
+.divider{border:none;border-top:1px dashed var(--line-2);margin:24px 0}
+footer{margin-top:64px;padding-top:20px;border-top:2px solid var(--line);font-size:12.5px;color:var(--ink-3)}
+@media (max-width:640px){.wrap{padding:0 16px 64px}h1{font-size:23px}.arch{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <span class="doc-tag">技术设计文档 · Technical Design</span>
+  <h1>AI 成长日记重设计</h1>
+  <div class="meta">
+    产品：岁记 App（家庭成长记录）&nbsp;&nbsp;·&nbsp;&nbsp;
+    版本：<b>v1.1（新增独立 AI 服务拆分）</b>&nbsp;&nbsp;·&nbsp;&nbsp;
+    日期：<b>2026-11-18</b>&nbsp;&nbsp;·&nbsp;&nbsp;
+    上游文档：<b><a href="file:///d:/project/traeData/suiji/docs/AI成长日记重设计PRD.html" style="color:var(--brand-deep)">PRD v1.0</a></b>&nbsp;&nbsp;·&nbsp;&nbsp;
+    状态：<b>待评审</b>
+  </div>
+</header>
+
+<!-- ================= 0 技术结论 ================= -->
+<h2><span class="no">00</span>技术结论与依赖评估</h2>
+
+<div class="card">
+  <p><b>结论：本设计不引入任何新技术<b>栈</b></b>，但按产品决策<b>新增一个独立后端服务 ai-server</b>（FastAPI + httpx，与主服务同栈，零新增框架/中间件）。部署形态：49.233.77.155 同机 docker-compose 新增 ai 容器，<b>不暴露公网</b>，主服务内网转发——客户端访问链路不变（nginx 唯一公网入口）。</p>
+  <table>
+    <tr><th style="width:220px">可能引入新技术的点</th><th>评估结论</th></tr>
+    <tr><td><b>独立 AI 服务（ai-server）</b><br><span class="fr-map">用户决策 2026-11-18</span></td><td><b>新增服务、不新增技术</b>。新目录 <code>suiji-server/ai/</code>（同仓库子目录，部署脚本无需改动），FastAPI 应用 + 独立 Dockerfile + compose 服务项；职责 = LLM 编排 + 输出守卫 + 句库兜底，见 §0.1。</td></tr>
+    <tr><td>定时任务框架（APScheduler / Celery / Cron）<br><span class="fr-map">FR-06 自动生成 · FR-07 月报</span></td><td><b>不引入</b>。PRD 的触发语义是「周一/月初 <i>任一成员首次打开 App</i>」，天然是客户端触发型——客户端首启上报 → 服务端幂等判断并生成。无需常驻调度器。现有后台 asyncio 循环（cleanup 每 6h）如需兜底可零成本加一步，不作为依赖项。</td></tr>
+    <tr><td>向量检索 / Embedding（照片语义匹配选图）<br><span class="fr-map">FR-04 图文混排</span></td><td><b>不引入</b>。照片候选量级为单周 ≤ 几十条，直接把照片事件的元信息（条目日期、条数、同一记录的心情文字）放进 prompt 让模型选 <code>entry_id</code>，无需向量库。</td></tr>
+    <tr><td>对象存储 / 转码等媒体能力<br><span class="fr-map">FR-04</span></td><td><b>不新增</b>。嵌图只存引用（entry_id + photos 数组下标），缩略图/预览走现有 media 缓存与 <code>sj-media-preview</code>，媒体字节不经日记表。</td></tr>
+    <tr><td>LLM 能力升级（结构化输出/更大模型）</td><td><b>不更换</b>。继续 DashScope <code>qwen3.5-flash</code> + <code>enable_thinking:false</code>，标题/摘要/选图通过 prompt 输出 JSON 扩展字段实现；现有 60s 超时与重试参数保留。<b>LLM API Key 从主服务 env 迁移到 ai-server env</b>，主服务不再持有 Key。</td></tr>
+    <tr><td>并发去重（分布式锁）<br><span class="fr-map">FR-06</span></td><td><b>复用现有 Redis</b>（redis_client 已在依赖中，锁归主服务）做家庭级短锁，叠加数据库查询兜底，见 §6。</td></tr>
+  </table>
+</div>
+
+<!-- ================= 0.1 服务拆分架构 ================= -->
+<h3>0.1 独立 AI 服务架构（ai-server）</h3>
+
+<div class="card">
+  <h3 style="margin-top:0">服务拓扑</h3>
+  <div class="state-flow" style="flex-direction:column;align-items:flex-start;gap:6px">
+    <span class="st-node">客户端 App（uni-app）</span>
+    <span class="st-arrow">↓ HTTPS（唯一公网入口，链路不变）</span>
+    <span class="st-node hot">nginx :30080 → suiji-server（主服务）</span>
+    <span class="st-arrow">↓ 内网 HTTP（compose 网络内，不暴露公网）</span>
+    <span class="st-node">ai-server（新容器，仅内网可达）</span>
+    <span class="st-arrow">↓ HTTPS 外呼</span>
+    <span class="st-node">DashScope（qwen3.5-flash）</span>
+  </div>
+  <p class="note">ai-server 无数据库连接、无 Redis、无鉴权中间件——它只被主服务调用（compose 内网），攻击面为零公网暴露。</p>
+
+  <h3>职责边界（拆分原则：ai-server 无状态纯计算）</h3>
+  <table>
+    <tr><th style="width:150px">职责</th><th style="width:110px">归属</th><th>理由</th></tr>
+    <tr><td>素材收集 _collect / 门槛判定 / BABY_PROFILE 隐私白名单</td><td><b>主服务</b></td><td>需要读 DB；隐私过滤在数据源头完成，出域素材经内网传给 ai-server</td></tr>
+    <tr><td>API 路由 / 鉴权 / 权限 / 落库 / 幂等锁 / 通知 / 草稿清理</td><td><b>主服务</b></td><td>业务状态全部在主服务，ai-server 不碰存储</td></tr>
+    <tr><td>快问出题（GET /journals/questions）</td><td><b>主服务</b></td><td>纯规则 + 读素材，不调 LLM，无拆分价值</td></tr>
+    <tr><td>LLM 调用 + 重试循环 / 守卫（禁词·白名单·引用·句式）/ prompt v2 / 句库兜底</td><td><b>ai-server</b></td><td>守卫必须与 LLM 重试同进程闭环；LLM Key 只在这里</td></tr>
+    <tr><td>段内选图解析（entryId→photos 下标）</td><td><b>ai-server</b>（结果）<br>校验归 <b>主服务</b></td><td>解析在生成循环内完成；落库前主服务再校验 entryId 归属</td></tr>
+    <tr><td>纵深防御终检（收到 ai-server 结果后复扫禁词）</td><td><b>主服务</b></td><td>内网响应也复跑轻量禁词扫描，守卫逻辑不单点信任</td></tr>
+  </table>
+
+  <h3>ai-server 接口契约（内部，仅主服务调用）</h3>
+  <pre><code><span class="c"># POST /generate（内网，无鉴权；素材由主服务收集并过滤后传入）</span>
+{ <span class="s">"kind"</span>: <span class="s">"week"</span>,                       <span class="c">/* week|month */</span>
+  <span class="s">"rng"</span>: {<span class="s">"start"</span>: <span class="s">"2026-11-09"</span>, <span class="s">"end"</span>: <span class="s">"2026-11-15"</span>},
+  <span class="s">"baby"</span>: {<span class="s">"name"</span>: <span class="s">"朵朵"</span>, <span class="s">"age_months"</span>: <span class="em">7</span>, <span class="s">"gender"</span>: <span class="s">"girl"</span>},  <span class="c">/* 已过隐私白名单 */</span>
+  <span class="s">"facts"</span>: [<span class="s">"…主服务 _collect 产物（§4.2 结构）…"</span>],
+  <span class="s">"answers"</span>: [{<span class="s">"q"</span>: <span class="s">"…"</span>, <span class="s">"a"</span>: <span class="s">"…"</span>}] }
+
+<span class="c"># 响应（主服务直接落库的字段）</span>
+{ <span class="s">"title"</span>: <span class="s">"会翻身了的一周"</span>, <span class="s">"summary"</span>: <span class="s">"…"</span>,
+  <span class="s">"paras"</span>: [{<span class="s">"text"</span>, <span class="s">"src"</span>, <span class="s">"entryIds"</span>, <span class="s">"media"</span>:[{<span class="s">"entryId"</span>, <span class="s">"idx"</span>}]}],
+  <span class="s">"model_version"</span>: <span class="s">"qwen3.5-flash"</span>, <span class="s">"prompt_version"</span>: <span class="s">"v2"</span>,
+  <span class="s">"fallback"</span>: <span class="k">false</span> }              <span class="c">/* true = ai-server 内部已走句库兜底 */</span>
+
+<span class="c"># GET /healthz → {"ok":true}（compose healthcheck 用）</span></code></pre>
+
+  <h3>失败降级链（三层）</h3>
+  <ul class="pl">
+    <li><b>层 1（ai-server 内）</b>：LLM 失败/守卫拦截 → 重试 → 句库兜底，响应 <code>fallback:true</code>，主服务照常落库。</li>
+    <li><b>层 2（主服务内）</b>：ai-server 超时/不可达（内网 httpx 90s 超时）→ 主服务调用<b>本地保留的现有 template_diary</b> 作为服务级兜底，<code>model_version="template"</code>——自动生成场景静默成功，手动生成照常出结果。</li>
+    <li><b>层 3</b>：两者都不可用（如零素材）→ 维持现有空态模板，不发通知。</li>
+  </ul>
+  <p class="note">代价：句库模板逻辑在 ai-server（主）与主服务本地 template_diary（降级）各存一份。接受此重复以换可用性；本地版本可保持现状简版，不追求两侧一致。</p>
+
+  <h3>部署形态（compose 变更）</h3>
+  <ul class="pl">
+    <li>代码位置：<code>suiji-server/ai/</code>（app.py + guard.py + prompt.py + 兜底句库 + Dockerfile），随 <code>--local-dir suiji-server</code> 部署流程同步，deploy 脚本零改动。</li>
+    <li>compose 新增 service：<code>ai</code>，仅内网端口（如 8100，不映射 host 端口），healthcheck 轮询 /healthz，restart unless-stopped。</li>
+    <li>主服务新增配置项 <code>AI_SERVICE_URL=http://ai:8100</code>（env），未配置或探测失败 → 自动走层 2 本地兜底（灰度安全：先部署不配置，逐步切换）。</li>
+    <li>env 变更：<code>LLM_API_KEY/LLM_MODEL/LLM_API_BASE</code> 迁移至 ai 服务环境；主服务移除后需保留兼容读取一个版本（读到也只用于层 2 判断 llm_configured，逐步下线）。</li>
+  </ul>
+</div>
+
+<!-- ================= 1 改动面总览 ================= -->
+<h2><span class="no">01</span>改动面总览</h2>
+
+<div class="card">
+  <div class="arch">
+    <div class="col">
+      <h4>后端 suiji-server（主服务）</h4>
+      <ul>
+        <li><code>models/models.py</code>：AiJournal 增 5 列</li>
+        <li>Alembic 迁移 ×1</li>
+        <li><code>schemas/schemas.py</code>：Generate/Update 入参扩展</li>
+        <li><code>api/journals.py</code>：+2 路由（questions / auto）</li>
+        <li><code>services/journal_service.py</code>：_collect 扩展 + 调 ai-server + 层 2 兜底</li>
+        <li><code>domain/fact_extractor.py</code>：素材升级</li>
+        <li><code>services/rows.py</code>：journal_row 出参扩展</li>
+        <li><code>services/cleanup_service.py</code>：不变</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h4>ai-server（新增服务，§0.1）</h4>
+      <ul>
+        <li>新目录 <code>suiji-server/ai/</code>：app.py（FastAPI，仅 /generate + /healthz）</li>
+        <li>prompt.py：prompt v2（家人手记 + title/summary/media 输出）</li>
+        <li>guard.py：禁词/白名单/引用/句式守卫（自 output_guard 移植扩展）</li>
+        <li>fallback.py：叙事句库兜底 v2</li>
+        <li>独立 Dockerfile；compose 新增 ai service（仅内网）</li>
+        <li>LLM Key 独占；无 DB / 无 Redis / 无鉴权</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h4>前端 suiji-uniapp</h4>
+      <ul>
+        <li><code>pages/diary/diary.vue</code>：列表改版（标题卡）</li>
+        <li><code>pages/diary/edit.vue</code>：标题/摘要输入、快问面板、嵌图增删、重新生成、只读详情态</li>
+        <li><code>utils/api.js</code>：normParas/generateDiary/updateDiary 扩展 + 2 个新函数</li>
+        <li>首启触发点：App onShow（index 页）调用 auto-check</li>
+        <li>设置页：自动生成开关（Setting 已有 switches 机制）</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h4>数据 / 部署</h4>
+      <ul>
+        <li>ai_journal 表：新增列均可空/有默认，<b>旧数据零迁移成本</b></li>
+        <li>无新表、无新索引强制项（去重靠查询 + Redis 锁）</li>
+        <li>部署：docker 重建 api 服务 + <code>alembic upgrade head</code></li>
+        <li>.env 不变；LLM Key 不变</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 2 数据模型 ================= -->
+<h2><span class="no">02</span>数据模型变更</h2>
+
+<h3>2.1 ai_journal 表新增列 <span class="fr-map">FR-02 · FR-03 · FR-04 · FR-07</span></h3>
+<div class="card">
+  <table>
+    <tr><th style="width:120px">列名</th><th style="width:110px">类型</th><th>内容</th></tr>
+    <tr><td><code>title</code></td><td>String(32), default ""</td><td>AI 标题 ≤12 字；草稿态可被 PUT 覆写；旧数据为空串（列表回退日期区间）</td></tr>
+    <tr><td><code>summary</code></td><td>String(80), default ""</td><td>一句话摘要 ≤40 字，同上</td></tr>
+    <tr><td><code>qa</code></td><td>JSON, default []</td><td>快问问答 <code>[{q, a}]</code>，随草稿保存；重新生成时注入 prompt 并保留；归档后随日记留存；<b>档案导出不包含</b>（导出序列化处按此过滤）</td></tr>
+    <tr><td><code>kind</code></td><td>String(8), default "week"</td><td><code>week</code> 周记 / <code>month</code> 月报（FR-07），列表卡片据此打「月报」标识</td></tr>
+    <tr><td><code>source</code></td><td>String(8), default "manual"</td><td><code>manual</code> 手动 / <code>auto</code> 自动生成；自动生成通知「不带操作人」依赖此字段</td></tr>
+  </table>
+  <p class="note">paras（JSON）元素扩展：<code>{text, src, entryIds, cites}</code> → 增加 <code>media: [{entryId, idx}]</code>（段内嵌图引用：entry_id + 该记录 photos 数组下标）。缺省为 <code>[]</code>，旧段落无需补写——客户端对缺失字段按空数组处理。视频不进 media。</p>
+  <pre><code><span class="c"># Alembic 迁移（单 revision，全部带 default，可在线执行）</span>
+op.add_column(<span class="s">'ai_journal'</span>, sa.Column(<span class="s">'title'</span>,   sa.String(32),  nullable=<span class="k">False</span>, server_default=<span class="s">''</span>))
+op.add_column(<span class="s">'ai_journal'</span>, sa.Column(<span class="s">'summary'</span>, sa.String(80),  nullable=<span class="k">False</span>, server_default=<span class="s">''</span>))
+op.add_column(<span class="s">'ai_journal'</span>, sa.Column(<span class="s">'qa'</span>,      sa.JSON,        nullable=<span class="k">True</span>))
+op.add_column(<span class="s">'ai_journal'</span>, sa.Column(<span class="s">'kind'</span>,    sa.String(8),   nullable=<span class="k">False</span>, server_default=<span class="s">'week'</span>))
+op.add_column(<span class="s">'ai_journal'</span>, sa.Column(<span class="s">'source'</span>,  sa.String(8),   nullable=<span class="k">False</span>, server_default=<span class="s">'manual'</span>))</code></pre>
+  <p class="note">不新增数据库唯一索引做区间去重：历史数据可能存在同区间多草稿（现状允许，手动生成可覆盖），加唯一约束会破坏现网数据；幂等由「查询检查 + Redis 锁」保证（§6）。</p>
+</div>
+
+<h3>2.2 复用不改的模型</h3>
+<div class="card">
+  <ul class="pl">
+    <li><b>Baby</b>：<code>name</code>（小名）、<code>birth_date</code>（月龄由此计算）、<code>gender</code> 已存在，BABY_PROFILE 直接拼装，<b>无迁移</b>。隐私规则：仅这三个字段出域，姓氏/家长姓名继续不出域。</li>
+    <li><b>Entry</b>：<code>mood</code>/<code>note</code>/<code>voice</code> 类型与 payload 已存在（voice 转写文本在 payload.voice 内）；MOOD 素材直接从既有 entries 过滤提取，<b>无迁移</b>。</li>
+    <li><b>Setting</b>：「自动生成成长日记」开关落在现有 <code>setting</code> 表的 family/ai 配置区（settings 接口已支持自由键值），前端设置页加一个开关项；默认开启（读不到即视为开启）。</li>
+    <li><b>Notification</b>：自动生成通知复用现有 notify_family 通道，无表变更。</li>
+  </ul>
+</div>
+
+<!-- ================= 3 API 设计 ================= -->
+<h2><span class="no">03</span>API 设计</h2>
+<p class="lead">前缀 <code>/api/v1/journals</code>，鉴权沿用现有 <code>get_auth / require_write</code>；「创建者任意、成员仅改本人草稿」的 <code>_assert_writable</code> 规则不变。对外接口全部由<b>主服务</b>提供（客户端无感知拆分）；<code>generate/auto</code> 内部经 <code>AI_SERVICE_URL</code> 委托 ai-server，失败降级见 §0.1。</p>
+
+<div class="card">
+  <table>
+    <tr><th style="width:190px">端点</th><th>变更</th></tr>
+    <tr>
+      <td><code>GET /journals</code><br><span class="fr-map">现状接口</span></td>
+      <td>出参增加 <code>title / summary / qa / kind / source</code>（rows.journal_row 扩展）；<code>paras[].media</code> 原样下发。旧客户端不识别新字段自然忽略，<b>向前兼容</b>。</td>
+    </tr>
+    <tr>
+      <td><code>POST /journals/generate</code><br><span class="fr-map">FR-01/02/03/04</span></td>
+      <td>入参扩展（<code>JournalGenerateIn</code>）：<br>
+        <code>answers: [{q: str, a: str}] = []</code> — 快问回答（单题 ≤200 字，空答案过滤）；<br>
+        <code>regenerate: bool = false</code> — 快问补答触发的重新生成：为 true 时必须命中同 family+baby+range 的既有<b>草稿</b>，覆盖其正文/标题/摘要/嵌图，<b>保留 qa 并合并新回答</b>，归档态返回 422「归档后不可重新生成」；<br>
+        <code>kind: "week"|"month" = "week"</code> — 月报手动入口预留（PRD Q1 待定，接口先行支持，前端本期不暴露入口）。
+      </td>
+    </tr>
+    <tr>
+      <td><code>PUT /journals/{id}</code><br><span class="fr-map">FR-02/04/05</span></td>
+      <td><code>JournalUpdateIn</code> 增加 <code>title / summary</code>（草稿态可改，长度校验 12/40 字上限截断）；<code>paras</code> 内的 media 引用随段落保存，服务端校验 entryId 属于本家庭且未被软删（防越权/防悬空）。</td>
+    </tr>
+    <tr>
+      <td><code>GET /journals/questions</code><br><span class="pill brand">新增</span><br><span class="fr-map">FR-03</span></td>
+      <td>快问出题。query：<code>kind</code>（缺省 week）、<code>range_start/range_end</code>（缺省近 7 天）。服务端跑 <code>_collect</code> 轻量收集，按 PRD 优先级出题（里程碑→照片≥5→心情→兜底），返回 <code>{questions: [{id, text, hint}]}</code>，最多 2 题。只读权限（get_auth）。</td>
+    </tr>
+    <tr>
+      <td><code>POST /journals/auto</code><br><span class="pill brand">新增</span><br><span class="fr-map">FR-06 · FR-07</span></td>
+      <td>自动生成检查（客户端首启调用一次）。入参：<code>{trigger: "week_open"|"month_open"}</code>，客户端不传日期——<b>服务端按 UTC 判断今天是否周一/每月 1 日</b>（避免客户端时钟不可信）。响应：<code>{generated: bool, journal: row|null, skipped: "not_due"|"dedup"|"insufficient"|"disabled"|"quiet_hours"|"regenerating"}</code>。详见 §6 幂等方案。require_write 权限（只读成员不触发）。</td>
+    </tr>
+  </table>
+</div>
+
+<h3>3.1 契约示例</h3>
+<div class="card">
+  <pre><code><span class="c"># POST /journals/generate（快问补答重新生成）</span>
+{ <span class="s">"baby_id"</span>: <span class="s">"b_xxx"</span>, <span class="s">"range_start"</span>: <span class="s">"2026-11-09"</span>, <span class="s">"range_end"</span>: <span class="s">"2026-11-15"</span>,
+  <span class="s">"answers"</span>: [{<span class="s">"q"</span>: <span class="s">"这周宝宝解锁了翻身新技能，当时发生了什么小故事？"</span>,
+              <span class="s">"a"</span>: <span class="s">"练了一下午，翻过去她自己先愣住了，然后咯咯笑个不停"</span>}],
+  <span class="s">"regenerate"</span>: <span class="k">true</span> }
+
+<span class="c"># 响应 journal 行（新增字段）</span>
+{ <span class="s">"id"</span>: <span class="s">"j_xxx"</span>, <span class="s">"title"</span>: <span class="s">"会翻身了的一周"</span>, <span class="s">"summary"</span>: <span class="s">"这周她终于自己翻过了身，全家鼓掌鼓了半天。"</span>,
+  <span class="s">"qa"</span>: [<span class="s">"…"</span>], <span class="s">"kind"</span>: <span class="s">"week"</span>, <span class="s">"source"</span>: <span class="s">"manual"</span>,
+  <span class="s">"paras"</span>: [{ <span class="s">"text"</span>: <span class="s">"…"</span>, <span class="s">"src"</span>: [<span class="s">"11月12日 里程碑"</span>],
+             <span class="s">"entryIds"</span>: [<span class="s">"e_xxx"</span>], <span class="s">"cites"</span>: [],
+             <span class="s">"media"</span>: [{<span class="s">"entryId"</span>: <span class="s">"e_xxx"</span>, <span class="s">"idx"</span>: 0}] }] }</code></pre>
+</div>
+
+<!-- ================= 4 生成管线重构 ================= -->
+<h2><span class="no">04</span>生成管线重构 <span class="fr-map">FR-01 · FR-02 · 核心</span></h2>
+
+<h3>4.1 管线流程（重构后；节点标注执行位置）</h3>
+<div class="card">
+  <p class="lead" style="margin-top:0">主服务负责素材与落库，ai-server 负责 LLM 编排与守卫（边界见 §0.1）。主服务在①后调用 <code>POST ai/generate</code>（内网 90s 超时），把②③④整体委托给 ai-server。</p>
+  <div class="pipe">
+    <div class="node mod"><b>① _collect 素材收集（扩展）【主服务】</b><small>新增：BABY_PROFILE（name/birth_date→月龄/gender）；MOOD（本周 mood/note/voice 文本，单条截断 200 字，按「含“第一次”/“最”/被标星」优先选 ≤5 条）；QUICK_ANSWERS（入参 answers 注入）。降权：CARE_STAT 压缩为单条汇总字段 <code>digest</code>，不再产出分项排比素材。保留：MILESTONE（“第一次”系标记 first=true）、MEASUREMENT、MEDIA（补 photo 条目的 mood 附文，供选图）、ROUTINE。</small></div>
+    <div class="arr">↓ 素材不足门槛判定（FR-06）【主服务】：总条数 ≥3 或含里程碑/照片/心情 → 继续；否则 auto 返回 insufficient，手动返回现有空态模板</div>
+    <div class="node mod"><b>② POST ai/generate → _call_llm（prompt v2）【ai-server】</b><small>system prompt 重写：家人手记口吻、3–6 段结构（开篇画面感→1–2 个瞬间→收束）、每段 40–120 字；输出 JSON 扩展为 <code>{"title","summary","paras":[{"text","src","media":[entryId]}]}</code>——模型只回 entryId，ai-server 把 photos 下标解析进 media 并限制每段 ≤2、全文 ≤6。CARE_STAT.digest 作为可选收尾素材，prompt 明示禁止排比。失败重试 1 次（现有逻辑）。</small></div>
+    <div class="arr">↓ 失败重试 1 次</div>
+    <div class="node mod"><b>③ OutputGuard 守卫（扩展）【ai-server guard.py】</b><small>保留：禁词表（含 title/summary 一并扫描）、引用完整性、数字白名单——<b>白名单比对 bag 扩大</b>：facts + mood/voice 原文 + qa 回答序列化文本。新增 <code>check_report_style</code> 句式守卫（§4.3）。任一拦截 → 重试 1 次 → 句库兜底。</small></div>
+    <div class="arr">↓ 两次失败</div>
+    <div class="node mod"><b>④ 句库兜底 v2【ai-server fallback.py】</b><small>按素材类型（里程碑/心情/照片/统计）预置 3–5 套叙事句式随机轮换，数字只出现在状语位；同时产出兜底 title（「{里程碑名}的一周」类）与 summary。兜底文案不嵌图。响应标 <code>fallback:true</code>。ai-server 整体不可达时主服务层 2 兜底（§0.1 降级链，本地保留现状 template_diary 简版）。</small></div>
+    <div class="arr">↓ ai-server 响应回主服务（层 2 兜底失效时由本地 template_diary 生成）</div>
+    <div class="node mod"><b>④' 纵深防御终检【主服务】</b><small>对 ai-server 返回的 title/summary/paras 复扫禁词（轻量本地实现），命中则丢弃 LLM 结果转层 2 兜底；再校验 media 引用的 entryId 属于本家庭且未软删，越权/悬空引用直接剔除。</small></div>
+    <div class="arr">↓</div>
+    <div class="node"><b>⑤ 落库 + 通知【主服务】</b><small>regenerate=true → 原地覆盖既有草稿（保留 qa 合并 answers，updated_at 刷新）；否则新建行。<code>prompt_version="v2"</code>；通知文案按 source 分流（§6.4）。notify_family 复用。</small></div>
+  </div>
+</div>
+
+<h3>4.2 素材结构（facts 输出新增项）</h3>
+<div class="card">
+  <pre><code>{<span class="s">"type"</span>: <span class="s">"BABY_PROFILE"</span>,   <span class="s">"name"</span>: <span class="s">"朵朵"</span>, <span class="s">"age_months"</span>: <span class="em">7</span>, <span class="s">"gender"</span>: <span class="s">"girl"</span>}
+{<span class="s">"type"</span>: <span class="s">"MOOD"</span>, <span class="s">"items"</span>: [{<span class="s">"date"</span>: <span class="s">"11-12"</span>, <span class="s">"text"</span>: <span class="s">"今天第一次自己扶站…"</span>, <span class="s">"entry_id"</span>: <span class="s">"e_1"</span>, <span class="s">"star"</span>: <span class="k">true</span>}]}  <span class="c">/* ≤5 条 */</span>
+{<span class="s">"type"</span>: <span class="s">"QUICK_ANSWERS"</span>, <span class="s">"items"</span>: [{<span class="s">"q"</span>: <span class="s">"…"</span>, <span class="s">"a"</span>: <span class="s">"…"</span>}]}
+{<span class="s">"type"</span>: <span class="s">"CARE_STAT"</span>, <span class="s">"digest"</span>: <span class="s">"本周共记录 23 条，喂养与睡眠节奏平稳"</span>}  <span class="c">/* 单串，非分项对象 */</span>
+{<span class="s">"type"</span>: <span class="s">"MEDIA"</span>, <span class="s">"photos"</span>: [{<span class="s">"entry_id"</span>: <span class="s">"e_9"</span>, <span class="s">"date"</span>: <span class="s">"11-12"</span>, <span class="s">"count"</span>: <span class="em">3</span>, <span class="s">"caption"</span>: <span class="s">"配文：笑得好开心"</span>}]}  <span class="c">/* 供模型选图 */</span></code></pre>
+  <p class="note">隐私白名单落地点：<b>主服务 <code>_collect</code></b>（唯一决定什么素材进入内网请求）+ ai-server prompt（对传入素材只组装不新增）。BABY_PROFILE 仅取 Baby.name（小名）三个字段；家长姓名、联系方式、照片原图字节、诊断类 payload 一律不进素材层，ai-server 收到的已是过滤后的白名单素材。</p>
+</div>
+
+<h3>4.3 句式守卫 check_report_style</h3>
+<div class="card">
+  <pre><code><span class="c"># ai-server guard.py 新增（自 output_guard.py 移植）；「X 次/段/张/条/回/顿」计数短语连续出现 ≥2 组 → 报表式违规</span>
+PATTERN = re.compile(<span class="s">r"\d+\s*(次|段|张|条|回|顿|个)(?=\s*[、，。]|$)"</span>)
+<span class="k">def</span> check_report_style(paras) -&gt; <span class="k">bool</span>:  <span class="c"># True = 合规</span>
+    <span class="k">for</span> p <span class="k">in</span> paras:
+        <span class="k">if</span> len(PATTERN.findall(p[<span class="s">"text"</span>])) &gt;= <span class="em">2</span>:
+            <span class="k">return</span> <span class="k">False</span>
+    <span class="k">return</span> <span class="k">True</span></code></pre>
+  <ul class="pl">
+    <li>正则按「数字+量词后紧跟标点/结尾」限定，避免误杀「150ml」「6 小时」「P48」类数值（不带上述量词）。</li>
+    <li>对 title/summary 单独跑：<b>summary 禁止出现任何统计数字</b>（PRD FR-02），title/summary 同跑禁词表。</li>
+    <li>里程碑固有名称不误杀的现状由禁词表收窄逻辑保证，本设计不再触碰 BANNED 表。</li>
+  </ul>
+</div>
+
+<!-- ================= 5 快问与选图 ================= -->
+<h2><span class="no">05</span>快问出题与段内选图 <span class="fr-map">FR-03 · FR-04</span></h2>
+
+<h3>5.1 出题决策（GET /journals/questions 内实现）</h3>
+<div class="card">
+  <table>
+    <tr><th style="width:180px">素材条件</th><th>题目</th></tr>
+    <tr><td>本周有里程碑</td><td>「{里程碑名}新技能，当时发生了什么小故事？」（取最近一条）</td></tr>
+    <tr><td>照片 ≥5 张</td><td>「这周哪张照片背后有故事？」</td></tr>
+    <tr><td>有 mood/voice 记录</td><td>「这周 TA 情绪最特别的一次是什么时候？」</td></tr>
+    <tr><td>兜底</td><td>「这周最让你印象深刻的瞬间是什么？」</td></tr>
+  </table>
+  <p class="note">按优先级取前 2 题；纯服务端计算（读 entries/milestones），<b>不调 LLM</b>，毫秒级返回。question 对象带 id（client 透传回 generate 即可，q 文本随 answers 回传落库）。</p>
+</div>
+
+<h3>5.2 段内选图（LLM 选中 → 服务端解析落库）</h3>
+<div class="card">
+  <ul class="pl">
+    <li>MEDIA 素材为模型提供 <code>entry_id + date + caption</code>；模型输出 <code>media:[entryId]</code>（每段 ≤2）。</li>
+    <li>服务端把 entryId 解析为该记录 payload.photos 下标（取前 2 张），超全文 6 张的按段落顺序截断；<b>视频条目不进 media</b>。</li>
+    <li>客户端渲染：按 media 引用从现有 media 缓存（diaryMedia 同源）取缩略图，点击进 sj-media-preview 全屏预览；未被引用的照片/视频落「更多照片」横向条（现状 dc-media 逻辑降级为此）。</li>
+    <li>编辑页增删嵌图：前端从本日记周期媒体池中选取/移除，PUT 时随 paras 保存，服务端校验 entryId 归属（§3）。</li>
+    <li>模板兜底产出的 paras 一律无 media（兜底无语义匹配能力），全部照片落「更多照片」。</li>
+  </ul>
+</div>
+
+<!-- ================= 6 自动生成幂等 ================= -->
+<h2><span class="no">06</span>自动生成与幂等方案 <span class="fr-map">FR-06 · FR-07</span></h2>
+
+<h3>6.1 总体链路</h3>
+<div class="card">
+  <div class="state-flow">
+    <span class="st-node">客户端 App 首启（index onShow）</span><span class="st-arrow">──POST /journals/auto──▶</span>
+    <span class="st-node hot">服务端 5 道闸门</span><span class="st-arrow">──全通过──▶</span>
+    <span class="st-node">生成 + 通知全部成员</span>
+  </div>
+  <p class="note">客户端本地不做周一/月初判断、不读开关，只管首启上报一次（带本地去抖：同一自然日只请求一次，写本地存储）；全部判断收敛在服务端，单一事实源。</p>
+</div>
+
+<h3>6.2 服务端五道闸门（POST /journals/auto）</h3>
+<div class="card">
+  <ol class="pl">
+    <li><b>日期闸</b>：服务端 UTC 今天是周一（trigger=week_open）或每月 1 日（trigger=month_open），否则 <code>skipped:"not_due"</code>。</li>
+    <li><b>开关闸</b>：读家庭设置「自动生成成长日记」（默认开启），关闭则 <code>skipped:"disabled"</code>。</li>
+    <li><b>去重闸</b>：同 family + baby + 上周一~上周日（自然周，服务端计算）已存在草稿或归档日记 → <code>skipped:"dedup"</code>。月报同理按自然月。</li>
+    <li><b>并发闸</b>：<code>redis SETNX sj:auto:{family_id}:{trigger}:{date_key}</code> TTL 90s（≥ LLM 最长耗时 60s×2）；抢锁失败 → <code>skipped:"regenerating"</code>（另一成员正在生成）。锁超时兜底 + 数据库复查去重，双保险。</li>
+    <li><b>素材闸</b>：门槛判定（§4.1），不足 → <code>skipped:"insufficient"</code>，<b>不生成、不通知</b>。</li>
+  </ol>
+  <p class="note">失败静默（FR-06）：管线全失败且兜底不可用时，auto 返回 <code>{generated:false, skipped:"failed"}</code>，不抛 5xx、不发通知；客户端不重试（次日首启天然重试）。手动 generate 不受影响。</p>
+</div>
+
+<h3>6.3 为什么不需要调度器</h3>
+<div class="card">
+  <p>PRD 触发语义是「当天任一成员首开」——凡是没有成员打开 App 的日子，生成与通知也无意义（通知无人看）。客户端触发 + 服务端幂等的组合：<b>语义等价、零新增进程、错误面更小</b>（无调度器单点）。若未来要求「无人打开也要生成」，再评估 APScheduler，本期不做。</p>
+</div>
+
+<h3>6.4 通知分流</h3>
+<div class="card">
+  <ul class="pl">
+    <li><code>source="auto"</code>：notify_family 全员推送「本周成长日记已生成，看看这周的小故事吧」，<b>不做本人过滤</b>（现有 notify_family 的 actor 过滤按 source 跳过）；月报文案对应替换。</li>
+    <li><code>source="manual"</code>：维持现状文案与本人过滤逻辑不变。</li>
+    <li>通知走现有 Notification 表与 /events/count 角标轮询，无通道变更。</li>
+  </ul>
+</div>
+
+<!-- ================= 7 前端改造 ================= -->
+<h2><span class="no">07</span>前端改造 <span class="fr-map">FR-03 · FR-04 · FR-05</span></h2>
+
+<div class="card">
+  <table>
+    <tr><th style="width:190px">文件</th><th>改动</th></tr>
+    <tr><td><code>pages/diary/diary.vue</code></td>
+      <td>列表改版为标题卡：封面（首段嵌图 or 周期首张照片）+ title（空则回退 d.range，兼容旧数据）+ summary ≤2 行 + 日期区间 + 状态徽标 + 月报标识（kind==="month"）+ 媒体数量条。点击卡：草稿 → edit 页（带 id）；归档 → edit 页只读详情态。<b>移除卡片内折叠正文与文末缩略图堆叠</b>。「本周草稿待核对」主按钮逻辑与 thisWeekDraftId 保留。</td></tr>
+    <tr><td><code>pages/diary/edit.vue</code></td>
+      <td>① 新增 title/summary 输入位（sj-input 风格，归档态只读）；② 快问面板：无 id 进入（手动生成）时先拉 questions 弹层（跳过=直接 generate，填了=answers 随请求）；「重新生成」按钮（草稿态 + regenerate=true + 本页快问补答入口）；③ 段内嵌图渲染与增删（编辑态从周期媒体池选择）；④ 「更多照片」横向条承接未嵌图媒体与视频；⑤ 归档后进入只读详情态（标题/正文/来源/嵌图可看，输入禁用，隐藏编辑按钮）；⑥ 暂存/归档 PUT 载荷扩展 title/summary/paras.media。</td></tr>
+    <tr><td><code>utils/api.js</code></td>
+      <td><code>normParas</code> 补 media 归一化（缺省 []）；<code>listDiaries</code> 透传新字段；<code>generateDiary(opts)</code> 支持 answers/regenerate/kind；<code>updateDiary</code> 载荷扩展；新增 <code>fetchQuestions()</code> 与 <code>autoDiaryCheck(trigger)</code>。乐观更新（updateDiary 本地缓存先行 + 失败回滚）机制保留。</td></tr>
+    <tr><td>App 首启触发</td>
+      <td>index 页 onShow（登录+家庭+宝宝三态就绪后）调用 <code>autoDiaryCheck("week_open")</code>，当日已请求过则本地跳过；响应 generated=true 时消息中心角标由现有轮询自然点亮，<b>不弹窗打扰</b>。每月 1 日同点追加 <code>"month_open"</code>。</td></tr>
+    <tr><td>设置页</td>
+      <td>「自动生成成长日记」开关，写家庭 setting 键（如 <code>ai_auto_diary</code>，默认 "1"）；只读成员隐藏。</td></tr>
+  </table>
+  <p class="note">浮层/弹窗一律走 ui.js + <code>&lt;sj-ui-host/&gt;</code>；文本输入沿用 :value+@input 模式；新组件优先 easycom sj-* 复用——均为项目既有约定，无新增框架能力。</p>
+</div>
+
+<!-- ================= 8 兼容与迁移 ================= -->
+<h2><span class="no">08</span>兼容性与数据迁移</h2>
+<div class="card">
+  <table>
+    <tr><th style="width:230px">场景</th><th>策略</th></tr>
+    <tr><td>旧日记（无 title/summary/qa/kind/media）</td><td>新列 default 兜底：kind="week"、source="manual"、qa=[]、title=""。列表对空 title 回退日期区间；编辑页对旧草稿保存时补 title/summary 可留空不强制。<b>不做批量补生成</b>（PRD FR-02 决策）。</td></tr>
+    <tr><td>旧客户端 + 新服务端</td><td>GET 新字段被旧客户端忽略；POST generate 新入参全部有默认值；PUT 不识别字段被 Pydantic 忽略。<b>完全兼容</b>。</td></tr>
+    <tr><td>新客户端 + 旧服务端</td><td>标题卡回退区间显示；autoDiaryCheck 404 时静默吞掉（try/catch）。发版顺序：<b>先服务端后客户端</b>。</td></tr>
+    <tr><td>进行中的旧草稿重新生成</td><td>regenerate 走 v2 管线覆盖正文，paras 内旧 src/entryIds 结构不变，media 缺省补 []。归档态 422 拦截。</td></tr>
+    <tr><td>档案导出</td><td>归档日记进入档案章节时用 title 作章节标题（空则日期区间）；<b>qa 不进导出序列化</b>（data.py 导出与档案导出两处过滤点）。</td></tr>
+    <tr><td>草稿 30 天清理</td><td>cleanup_service 按 status="draft" + updated_at 删除，新列不影响；「暂存续期」语义不变。</td></tr>
+  </table>
+</div>
+
+<!-- ================= 9 测试要点 ================= -->
+<h2><span class="no">09</span>测试要点</h2>
+<div class="card">
+  <ul class="pl">
+    <li><b>守卫单测</b>：句式守卫正反例（「喂养 18 次、睡眠 12 段」违规；「平均每顿 150ml」放行；「6 小时」放行）；数字白名单对 mood/qa 原文数字放行；title/summary 禁词扫描。</li>
+    <li><b>管线集成</b>：LLM 输出含 media 越界（每段 >2 / 全文 >6）截断；模型回错误 entryId → 丢弃该引用不报错；regenerate 对归档态 422；qa 合并保留。</li>
+    <li><b>服务拆分</b>：ai-server 不可达 → 主服务层 2 兜底出模板文案且不 5xx；ai-server /healthz 通过；主服务终检复扫命中禁词 → 丢弃 LLM 结果走兜底；AI_SERVICE_URL 未配置 → 全量走本地兜底（灰度路径）。</li>
+    <li><b>幂等</b>：同家庭双成员并发 POST /journals/auto → 仅一次生成（Redis 锁 + 去重复查）；非周一返回 not_due；开关关闭 disabled；素材不足 insufficient 且无通知。</li>
+    <li><b>权限</b>：只读成员调 auto/questions/generate 被拒；成员改他人草稿 403 现状回归；media entryId 越权（别家家庭）被服务端过滤。</li>
+    <li><b>迁移</b>：alembic upgrade head 在含旧数据的库上执行，旧日记行读取正常、列表回退显示；downgrade 可回滚。</li>
+    <li><b>前端</b>：旧数据无标题卡渲染；快问面板跳过/填写/超 200 字截断；嵌图增删后归档不可改；月报标识。</li>
+  </ul>
+</div>
+
+<!-- ================= 10 部署与实施顺序 ================= -->
+<h2><span class="no">10</span>部署与实施顺序</h2>
+
+<h3>10.1 实施顺序（依赖关系决定）</h3>
+<div class="card">
+  <table>
+    <tr><th style="width:90px">批次</th><th>内容</th><th style="width:150px">前置</th></tr>
+    <tr><td><span class="badge be">P0</span></td><td>迁移 + 模型列 → <b>ai-server 搭建</b>（ai/ 目录 + Dockerfile + compose 服务 + Key 迁移）→ prompt v2 / 守卫 / 句库兜底（ai-server 内）→ 主服务 _collect 扩展 + 委托调用 + 层 2 兜底 + 终检 → journal_row 出参 → 编辑页 title/summary 输入位（先落数据，后改展示）</td><td>无</td></tr>
+    <tr><td><span class="badge" style="background:#7A5FB0">P1</span></td><td>questions/auto API → 快问面板 + regenerate → 嵌图（服务端解析 + 编辑页增删）→ diary.vue 列表改版 + 详情只读态 → api.js 扩展</td><td>P0</td></tr>
+    <tr><td><span class="badge bd">P2</span></td><td>首启触发接入 index + 设置页开关 → 月报（kind=month 管线复用，月初触发）→ 档案导出过滤 qa + title 作章节标题</td><td>P1</td></tr>
+  </table>
+</div>
+
+<h3>10.2 部署清单（后端变更后）</h3>
+<div class="card">
+  <ul class="pl">
+    <li>compose 新增 ai 服务（构建自 <code>suiji-server/ai/Dockerfile</code>，仅内网端口 8100 + healthcheck）；镜像重建 api 与 ai 两个服务（ai 依赖 = fastapi + uvicorn + httpx，requirements 零新增第三方包）；</li>
+    <li>env：ai 服务配置 <code>LLM_API_KEY/LLM_MODEL/LLM_API_BASE</code>（远端 .env 保留不覆盖原则下<b>新增键</b>）；主服务新增 <code>AI_SERVICE_URL=http://ai:8100</code>；</li>
+    <li>容器内执行 <code>alembic upgrade head</code>（新列均带 server_default，在线执行安全）；</li>
+    <li>部署命令沿用项目既定流程：<code>deploy_compose.py --mode deploy --local-dir suiji-server --host-port 30080 --container-port 8000</code>（nginx 唯一公网入口不变，ai 容器不经 nginx）；</li>
+    <li>灰度顺序：先部署主服务（AI_SERVICE_URL 不配置 → 全量本地兜底，行为与旧版一致）→ 再部署 ai 服务并配置 URL → 观察日记生成走 LLM；</li>
+    <li>验证：GET /journals 返回新字段、POST /journals/auto 非周一返回 not_due、旧日记列表正常、主服务容器内 <code>curl http://ai:8100/healthz</code> 通、生成一篇日记 model_version=qwen3.5-flash；</li>
+    <li>回滚预案：alembic downgrade 一版 + 旧镜像重启；ai-server 单独故障不影响主服务（层 2 兜底），可单独重启；前端发版可独立回滚（兼容策略见 §8）。</li>
+  </ul>
+</div>
+
+<footer>
+  岁记 · AI 成长日记重设计 技术设计 v1.1 · 2026-11-18 · v1.1 新增独立 ai-server 拆分（用户决策）· 评审通过后按 §10.1 批次实施
+</footer>
+
+</div>
+</body>
+</html>
