@@ -14,8 +14,7 @@
           <image class="mem-img" v-if="m.av" :src="m.av" mode="aspectFill" />
           <text v-else>{{ m.n[0] }}</text>
         </view>
-        <text class="mc-name">{{ m.n }}</text>
-        <text class="mc-rel" :class="{ 'mc-rel-none': !m.rel }">{{ m.rel || '未设置' }}</text>
+        <text class="mc-name" :class="{ 'mc-rel-none': !m.rel }">{{ m.rel || '未设置' }}</text>
         <text class="role" :class="m.rc">{{ m.tag }}</text>
       </view>
       <view class="member-card member-add" v-if="isCreator" hover-class="hover-press" :hover-stay-time="80" @click="onInvite">

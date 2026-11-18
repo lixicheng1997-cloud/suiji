@@ -25,7 +25,7 @@
           :autoplay="true"
           :show-center-play-btn="true"
           :show-fullscreen-btn="true"
-          :enable-progress-gesture="true"
+          :enable-progress-gesture="false"
           :object-fit="'contain'"
         />
       </view>
@@ -87,7 +87,8 @@ export default {
       winH: 667,
       touchStartX: 0,
       touchStartY: 0,
-      edgeGesture: false
+      edgeGesture: false,
+      swipeGesture: false
     }
   },
   computed: {
@@ -213,22 +214,34 @@ export default {
       this._native = null
     },
 
-    /* 边缘滑动返回：仅视频场景，左边缘 24px 内起步、右滑超过 60px、纵向偏移小于 40px 视为返回手势（坐标为 px） */
+    /* 视频场景手势（图片由 swiper 原生左右滑动切换）：
+     * - 左边缘 24px 内起步右滑超过 60px：关闭预览；
+     * - 其余区域左右滑动超过 60px（纵向偏移小于 40px）：切换上一张/下一张媒体；
+     * - 视频自身已禁用进度手势（enable-progress-gesture=false），左右滑动不再快进/后退。
+     * 注：App 端 video 为原生控件会吞掉其表面的触摸，此时用底部「上一段/下一段」按钮切换。 */
     onTouchStart(e) {
       const t = e.touches && e.touches[0]
       if (!t) return
       this.touchStartX = t.clientX
       this.touchStartY = t.clientY
-      this.edgeGesture = this.currentItem.type === 'video' && t.clientX <= 24
+      const isVideo = this.currentItem.type === 'video'
+      this.edgeGesture = isVideo && t.clientX <= 24
+      this.swipeGesture = isVideo && !this.edgeGesture
     },
     onTouchEnd(e) {
-      if (!this.edgeGesture) return
+      if (!this.edgeGesture && !this.swipeGesture) return
       const t = e.changedTouches && e.changedTouches[0]
-      if (!t) return
+      if (!t) { this.edgeGesture = false; this.swipeGesture = false; return }
       const dx = t.clientX - this.touchStartX
       const dy = t.clientY - this.touchStartY
-      if (dx > 60 && Math.abs(dy) < 40) this.close()
+      if (Math.abs(dy) < 40) {
+        if (this.edgeGesture) {
+          if (dx > 60) this.close()
+        } else if (dx < -60) this.next()
+        else if (dx > 60) this.prev()
+      }
       this.edgeGesture = false
+      this.swipeGesture = false
     }
   }
 }
