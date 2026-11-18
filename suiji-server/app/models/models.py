@@ -16,6 +16,9 @@ class User(Base):
     family_id: Mapped[str] = mapped_column(String(32), default="", index=True)
     created_at: Mapped[str] = mapped_column(String(32), default="")
     is_admin: Mapped[int] = mapped_column(Integer, default=0)  # 0/1 系统管理员（启动自动播种）
+    # 账号停用标记（管理后台）：0 正常 / 1 停用。
+    # 停用 ≠ 注销：deletion_scheduled_at 是用户自助的 30 天冷静期，两者链路互不干扰。
+    status: Mapped[int] = mapped_column(Integer, default=0)
     # 账号注销冷静期（TDD §十）：空串=未申请注销；非空=计划于该 UTC 时刻删除账号。
     # 30 天内登录或主动调用 /auth/deactivate/cancel 即清空该字段撤销注销。
     deletion_scheduled_at: Mapped[str] = mapped_column(String(32), default="", index=True)

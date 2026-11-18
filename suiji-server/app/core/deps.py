@@ -33,12 +33,17 @@ class AuthContext:
     family_name: str
     jti: str = ""      # 当前 access 令牌 ID，供 /auth/logout 精确撤销
     exp: int = 0       # 当前 access 过期时刻，撤销时用作账本 TTL
+    is_admin: int = 0  # 0/1 系统管理员（实时查 user.is_admin，管理后台门控用）
 
 
 def _resolve(db: Session, payload: dict) -> AuthContext:
     user = db.get(User, payload.get("user_id", ""))
     if not user:
         raise HTTPException(status_code=401, detail="登录已失效，请重新登录")
+    # 停用拦截（纵深防御第三层）：login/refresh 挡新会话，这里挡存量令牌——
+    # 每请求实时查库，被停用的账号旧 access 即便未过期、未被 bump_epoch 撤销也无法再用。
+    if int(user.status or 0) == 1:
+        raise HTTPException(status_code=403, detail="账号已被停用，请联系管理员")
     family = db.get(Family, user.family_id) if user.family_id else None
     role = "member"
     family_name = ""
@@ -63,6 +68,7 @@ def _resolve(db: Session, payload: dict) -> AuthContext:
         family_name=family_name,
         jti=payload.get("jti") or "",
         exp=int(payload.get("exp") or 0),
+        is_admin=int(user.is_admin or 0),
     )
 
 
@@ -109,6 +115,17 @@ def require_family(auth: AuthContext = Depends(get_auth)) -> AuthContext:
     """
     if not auth.family_id:
         raise HTTPException(status_code=409, detail="need_family")
+    return auth
+
+
+def require_admin(auth: AuthContext = Depends(get_auth)) -> AuthContext:
+    """管理后台门控：仅 is_admin=1 的账号可调用 /admin/*。
+
+    注意：admin 路由只挂本依赖、不挂 require_family——管理员的「系统管理」家庭
+    一旦被误删，若叠加家庭门控会导致后台自锁，谁都进不去。
+    """
+    if not auth.is_admin:
+        raise HTTPException(status_code=403, detail="仅系统管理员可访问")
     return auth
 
 

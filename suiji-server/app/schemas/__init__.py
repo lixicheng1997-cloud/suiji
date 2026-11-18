@@ -19,6 +19,7 @@ from .schemas import (
     RegisterIn,
     SettingsIn,
     SyncRowsIn,
+    UserStatusIn,
     VaccinePatch,
     MilestonePatch,
 )
@@ -26,5 +27,6 @@ from .schemas import (
 __all__ = [
     "BabyIn", "DeactivateIn", "EntryIn", "EntryMediaPatch", "FamilyCreateIn", "FilePatch", "ImportIn", "JoinIn", "JournalGenerateIn",
     "JournalUpdateIn", "LoginIn", "LogoutIn", "MemberRoleIn", "PasswordIn", "PresignIn", "RefreshIn",
-    "RegisterDirectIn", "RegisterIn", "SettingsIn", "SyncRowsIn", "VaccinePatch", "MilestonePatch",
+    "RegisterDirectIn", "RegisterIn", "SettingsIn", "SyncRowsIn",
+    "UserStatusIn", "VaccinePatch", "MilestonePatch",
 ]

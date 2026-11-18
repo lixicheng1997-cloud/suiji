@@ -2,8 +2,9 @@
 from fastapi import APIRouter, Depends
 
 from ..core.deps import require_family
-from . import (auth, babies, bootstrap, crypto, data, entries, events, family, files, growth,
-               journals, media, milestones, notifications, servers, settings, vaccines, weather)
+from . import (admin, auth, babies, bootstrap, crypto, data, entries, events, family, files,
+               growth, journals, media, milestones, notifications, servers, settings,
+               vaccines, weather)
 
 api_router = APIRouter()
 
@@ -24,6 +25,9 @@ api_router.include_router(weather.router)
 api_router.include_router(files.router)
 # media 同理：契约要求无/非法 token 一律 403，门控写在 endpoint 内部。
 api_router.include_router(media.router)
+# admin：门控写在每个端点内部（require_admin）——媒体字节通道 /media/{id}/content
+# 走 ?token= 受限 media 令牌，router 级 Bearer 依赖会把它挡成 401，与 files/media 同因。
+api_router.include_router(admin.router)
 for router in (babies.router, entries.router, vaccines.router,
                milestones.router, settings.router, journals.router, data.router, growth.router,
                events.router, notifications.router):

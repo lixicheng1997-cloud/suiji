@@ -183,3 +183,8 @@ class RegisterDirectIn(BaseModel):
 class DeactivateIn(BaseModel):
     """账号注销二次验证：必须输入当前密码。"""
     password: str = Field(max_length=PASSWORD_MAX_LENGTH)
+
+
+class UserStatusIn(BaseModel):
+    """管理端停用/启用账号：0 正常 / 1 停用。"""
+    status: int

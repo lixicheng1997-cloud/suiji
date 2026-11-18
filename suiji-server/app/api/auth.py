@@ -118,6 +118,9 @@ def login(body: LoginIn, db: Session = Depends(get_db),
         raise HTTPException(status_code=401, detail="用户名不存在，请检查或先注册")
     if not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="密码错误，请重新输入")
+    # 停用拦截（第一层）：密码正确也拒登，业务接口由 deps._resolve 每请求实时兜底
+    if int(user.status or 0) == 1:
+        raise HTTPException(status_code=403, detail="账号已被停用，请联系管理员")
     family = db.get(Family, user.family_id) if user.family_id else None
     if family is None:
         return _issue_pending(user)
@@ -153,6 +156,9 @@ def refresh(body: RefreshIn, db: Session = Depends(get_db),
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=401, detail="登录已失效，请重新登录")
+    # 停用拦截（第二层）：存量 refresh 也续不出新令牌（第一层在 login，第三层在 deps._resolve）
+    if int(user.status or 0) == 1:
+        raise HTTPException(status_code=403, detail="账号已被停用，请联系管理员")
     family = db.get(Family, user.family_id) if user.family_id else None
     role = _role_of(db, user.family_id, user.id) if family else "member"
     return dict(

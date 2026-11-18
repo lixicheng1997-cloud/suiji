@@ -156,6 +156,16 @@ def download(file_id: str, request: Request, token: str = Query(""),
     # 手写鉴权（支持 ?token= 给 <img src> 直连）后仍需过家庭门控
     auth = require_family(_auth(request, token, db))
     row: FileObject = file_service.get_file(db, auth, file_id)
+    return serve_file(row, request, inline, variant)
+
+
+def serve_file(row: FileObject, request: Request, inline: int, variant: str):
+    """字节响应核心管线：307 预签名 / 流式回源 / Range / 防 XSS 内联判定。
+
+    /files/{id}/download 与管理后台 /admin/media/{id}/content 共用：
+    两个入口的差异只在「谁能取哪个文件」（家庭隔离 vs admin 特权 + 留痕），
+    拿到 FileObject 行之后的响应构造完全一致，故抽成 helper 而非复制代码。
+    """
     store = get_store()
     media_type = row.content_type or "application/octet-stream"
 

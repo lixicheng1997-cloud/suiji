@@ -1,0 +1,217 @@
+/* 品牌主题：岁记「森林绘本 Kawaii」蜂蜜暖棕 #F7A15C 主色 + Element Plus 梯度覆盖 */
+
+/* ---------- 设计令牌（与 App 端 uni.scss 对齐，px = rpx/2） ---------- */
+:root {
+  /* 蜂蜜主色系 */
+  --sj-honey: #F7A15C;
+  --sj-honey-deep: #E07E33;
+  --sj-honey-light: #FFB86B;
+  --sj-honey-soft: #FFEBD8;
+  --sj-duckling: #F5B32C;
+  /* 兼容旧变量名（布局/登录仍引用） */
+  --sj-brand: #F7A15C;
+  --sj-brand-deep: #E07E33;
+  --sj-brand-soft: #FFEBD8;
+  /* 面与描边 */
+  --sj-cream: #FFF8F0;
+  --sj-card: #FFFDFA;
+  --sj-line: #F3E4D3;
+  /* 文字 */
+  --sj-ink: #5B4636;
+  --sj-ink-2: #9C8878;
+  --sj-ink-3: #C7B6A8;
+  /* 语义色 */
+  --sj-mint: #5FC08C;
+  --sj-amber: #F6B23C;
+  --sj-coral: #EF7A7A;
+  --sj-blush: #FF8FAB;
+  --sj-blush-bg: #FFE7EE;
+  /* 圆角 */
+  --sj-radius-sm: 12px;
+  --sj-radius-md: 20px;
+  --sj-radius-lg: 28px;
+  --sj-radius-pill: 999px;
+  /* 暖棕阴影 */
+  --sj-shadow-sm: 0 2px 10px rgba(214, 158, 99, .12);
+  --sj-shadow-md: 0 10px 28px rgba(214, 158, 99, .16);
+  --sj-shadow-lg: 0 20px 48px rgba(180, 110, 60, .22);
+  /* 字体与缓动 */
+  --sj-font-title: "Yuanti SC", "YouYuan", "幼圆", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --sj-font-body: "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei", sans-serif;
+  --sj-ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ---------- Element Plus 变量覆盖 ---------- */
+  --el-color-primary: #F7A15C;
+  --el-color-primary-light-3: #f9bd8d;
+  --el-color-primary-light-5: #fbd0ae;
+  --el-color-primary-light-7: #fde3ce;
+  --el-color-primary-light-8: #feecde;
+  --el-color-primary-light-9: #fef6ef;
+  --el-color-primary-dark-2: #E07E33;
+
+  --el-color-success: #5FC08C;
+  --el-color-success-light-3: #8fd3af;
+  --el-color-success-light-5: #afe0a8;
+  --el-color-success-light-7: #ceecc1;
+  --el-color-success-light-8: #dff2cb;
+  --el-color-success-light-9: #eff9d4;
+  --el-color-success-dark-2: #4c9a70;
+
+  --el-color-warning: #F6B23C;
+  --el-color-warning-light-3: #f9c977;
+  --el-color-warning-light-5: #fad99e;
+  --el-color-warning-light-7: #fce8c5;
+  --el-color-warning-light-8: #fdefd8;
+  --el-color-warning-light-9: #fef7ec;
+  --el-color-warning-dark-2: #c58e30;
+
+  --el-color-danger: #EF7A7A;
+  --el-color-danger-light-3: #f4a2a2;
+  --el-color-danger-light-5: #f7bcbc;
+  --el-color-danger-light-7: #fad7d7;
+  --el-color-danger-light-8: #fce4e4;
+  --el-color-danger-light-9: #fdf2f2;
+  --el-color-danger-dark-2: #bf6262;
+  --el-color-error: #EF7A7A;
+  --el-color-error-light-3: #f4a2a2;
+  --el-color-error-light-5: #f7bcbc;
+  --el-color-error-light-7: #fad7d7;
+  --el-color-error-light-8: #fce4e4;
+  --el-color-error-light-9: #fdf2f2;
+  --el-color-error-dark-2: #bf6262;
+
+  --el-color-info: #9C8878;
+
+  /* 面 / 文字 / 描边 */
+  --el-bg-color: #FFFDFA;
+  --el-bg-color-page: #FFF8F0;
+  --el-bg-color-overlay: #FFFDFA;
+  --el-text-color-primary: #5B4636;
+  --el-text-color-regular: #6E5A4A;
+  --el-text-color-secondary: #9C8878;
+  --el-text-color-placeholder: #C7B6A8;
+  --el-text-color-disabled: #D8CBBd;
+  --el-border-color: #F3E4D3;
+  --el-border-color-light: #F5E8DA;
+  --el-border-color-lighter: #F8EEE2;
+  --el-border-color-extra-light: #FBF4EA;
+  --el-border-color-dark: #EBD9C6;
+  --el-border-color-hover: #F7A15C;
+  --el-fill-color-blank: #FFFDFA;
+  --el-fill-color-light: #FFF6EA;
+  --el-fill-color-lighter: #FFFBF5;
+
+  /* 圆角 / 阴影 / 字体 */
+  --el-border-radius-base: 12px;
+  --el-border-radius-small: 8px;
+  --el-border-radius-round: 999px;
+  --el-box-shadow: var(--sj-shadow-md);
+  --el-box-shadow-light: var(--sj-shadow-sm);
+  --el-box-shadow-lighter: var(--sj-shadow-sm);
+  --el-box-shadow-dark: var(--sj-shadow-lg);
+  --el-font-family: var(--sj-font-body);
+}
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  font-family: var(--sj-font-body);
+  background: var(--sj-cream);
+  color: var(--sj-ink);
+}
+
+/* ---------- 全局小细节：滚动条 / 选中色 ---------- */
+::selection {
+  background: var(--sj-honey-soft);
+  color: var(--sj-honey-deep);
+}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: #E8C9A6;
+  border-radius: var(--sj-radius-pill);
+  border: 2px solid var(--sj-cream);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--sj-honey); }
+
+/* ---------- Element Plus 组件全局暖化 ---------- */
+/* 卡片：大圆角 + 暖描边 + 暖阴影 */
+.el-card {
+  border-radius: var(--sj-radius-md);
+  border: 1px solid var(--sj-line);
+  box-shadow: var(--sj-shadow-sm) !important;
+  background: var(--sj-card);
+}
+.el-card__header {
+  border-bottom: 1px solid var(--sj-line);
+  font-family: var(--sj-font-title);
+  color: var(--sj-ink);
+}
+
+/* 按钮：胶囊 */
+.el-button { border-radius: var(--sj-radius-pill); }
+
+/* 表格：奶油表头 + 暖描边 + 行 hover 浅蜜底 */
+.el-table {
+  --el-table-border-color: var(--sj-line);
+  --el-table-header-bg-color: #FFF6EA;
+  --el-table-header-text-color: #6E5A4A;
+  --el-table-row-hover-bg-color: var(--sj-honey-soft);
+  --el-table-text-color: var(--sj-ink);
+  --el-table-bg-color: var(--sj-card);
+  --el-table-tr-bg-color: var(--sj-card);
+  background: var(--sj-card);
+}
+.el-table th.el-table__cell { font-family: var(--sj-font-title); }
+.el-table .el-table__cell { padding: 10px 0; }
+
+/* 标签：胶囊 */
+.el-tag { border-radius: var(--sj-radius-pill); }
+
+/* 弹窗：大圆角 */
+.el-dialog {
+  border-radius: var(--sj-radius-lg);
+  box-shadow: var(--sj-shadow-lg);
+}
+.el-dialog__title { font-family: var(--sj-font-title); color: var(--sj-ink); }
+
+/* 分页：圆角页码 */
+.el-pagination {
+  --el-pagination-button-bg-color: var(--sj-card);
+  --el-pagination-hover-color: var(--sj-honey-deep);
+  color: var(--sj-ink-2);
+}
+.el-pagination .el-pager li,
+.el-pagination button { border-radius: 10px; }
+
+/* 描述列表：暖描边 */
+.el-descriptions__body { background: var(--sj-card); }
+.el-descriptions__label { color: var(--sj-ink-2) !important; }
+
+/* 下拉菜单圆角 */
+.el-dropdown-menu { border-radius: var(--sj-radius-md); }
+.el-popper.is-light, .el-popper.is-pure { border-color: var(--sj-line); }
+
+/* ---------- 页面通用骨架（类名保持不变） ---------- */
+.page {
+  padding: 20px;
+}
+
+.page-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.pager {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.muted {
+  color: var(--sj-ink-2);
+  font-size: 12px;
+}

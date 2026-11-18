@@ -232,7 +232,42 @@ server {
         add_header Content-Security-Policy   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'self'" always;
     }
 
-    # 兜底：H5 hash 路由未匹配的路径回退入口页；/api、/suiji-website、/docs 等前缀已在上面优先匹配
+    # ---- 管理后台（suiji-admin，Vue3 SPA，vite base=/admin/，history 路由）----
+    # 裸路径 /admin 补斜杠重定向，保证站内相对路径（/admin/assets/...）解析正确
+    location = /admin {
+        absolute_redirect off;
+        return 301 /admin/;
+    }
+
+    # 打包产物 JS/CSS（文件名带内容哈希，长缓存 7 天）
+    location /admin/assets/ {
+        alias /usr/share/nginx/html/suiji-admin/assets/;
+        expires 7d;
+        add_header Cache-Control "public, max-age=604800";
+        add_header X-Content-Type-Options    "nosniff" always;
+        add_header X-Frame-Options           "DENY" always;
+        add_header Referrer-Policy           "no-referrer" always;
+        add_header Content-Security-Policy   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; frame-ancestors 'none'" always;
+    }
+
+    # SPA 入口与路由回退：history 模式下未命中的 /admin/xxx 一律回 index.html。
+    # CSP：Element Plus 依赖内联 style 属性（style-src 'unsafe-inline'），脚本仅同域；
+    # img-src 放行 ${NGINX_MEDIA_ORIGIN}——媒体中心的图片经 /admin/media/{id}/content
+    # 下载，auto 模式下会 307 跳 COS 预签名直链，浏览器对重定向终点同样按页面 CSP 校验。
+    # 后台是敏感入口，frame-ancestors 'none' + X-Frame-Options DENY 防点击劫持。
+    location /admin/ {
+        alias /usr/share/nginx/html/suiji-admin/;
+        index index.html;
+        try_files $uri $uri/ /admin/index.html;
+        add_header Cache-Control "no-cache";
+        add_header X-Content-Type-Options    "nosniff" always;
+        add_header X-Frame-Options           "DENY" always;
+        add_header Referrer-Policy           "no-referrer" always;
+        add_header Permissions-Policy        "geolocation=(), microphone=(), camera=()" always;
+        add_header Content-Security-Policy   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: ${NGINX_MEDIA_ORIGIN}; media-src 'self' data: blob: ${NGINX_MEDIA_ORIGIN}; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'" always;
+    }
+
+    # 兜底：H5 hash 路由未匹配的路径回退入口页；/api、/suiji-website、/admin 等前缀已在上面优先匹配
     location / {
         root /usr/share/nginx/html/suiji-web;
         try_files $uri $uri/ /index.html;

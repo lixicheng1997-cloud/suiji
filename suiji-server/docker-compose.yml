@@ -166,6 +166,8 @@ services:
       - "./static/suiji-website:/usr/share/nginx/html/suiji-website:ro"
       # H5 网页版产物（岁记 web 版），nginx 根路径托管；产物资源为根绝对路径 /assets、/static
       - "./static/suiji-web:/usr/share/nginx/html/suiji-web:ro"
+      # 管理后台（suiji-admin）构建产物，挂在 /admin/ 路径下（vite base=/admin/）
+      - "./static/suiji-admin:/usr/share/nginx/html/suiji-admin:ro"
       # 启用 HTTPS 时在覆盖文件或 env 中追加：
       # - "./nginx/templates/tls.conf.template:/etc/nginx/templates/tls.conf.template:ro"
       # - "/etc/letsencrypt/live/<你的域名>:/etc/nginx/certs:ro"

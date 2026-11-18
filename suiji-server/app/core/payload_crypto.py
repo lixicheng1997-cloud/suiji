@@ -38,6 +38,17 @@ ENCRYPTED_PATHS = frozenset({
     "/api/v1/export/data",
 })
 
+# 前缀规则：/api/v1/admin/* 全部强制加密（管理后台接口，为 CRYPTO_MODE=required 铺路）。
+# 豁免：路径以 /content 结尾的媒体字节通道——<img>/<video> 标签无法携带 X-Sj-Enc 信封头，
+# 且「大文件刻意不加密」与客户端既有口径一致（媒体靠受限 media 令牌鉴权）。
+ENCRYPTED_PREFIXES = ("/api/v1/admin/",)
+
+
+def _is_encrypted_path(path: str) -> bool:
+    if path in ENCRYPTED_PATHS:
+        return True
+    return path.startswith(ENCRYPTED_PREFIXES) and not path.endswith("/content")
+
 
 def _get_header(scope, name: bytes) -> str:
     for k, v in scope.get("headers") or []:
@@ -126,7 +137,7 @@ class PayloadCryptoMiddleware:
         # OPTIONS 是浏览器的 CORS 预检：它不带业务头也不带 body，
         # 若在 required 模式下把它判成「明文请求」返回 400，跨域直接就断了
         if scope.get("type") != "http" or scope.get("method") == "OPTIONS" \
-                or scope.get("path") not in ENCRYPTED_PATHS:
+                or not _is_encrypted_path(scope.get("path", "")):
             await self.app(scope, receive, send)
             return
 
