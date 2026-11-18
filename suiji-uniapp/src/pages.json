@@ -25,7 +25,10 @@
         "navigationStyle": "custom",
         "backgroundColor": "#FFF6F0",
         "backgroundColorTop": "#FFF6F0",
-        "backgroundColorBottom": "#FFF6F0"
+        "backgroundColorBottom": "#FFF6F0",
+        "app-plus": {
+          "animationType": "none"
+        }
       }
     },
     {
@@ -35,7 +38,10 @@
         "navigationBarTitleText": "成长",
         "navigationBarBackgroundColor": "#FFF6F0",
         "navigationBarTextStyle": "black",
-        "backgroundColor": "#FFF6F0"
+        "backgroundColor": "#FFF6F0",
+        "app-plus": {
+          "animationType": "none"
+        }
       }
     },
     {
@@ -45,13 +51,17 @@
         "navigationBarTitleText": "家庭",
         "navigationBarBackgroundColor": "#FFF6F0",
         "navigationBarTextStyle": "black",
-        "backgroundColor": "#FFF6F0"
+        "backgroundColor": "#FFF6F0",
+        "app-plus": {
+          "animationType": "none"
+        }
       }
     },
     {
       "path": "pages/family-album/family-album",
       "style": {
         "enablePullDownRefresh": true,
+        "onReachBottomDistance": 120,
         "navigationStyle": "custom",
         "backgroundColor": "#FFF6F0",
         "backgroundColorTop": "#FFF6F0",
@@ -65,7 +75,10 @@
         "navigationBarTitleText": "我的",
         "navigationBarBackgroundColor": "#FFF6F0",
         "navigationBarTextStyle": "black",
-        "backgroundColor": "#FFF6F0"
+        "backgroundColor": "#FFF6F0",
+        "app-plus": {
+          "animationType": "none"
+        }
       }
     },
     {

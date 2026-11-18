@@ -18,8 +18,8 @@ services:
       SUIJI_ALLOW_FALLBACK: "0"
       # 每次启动自动迁移到最新版本（迁移均为判存幂等，可安全重复执行）
       RUN_MIGRATIONS: "1"
-      # 生产不开放宽松跨域；H5 独立域名需要时在此显式列出具体来源
-      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      # 跨域白名单：默认放行本地 Vite 5173/5174 联调来源；H5 独立域名在 .env.prod 显式追加（不要填 *）
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174}
       # 客户端全量升级后改为 required：敏感接口必须加密，明文一律 400，防中间人降级
       CRYPTO_MODE: ${CRYPTO_MODE:-optional}
     # 生产不挂载源码卷：底座 volumes 仅保留 media / crypto 两个数据卷

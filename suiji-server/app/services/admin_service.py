@@ -22,7 +22,7 @@ from .ids import gen_id
 
 logger = logging.getLogger("suiji.admin")
 
-# 内置管理员凭据：可用环境变量覆盖（生产请在 .env 里改掉默认口令）
+# 内置管理员凭据：可用环境变量覆盖（生产请在 .env.prod 里改掉默认口令）
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_NAME = os.getenv("ADMIN_NAME", "系统管理员")
 ADMIN_INIT_PASSWORD = os.getenv("ADMIN_INIT_PASSWORD", "admin888")

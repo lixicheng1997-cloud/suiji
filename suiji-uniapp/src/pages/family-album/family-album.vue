@@ -26,10 +26,10 @@
 
     <!-- 流式网格：按日期分组，照片 / 视频混排，正方形格子，类手机相册 -->
     <view v-if="filtered.length">
-      <view class="group" v-for="g in grouped" :key="g.day">
+      <view class="group" v-for="g in visibleGroups" :key="g.day">
         <view class="group-title">
           <text>{{ g.day }}</text>
-          <text class="group-count">{{ g.items.length }} 项</text>
+          <text class="group-count">{{ g.total }} 项</text>
         </view>
         <view class="grid">
           <view
@@ -84,6 +84,9 @@ const TABS = [
   { k: 'video', label: '视频' }
 ]
 
+/* 分批渲染：首屏与每次触底追加的格子数；避免一次性创建全部日期组与图片节点 */
+const ITEM_PAGE_SIZE = 30
+
 export default {
   data() {
     return {
@@ -91,6 +94,8 @@ export default {
       filter: 'all',
       /* 全量相册媒体（照片 + 视频，时间倒序），形状见 api.getFamilyAlbum */
       all: [],
+      /* 已渲染的格子数上限；触底按 ITEM_PAGE_SIZE 追加 */
+      visibleItemCount: ITEM_PAGE_SIZE,
       loaded: false,
       statusBarHeight: 20,
       /* 全屏媒体预览 */
@@ -114,7 +119,27 @@ export default {
         if (!map[k]) { map[k] = []; order.push(k) }
         map[k].push(m)
       })
-      return order.map(k => ({ day: k, items: map[k] }))
+      return order.map(k => ({ day: k, items: map[k], total: map[k].length }))
+    },
+    /* 分批可见分组：按格子累计截断到 visibleItemCount；跨组切分时本组只取余量，标题计数保留全量 */
+    visibleGroups() {
+      const limit = this.visibleItemCount
+      let acc = 0
+      const out = []
+      for (const g of this.grouped) {
+        if (acc >= limit) break
+        const room = limit - acc
+        out.push({ day: g.day, total: g.total, items: g.items.slice(0, room) })
+        acc += g.items.length
+      }
+      return out
+    }
+  },
+
+  watch: {
+    /* 切换类型筛选：分组口径变化，回到首屏批次 */
+    filter() {
+      this.visibleItemCount = ITEM_PAGE_SIZE
     }
   },
 
@@ -126,6 +151,13 @@ export default {
 
   onShow() {
     this.load()
+  },
+
+  /* 触底追加下一批格子；全量已渲染完时上限不再增长 */
+  onReachBottom() {
+    if (this.visibleItemCount < this.filtered.length) {
+      this.visibleItemCount += ITEM_PAGE_SIZE
+    }
   },
 
   /* 下拉刷新：强制重拉全家快照后重渲染 */
@@ -147,6 +179,7 @@ export default {
   methods: {
     load() {
       this.all = api.getFamilyAlbum()
+      this.visibleItemCount = ITEM_PAGE_SIZE
       this.loaded = true
     },
 

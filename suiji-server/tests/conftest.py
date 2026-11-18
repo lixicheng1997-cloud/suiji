@@ -10,7 +10,7 @@ os.environ["REDIS_URL"] = ""
 os.environ["JWT_SECRET"] = "pytest-only-secret-0123456789abcdef"
 os.environ["SUIJI_ALLOW_FALLBACK"] = "1"
 os.environ["MEDIA_DIR"] = os.path.join(_TMP, "media")
-# 置空而非 pop：load_dotenv 不覆盖已存在的环境变量，防止 .env 的真实 LLM/COS 配置渗入测试
+# 置空而非 pop：load_dotenv 不覆盖已存在的环境变量，防止 .env.dev/.env.prod 的真实 LLM/COS 配置渗入测试
 os.environ["LLM_API_BASE"] = ""
 os.environ["LLM_API_KEY"] = ""
 os.environ["LLM_MODEL"] = ""

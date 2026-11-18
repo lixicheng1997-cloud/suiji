@@ -274,4 +274,76 @@ export function onNoticeClick(handler) {
   } catch (e) { /* ignore */ }
 }
 
+/* ---------- App 端原生覆盖控件（plus.nativeObj.View） ----------
+ * 背景：App-vue 页面里 video 是原生控件，层级高于 webview 内普通 DOM / cover-view，
+ * 普通按钮既盖不上去也点不到。这里用 plus.nativeObj.View 在原生层绘制可点按钮。
+ * 仅 APP-PLUS 可用；H5 / 小程序一律返回 null，上层回退普通 view / cover-view 模板。
+ * 架构约束：plus.* 只允许出现在本文件（TDD §4.3）。
+ */
+
+/** 当前环境是否支持原生覆盖控件 */
+export function nativeOverlaySupported() {
+  // #ifdef APP-PLUS
+  try { return typeof plus !== 'undefined' && !!(plus.nativeObj && plus.nativeObj.View) } catch (e) { return false }
+  // #endif
+  return false
+}
+
+/**
+ * 创建一个原生覆盖按钮（独立 View、独立点击回调，不做坐标热区命中）
+ * @param {Object} o
+ * @param {string} o.id 唯一标识
+ * @param {{top:string,left:string,width:string,height:string}} o.rect 相对屏幕区域，单位 px 字符串
+ * @param {string} [o.bg] 背景色 rgba() / #RRGGBB；空串表示透明
+ * @param {string} [o.text] 文案
+ * @param {string} [o.color] 文字颜色，默认 #FFFFFF
+ * @param {number} [o.fontSize] 字号 px
+ * @param {boolean} [o.bold] 是否加粗，默认 true
+ * @param {number|string} [o.radius] 背景圆角半径 px（数字）或带单位字符串；不传为直角
+ * @param {Function} [o.onClick] 点击回调；不传则为纯展示控件
+ * @returns {null|{setText(t:string):void, setOpacity(n:number):void, destroy():void}}
+ */
+export function createNativeButton(o) {
+  // #ifdef APP-PLUS
+  try {
+    if (!nativeOverlaySupported()) return null
+    const view = new plus.nativeObj.View(o.id, {
+      top: o.rect.top,
+      left: o.rect.left,
+      width: o.rect.width,
+      height: o.rect.height,
+      backgroundColor: 'rgba(0,0,0,0)'
+    })
+    const bg = o.bg || ''
+    if (bg) {
+      /* radius 传入时按 RectStyles 对象绘制圆角矩形；否则保持原字符串颜色直角矩形 */
+      const styles = o.radius
+        ? { color: bg, radius: typeof o.radius === 'number' ? o.radius + 'px' : o.radius }
+        : bg
+      view.drawRect(styles, { top: '0px', left: '0px', width: '100%', height: '100%' }, o.id + '-bg')
+    }
+    const drawTx = (txt) => {
+      view.drawText(txt, { top: '0px', left: '0px', width: '100%', height: '100%' }, {
+        size: (o.fontSize || 14) + 'px',
+        color: o.color || '#FFFFFF',
+        align: 'center',
+        verticalAlign: 'middle',
+        weight: o.bold === false ? 'normal' : 'bold'
+      }, o.id + '-tx')
+    }
+    drawTx(o.text || '')
+    if (typeof o.onClick === 'function') {
+      view.addEventListener('click', () => { try { o.onClick() } catch (e) { /* 回调异常不影响原生控件 */ } }, false)
+    }
+    view.show()
+    return {
+      setText(t) { drawTx(t) },
+      setOpacity(n) { try { view.setStyle({ opacity: n }) } catch (e) { /* 低版本不支持则忽略 */ } },
+      destroy() { try { view.close() } catch (e) { /* ignore */ } }
+    }
+  } catch (e) { return null }
+  // #endif
+  return null
+}
+
 

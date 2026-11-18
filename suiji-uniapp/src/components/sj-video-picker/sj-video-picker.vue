@@ -4,7 +4,7 @@
     <view v-for="(v, i) in list" :key="v.key || i" class="vp-item" hover-class="hover-press" @click="onPreview(i)">
       <sj-video-cover
         class="vp-video"
-        :thumb="v.thumb ? (isCloud(v.thumb) ? resolve(v.thumb) : v.thumb) : ''"
+        :thumb="coverOf(v)"
       />
       <view class="vp-mask" />
       <!-- 压缩中：只显示占位遮罩与文案，不实例化播放按钮；后台压缩完成后回写封面与路径 -->
@@ -96,7 +96,7 @@
  *  - 点击卡片弹出全屏播放层，autoplay
  *  - 上传由调用方在保存时统一走 http.uploadFile（带 duration + thumb）
  */
-import { resolveUrl } from '@/api/http.js'
+import { resolveUrl, resolveCover } from '@/api/http.js'
 
 export default {
   name: 'SjVideoPicker',
@@ -136,6 +136,14 @@ export default {
   methods: {
     isCloud(p) { return /^\/api\//.test(String(p || '')) },
     resolve(p) { return resolveUrl(p) },
+    /* 卡片封面：已有缩略图优先；本地无缩略图但已是云端视频时，取后台抽帧封面（variant=cover）。
+       抽帧尚未完成时服务端回落原图，封面组件加载失败再走暖灰占位，不露出破图 */
+    coverOf(v) {
+      if (!v) return ''
+      if (v.thumb) return this.isCloud(v.thumb) ? this.resolve(v.thumb) : v.thumb
+      if (v.path && this.isCloud(v.path)) return resolveCover(v.path)
+      return ''
+    },
     formatDur(s) {
       s = Math.max(0, Math.round(Number(s) || 0))
       const m = Math.floor(s / 60)
@@ -166,13 +174,13 @@ export default {
           if (accepted.some(it => it.size && it.size > this.maxBytes)) {
             this.$refs.ntf.show({ type: 'warn', message: '原片较大，正在本地压缩…' })
           }
-          accepted.forEach(item => {
-            const key = this.genKey()
-            /* 先以原片立即上屏（compressing 态）；压缩走并发调度，完成再回写，
-               避免 App 端转码数十秒期间卡片一直不出现 */
-            this.append(Object.assign({ key, status: 'compressing' }, item))
-            this.enqueueCompress(key, item)
-          })
+          /* 先在本地一次性累积整批上屏（compressing 态），再统一回写：
+             若在同步循环里逐个 append，每次都会从尚未被父组件回写的 modelValue 重新切片，
+             前一段会被后一段覆盖，多选最终只剩最后一段 */
+          const prepared = accepted.map(item =>
+            Object.assign({ key: this.genKey(), status: 'compressing' }, item))
+          this.appendAll(prepared)
+          prepared.forEach(it => this.enqueueCompress(it.key, it))
         })
         .catch(e => this.onFail(e))
     },
@@ -261,11 +269,12 @@ export default {
           success: r => {
             const out = r && r.tempFilePath
             if (!out || out === item.path) return resolve(item)
-            /* 压缩后旧首帧临时图可能已失效，清空封面；新大小按返回值(kB)回填，取不到留 0 由服务端补 */
+            /* 封面保留 chooseMedia 的首帧临时图：compressVideo 只另写一个新视频文件，
+               不会使缩略图失效，且画面内容一致；清空会导致上传中/上传后卡片无封面。
+               新大小按返回值(kB)回填，取不到留 0 由服务端补 */
             const kb = Number(r.size)
             resolve(Object.assign({}, item, {
               path: out,
-              thumb: '',
               size: kb ? Math.round(kb * 1024) : 0
             }))
           },
@@ -281,7 +290,7 @@ export default {
           success: r => {
             const out = r && r.tempFilePath
             if (!out || out === item.path) return resolve(item)
-            resolve(Object.assign({}, item, { path: out, thumb: '', size: 0 }))
+            resolve(Object.assign({}, item, { path: out, size: 0 }))
           },
           fail: () => resolve(item)
         })
@@ -374,6 +383,16 @@ export default {
       next.push(item)
       this.emit(next)
     },
+    /* 批量追加：同一同步循环内先在本地累积整批，去重后只回写一次，避免逐段 emit 被未回写的旧数组覆盖 */
+    appendAll(items) {
+      const next = this.list.slice()
+      ;(items || []).forEach(item => {
+        if (!item || !item.path) return
+        if (next.some(x => x && x.path === item.path)) return
+        next.push(item)
+      })
+      this.emit(next)
+    },
     onRemove(i) {
       const v = this.list[i]
       /* 压缩中的项被删：登记取消，后台结果回来时不再回写 */
@@ -389,7 +408,7 @@ export default {
       if (this.isCompressing(v) || this.isUploading(v) || this.isFailed(v)) return
       /* 云端路径拼 host + token；本地临时路径原样给 video 组件 */
       const url = this.isCloud(v.path) ? this.resolve(v.path) : v.path
-      const poster = v.thumb ? (this.isCloud(v.thumb) ? this.resolve(v.thumb) : v.thumb) : ''
+      const poster = this.coverOf(v)
       this.preview = { show: true, url, poster }
     },
     closePreview() {

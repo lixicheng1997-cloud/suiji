@@ -1,13 +1,13 @@
 <!--
   sj-tabbar · v2 悬浮底部导航（森林绘本 Kawaii）
-  设计还原：suiji-ui-v2 styles.css .tabbar/.tab（悬浮圆角胶囊、激活态 primary-deep + tabJump 弹性动画）。
+  设计还原：suiji-ui-v2 styles.css .tabbar/.tab（悬浮圆角胶囊、激活态 primary-deep 静态放大，无回弹/浮动动画）。
   用法：tab 页根节点内放置 <sj-tabbar active="home" />；组件挂载时自动隐藏原生 tabBar。
   图标走 sj-icon 主题 png（10-tab-home…13-tab-me），随 bear/duck 实时换肤。
 -->
 <template>
   <view class="sj-tabbar">
     <view class="stb" hover-class="stb-hover" :hover-stay-time="120" v-for="t in tabs" :key="t.key" @click="go(t)">
-      <view class="stb-ic" :class="{ on: t.key === active, jump: t.key === active && bounce === t.key }">
+      <view class="stb-ic" :class="{ on: t.key === active }">
         <sj-icon :name="t.png" :size="68" />
       </view>
       <text class="stb-tx" :class="{ on: t.key === active }">{{ t.label }}</text>
@@ -31,7 +31,7 @@ export default {
     active: { type: String, required: true }
   },
   data() {
-    return { tabs: TABS, bounce: '' }
+    return { tabs: TABS }
   },
   mounted() {
     /* 隐藏原生 tabBar，保留 pages.json 配置以维持 tab 页路由语义 */
@@ -41,12 +41,7 @@ export default {
     go(t) {
       if (t.key !== this.active) {
         uni.switchTab({ url: t.url })
-        return
       }
-      /* 点击当前页签：重播 tabJump 弹性动画 */
-      this.bounce = ''
-      this.$nextTick(() => { this.bounce = t.key })
-      setTimeout(() => { if (this.bounce === t.key) this.bounce = '' }, 520)
     }
   }
 }
@@ -80,33 +75,14 @@ export default {
   gap: 4rpx;
   border-radius: 40rpx;
 }
-/* 安卓适配：animation/transition 简写内不用 var()（部分 webview 解析失败会丢弃整条声明），
-   keyframes 位移用 px（rpx 在 keyframes 中不保证被编译转换）。1rpx = 0.5px。 */
 .stb-ic {
   width: 68rpx;
   height: 68rpx;
   transition: transform 0.3s cubic-bezier(.34,1.56,.64,1);
 }
 .stb-hover .stb-ic { transform: translateY(-3px); }
-/* 选中态：放大并持续上下浮动（可超出底栏） */
-.stb-ic.on { animation: sjTabPop 0.45s cubic-bezier(.34,1.56,.64,1), sjTabFloat 1.5s ease-in-out 0.45s infinite; }
-.stb-ic.jump { animation: sjTabJump 0.5s cubic-bezier(.34,1.56,.64,1), sjTabFloat 1.5s ease-in-out 0.5s infinite; }
-@keyframes sjTabPop {
-  0% { transform: scale(1); }
-  40% { transform: scale(1.5) translateY(-6px) rotate(-8deg); }
-  70% { transform: scale(1.24) translateY(-3px); }
-  100% { transform: scale(1.32) translateY(-4px); }
-}
-@keyframes sjTabFloat {
-  0%, 100% { transform: scale(1.32) translateY(-4px); }
-  50% { transform: scale(1.44) translateY(-6.5px); }
-}
-@keyframes sjTabJump {
-  0% { transform: scale(1); }
-  35% { transform: scale(1.28) translateY(-6px) rotate(-6deg); }
-  70% { transform: scale(0.94) translateY(1px); }
-  100% { transform: scale(1); }
-}
+/* 选中态：静态放大，无回弹/上下浮动动画 */
+.stb-ic.on { transform: scale(1.18); }
 .stb-tx {
   font-size: 22rpx;
   font-weight: 700;

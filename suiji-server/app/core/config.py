@@ -1,4 +1,4 @@
-"""应用配置：.env（python-dotenv）与环境变量，默认值面向本机开发（SQLite）。"""
+"""应用配置：分环境 dotenv（.env.dev/.env.prod）与环境变量，默认值面向本机开发（SQLite）。"""
 import logging
 import os
 import secrets
@@ -9,7 +9,14 @@ from dotenv import load_dotenv
 logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parents[2]  # suiji-server 根目录
-load_dotenv(BASE_DIR / ".env")
+# 直连运行（python app/main.py）时按 APP_ENV 选择分环境 dotenv：
+#   APP_ENV=prod  -> .env.prod；其余（默认 dev）-> .env.dev
+# 容器部署由 compose 注入环境变量，不依赖 dotenv 文件；文件缺失时静默跳过。
+_app_env = os.getenv("APP_ENV", "dev").strip().lower()
+_dotenv_file = BASE_DIR / (".env.prod" if _app_env == "prod" else ".env.dev")
+if not _dotenv_file.exists():
+    _dotenv_file = BASE_DIR / ".env"  # 兼容旧布局
+load_dotenv(_dotenv_file)
 
 # 已知会被直接照抄进配置的占位密钥：生产环境出现即拒绝启动
 _WEAK_SECRETS = {"change-me-in-prod", "changeme", "secret", "test", "your-secret-key"}
@@ -163,7 +170,7 @@ class Settings:
         reason = "未配置" if not raw else ("仍是占位值" if raw in _WEAK_SECRETS else "长度不足 16 位")
         if not self.allow_fallback:
             raise RuntimeError(
-                f"JWT_SECRET {reason}：生产部署请先在 .env 中设置随机长密钥"
+                f"JWT_SECRET {reason}：生产部署请先在 .env.prod 中设置随机长密钥"
                 f"（python -c \"import secrets;print(secrets.token_urlsafe(48))\"）"
             )
         ephemeral = secrets.token_urlsafe(48)

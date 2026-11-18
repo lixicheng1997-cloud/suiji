@@ -146,8 +146,13 @@
           </view>
         </view>
 
+        <!-- 首屏加载占位：弹跳 IP 图标 + 文案（已有数据的回页刷新不遮挡） -->
+        <view v-if="firstLoading" class="timeline-loading">
+          <image class="tl-ld-ic bounce" :src="firstLoadingIcon" />
+          <text class="tl-ld-tx">正在加载记录…</text>
+        </view>
         <!-- 空态 -->
-        <view v-if="!groups.length" class="empty">
+        <view v-else-if="!groups.length" class="empty">
           <sj-mascot :size="200" />
           <text class="empty-text">还没有记录{{ '\n' }}点右下角 + 记一笔吧</text>
         </view>
@@ -298,6 +303,8 @@ export default {
       dayTotals: {},
       pageSize: 10,
       loadingMore: false,
+      /* 首屏整页加载态：页面打开即在拉第一页，初始 true 避免首帧闪空态；加载完成后置 false */
+      firstLoading: true,
       /* 消息中心未读通知数（待办不计入，驱动顶栏铃铛角标） */
       unread: 0,
       sheetOpen: false,
@@ -416,6 +423,10 @@ export default {
       }
       return out
     },
+    /* 首屏加载占位图标：ctl 库 46-loading（与底部加载中同款 IP 弹跳图标） */
+    firstLoadingIcon() {
+      return '/static/icons/ctl/' + this.__theme + '/192/46-ctl-loading.png'
+    },
     /* 底部提示卡通图标（ctl 控制图标库，按状态取语义）：
        加载中→46-loading；还有更多→60-more；到底啦→66-ok（完成对勾） */
     scrollEndIcon() {
@@ -473,6 +484,9 @@ export default {
     /* 每次回到本页刷新：档案 / 今日概览 / 时光轴（记录会增删改） */
     async refresh() {
       this.syncing = true
+      /* 列表当前无已加载数据时进入首屏加载态，列表区显示 loading 占位；
+         已有数据的回页/下拉刷新保留旧列表，不整屏遮挡 */
+      if (!this.items.length) this.firstLoading = true
       const b = api.getBaby()
       if (b) this.baby = b
       this.todayStats = api.getTodayStats()
@@ -490,6 +504,7 @@ export default {
         this.hasMore = p.has_more
         this.dayTotals = p.day_totals || {}
       } catch (e) { /* 保留当前列表 */ }
+      this.firstLoading = false
       this.syncing = false
       this.syncSleepTimer()
     },
@@ -509,7 +524,7 @@ export default {
         this.loadingMore = false
       }).catch(() => { this.loadingMore = false })
     },
-    /* 记录人展示：与宝宝关系在前、昵称在后（「妈妈 · 小熊妈妈」）；按 creator_id 解析成员 */
+    /* 记录人展示：优先与宝宝关系 → 昵称 → 登录账号；按 creator_id 解析成员 */
     whoOf(e) {
       return api.creatorLabel(e)
     },
@@ -716,10 +731,31 @@ export default {
         success: res => {
           if (!res.confirm) return
           api.deleteEntry(e.id)
-            .then(() => { this.swipe.openId = ''; this.refresh() })
+            .then(() => this.removeEntryLocal(e))
             .catch(err => ui.error(err, '删除失败'))
         }
       })
+    },
+    /* 后台删除成功后直接从本地时光轴移除该条，不整页重拉：
+       items 局部更新，页面滚动位置保持不变；dayTotals / 今日胶囊 / 进行中睡眠计时
+       按 deleteEntry 已同步的缓存本地重算 */
+    removeEntryLocal(e) {
+      this.swipe.openId = ''
+      this.swipe.id = ''
+      this.swipe.x = 0
+      this.items = this.items.filter(x => x.id !== e.id)
+      /* 该日全天条数 -1（服务端 day_totals 口径，下限 0） */
+      if (e.dk && this.dayTotals[e.dk] !== undefined) {
+        this.dayTotals = Object.assign({}, this.dayTotals, {
+          [e.dk]: Math.max(0, this.dayTotals[e.dk] - 1)
+        })
+      }
+      /* 今日概览胶囊：记录已移出缓存，按最新缓存重算 */
+      this.todayStats = api.getTodayStats()
+      /* 若删掉的是进行中睡眠，停掉旧计时并按缓存重新查找 */
+      this.syncSleepTimer()
+      /* 已加载条目被删空但后台还有下一页时，静默补拉一页，避免空态闪烁 */
+      if (!this.items.length && this.hasMore) this.loadMore()
     }
   }
 }
@@ -1145,6 +1181,15 @@ export default {
 .badge.backfill { color: var(--sj-faint); border: 2rpx dashed var(--sj-faint); }
 .badge.ongoing { background: #E9EEFB; color: var(--sj-c-sleep); }
 .badge.p50 { background: var(--sj-tint-measure); color: var(--sj-c-measure); }
+
+/* 首屏加载占位：居中弹跳图标 + 文案，高度与空态区接近，避免内容上下跳变 */
+.timeline-loading {
+  display: flex; flex-direction: column; align-items: center; gap: 24rpx;
+  padding: 120rpx 40rpx;
+}
+.tl-ld-ic { width: 72rpx; height: 72rpx; flex: none; }
+.tl-ld-ic.bounce { animation: seBounce 0.8s ease-in-out infinite; }
+.tl-ld-tx { font-size: 26rpx; color: var(--sj-sub); letter-spacing: 2rpx; }
 
 /* 空态 / 收尾 */
 .empty { text-align: center; padding: 96rpx 40rpx; display: flex; flex-direction: column; align-items: center; gap: 24rpx; }

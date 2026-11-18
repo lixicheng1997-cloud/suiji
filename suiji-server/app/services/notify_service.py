@@ -44,7 +44,7 @@ TITLES = {
 
 
 def actor_name(db: Session, auth_or_user_id) -> str:
-    """操作人展示名：与宝宝关系在前、昵称在后（「妈妈 · 李芳」），不含登录账号。"""
+    """操作人展示名：与宝宝关系 → 昵称 → 登录账号。"""
     uid = auth_or_user_id.user_id if isinstance(auth_or_user_id, AuthContext) else str(auth_or_user_id)
     u = db.get(User, uid)
     st = db.get(Setting, uid)

@@ -4,9 +4,9 @@ from ..models import (AiJournal, AuditLog, Baby, Entry, EntryMedia, FamilyMember
 
 
 def display_name(user: User, parent: dict | None = None) -> str:
-    """成员展示名统一口径（绝不透出登录账号）：
+    """成员展示名（家庭卡「名字」字段，与宝宝关系在 member_row.relation 另列）：
     家长昵称（parent.name，等于用户名时视为未设置）→ 注册昵称（User.name，同上）
-    → 与宝宝关系 → 家人。"""
+    → 与宝宝关系 → 登录账号 → 家人。"""
     parent = parent or {}
     pname = (parent.get("name") or "").strip()
     if pname and pname != user.username:
@@ -16,23 +16,17 @@ def display_name(user: User, parent: dict | None = None) -> str:
     rel = (parent.get("relation") or "").strip()
     if rel:
         return rel
-    return "家人"
+    uname = (user.username or "").strip()
+    return uname or "家人"
 
 
 def actor_label(user: User, parent: dict | None = None) -> str:
-    """动态/通知里「记录人」的展示口径：与宝宝关系在前、昵称在后（「妈妈 · 李芳」）。
-
-    与 display_name 的区别：display_name 是成员行的「名字」字段（昵称优先，关系在
-    member_row.relation 里另列，家庭卡两张分开摆），反过来用会让家庭页出现
-    「妈妈 · 妈妈」。这里的关系与昵称同样都不含登录账号（昵称等于账号名视为未设置）。
-    """
+    """动态/通知/记录里「记录人/操作人」单一标签的展示口径：
+    优先与宝宝关系，其次昵称（家长昵称 → 注册昵称），最后登录账号。"""
     rel = ((parent or {}).get("relation") or "").strip()
-    nm = display_name(user, parent)
-    if nm == "家人":
-        nm = ""
-    if rel and nm and nm != rel:
-        return rel + " · " + nm
-    return rel or nm or "家人"
+    if rel:
+        return rel
+    return display_name(user, parent)
 
 
 def baby_row(b: Baby) -> dict:

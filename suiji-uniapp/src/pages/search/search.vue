@@ -165,7 +165,7 @@ export default {
         this.loadingMore = false
       }).catch(() => { this.loadingMore = false })
     },
-    /* 记录人展示：与宝宝关系在前、昵称在后（「妈妈 · 小熊妈妈」）；按 creator_id 解析成员 */
+    /* 记录人展示：优先与宝宝关系 → 昵称 → 登录账号；按 creator_id 解析成员 */
     whoOf(e) {
       return api.creatorLabel(e)
     },

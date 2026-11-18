@@ -158,8 +158,8 @@ export default {
       const baby = api.getBaby()
       this.baby = baby ? { name: baby.name, age: baby.age } : { name: '宝宝', age: '' }
       const p = api.getParentInfo()
-      /* 昵称未填时退回注册昵称，两者都没有才用「家长」占位 */
-      this.parent = { name: p.name || api.getNickname() || '家长', account: p.account }
+      /* 标题优先显示与宝宝的关系，其次昵称 → 注册昵称 → 登录账号（与记录人口径一致），都没有才用「家长」占位 */
+      this.parent = { name: api.myLabel() || '家长', account: p.account }
       if (p.avatar) this.avatarUrl = api.fileSrc(p.avatar) || p.avatar
       const s = api.getSwitches()
       this.switches = SWITCH_KEYS.map(k => !!s[k])

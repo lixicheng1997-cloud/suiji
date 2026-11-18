@@ -6,9 +6,10 @@
       <view class="ph-del" @click.stop="onRemove(i)"><text class="ph-x">×</text></view>
     </view>
 
-    <!-- 添加位：达上限后隐藏；图标为 ctl-v2 上传概念图去底切图（96rpx，随主题切换） -->
+    <!-- 添加位：达上限后隐藏；图标为 ctl-v2 上传概念图去底切图（随主题切换），样式与视频选择器添加位对齐 -->
     <view v-if="list.length < max" class="ph-add" hover-class="hover-press" @click="onAdd">
       <image class="ph-ic" :src="uploadSrc" mode="aspectFit" />
+      <text class="ph-add-text">拍照 / 选照片</text>
     </view>
 
     <!-- 来源选择对话框（sj-modal）：点选项行调起对应来源，「取消」关闭 -->
@@ -186,28 +187,28 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-/* 照片栅格：与编辑页 .photo-add 同尺寸（144rpx 方砖），一行三张后自动换行 */
+/* 照片栅格：与视频选择器同口径（grid 三列、162rpx 横卡），一行三张后自动换行 */
 .sj-pp {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 20rpx;
 }
 .ph-item {
   position: relative;
-  width: 144rpx;
-  height: 144rpx;
+  width: 100%;
+  height: 162rpx;
   border-radius: $sj-r-sm;
-  overflow: visible;
+  overflow: hidden;
 }
 .ph-img {
-  width: 144rpx;
-  height: 144rpx;
+  width: 100%;
+  height: 162rpx;
   border-radius: $sj-r-sm;
 }
 .ph-del {
   position: absolute;
-  top: -10rpx;
-  right: -10rpx;
+  top: 6rpx;
+  right: 6rpx;
   width: 40rpx;
   height: 40rpx;
   border-radius: 50%;
@@ -222,17 +223,20 @@ export default {
   line-height: 1;
 }
 .ph-add {
-  width: 144rpx;
-  height: 144rpx;
+  width: 100%;
+  height: 162rpx;
   border: 3rpx dashed $sj-border;
   border-radius: $sj-r-sm;
   background: #FFF9F5;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 8rpx;
   box-sizing: border-box;
 }
-.ph-ic { width: 96rpx; height: 96rpx; }
+.ph-ic { width: 72rpx; height: 72rpx; }
+.ph-add-text { font-size: 22rpx; color: var(--sj-sub); font-weight: 600; }
 
 /* 来源对话框选项行（sj-modal 默认 slot，对齐 .bs-row 卡片栅格风格：左图标 + 右标题/副标题） */
 .src-row {

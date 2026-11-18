@@ -217,16 +217,16 @@ def test_bootstrap_carries_events_version(client):
     assert v1 > v0
 
 
-def test_notice_actor_puts_relation_before_nickname(client):
-    """动态文案的记录人：与宝宝关系在前、昵称在后（「妈妈 · 李芳 记录了…」）。"""
+def test_notice_actor_prefers_relation(client):
+    """动态文案的记录人：优先与宝宝关系，其次昵称，最后登录账号（关系已填时只显示「妈妈」）。"""
     h_a, h_b, _ = _family(client, "nfrel")
     client.put(API + "/settings", headers=h_a,
                json={"key": "parent", "value": {"name": "李芳", "relation": "妈妈"}})
     assert client.post(API + "/entries", headers=h_a, json={
         "type": "note", "occurred_at": _now_str(), "note": "一条随手记"}).status_code == 200
     items = _notices(client, h_b)
-    assert items[0]["actor"] == "妈妈 · 李芳"
-    assert items[0]["content"].startswith("妈妈 · 李芳 ")
+    assert items[0]["actor"] == "妈妈"
+    assert items[0]["content"].startswith("妈妈 ")
     # 成员行仍走「昵称优先 + 关系另列」：家庭卡两列分开显示，不能被关系挤掉
     members = client.get(API + "/bootstrap", headers=h_b).json()["family"]["members"]
     assert next(m for m in members if m["relation"] == "妈妈")["name"] == "李芳"

@@ -30,7 +30,7 @@ _ROLE_TEXT = {"creator": "创建者", "member": "成员"}
 
 
 def _name_of(db: Session, user_id: str) -> str:
-    # 留痕文案显示口径：统一走 display_name，绝不透出登录账号
+    # 留痕文案显示口径：统一走 display_name（昵称 → 关系 → 登录账号兜底）
     u = db.get(User, user_id)
     if u is None:
         return "家人"

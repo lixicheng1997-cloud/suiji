@@ -48,6 +48,11 @@ const cache = {
 const mediaIdx = new Map()
 const EMPTY_MEDIA = []
 
+/* 派生媒体流缓存：当前宝宝口径、occurred_at 倒序、仅就绪（有云端 url）。
+ * 整表更换时重建；单条记录增删改 / 切宝宝后置空，读侧懒重建。
+ * 避免每次 getAllMedia 都重跑 filter+sort+entryMedia 展开（日记页 N 篇 × 全表的 O(n²)）。 */
+let mediaStream = null
+
 function reindexMedia() {
   mediaIdx.clear()
   for (let i = 0; i < cache.media.length; i++) {
@@ -66,6 +71,22 @@ function reindexMediaOf(entryId) {
   if (bucket.length) mediaIdx.set(entryId, bucket)
   else mediaIdx.delete(entryId)
 }
+
+/* 重建派生媒体流：当前宝宝口径、时间倒序、仅就绪媒体（与旧 getAllMedia 口径一致） */
+function rebuildMediaStream() {
+  const baby = getBaby()
+  const babyId = baby ? baby.id : ''
+  const items = []
+  cache.entries
+    .filter(e => matchBabyEntry(e, babyId))
+    .slice()
+    .sort((a, b) => (a.occurred_at < b.occurred_at ? 1 : -1))
+    .forEach(e => { items.push(...entryMedia(e)) })
+  mediaStream = items.filter(m => m.url)
+}
+
+/** 缓存流置脏：entries 增删改 / 切宝宝后调，读侧下次访问懒重建 */
+function invalidateMediaStream() { mediaStream = null }
 
 /** 台账行只读：调用方一律 .map 出 url，不许就地改这个数组 */
 function mediaRowsOf(entryId) {
@@ -86,6 +107,7 @@ function resetCache() {
   cache.settings = {}
   cache.trash = []
   mediaIdx.clear()
+  invalidateMediaStream()
 }
 
 function fillCache(s) {
@@ -102,6 +124,7 @@ function fillCache(s) {
   cache.settings = s.settings && typeof s.settings === 'object' ? s.settings : {}
   cache.trash = Array.isArray(s.trash) ? s.trash : []
   reindexMedia()
+  rebuildMediaStream()
 }
 
 /**
@@ -120,6 +143,7 @@ export function resetFamilyCache() {
   cache.journals = []
   cache.trash = []
   mediaIdx.clear()
+  invalidateMediaStream()
 }
 
 /* 服务端列表端点兼容裸数组、{rows:[...]}、{items:[...]} 三种包装 */
@@ -341,10 +365,11 @@ function settingOf(key, dflt) {
   return v === undefined ? dflt : v
 }
 function accountName() {
-  /* 本机展示兜底名：家长昵称 → 注册昵称 → 账号名。
-     落库的记录人/删除人名字由服务端按令牌解析（creator=display_name），不采信这里的值 */
+  /* 本机展示兜底名：与宝宝关系 → 家长昵称 → 注册昵称 → 账号名。
+     落库的记录人/删除人名字由服务端按令牌解析（creator=actor_label），不采信这里的值 */
   const u = cache.user || {}
-  return (cache.settings.parent || {}).name || u.name || u.username || '妈妈'
+  const p = cache.settings.parent || {}
+  return (p.relation || '').trim() || (p.name || '').trim() || u.name || u.username || '妈妈'
 }
 /** 当前账号 ID：服务端 creator_id 的唯一来源（客户端提交的 ID 服务端不采信） */
 function myUserId() {
@@ -542,6 +567,7 @@ export function createBaby(data) {
 export function setActiveBaby(id) {
   cache.babies.forEach(b => { b.is_active = b.id === id ? 1 : 0 })
   cache.active_baby_id = id
+  invalidateMediaStream()
   http.post('/babies/' + id + '/activate').catch(e => {
     uiError(e, '切换同步失败')
     bootstrap().catch(() => {})
@@ -1108,6 +1134,7 @@ function uploadVoice(payload, babyId, onProgress) {
     mRows.forEach(m => cache.measurements.push(m))
     mediaRows.forEach(m => cache.media.push(m))
     reindexMediaOf(row.id)
+    invalidateMediaStream()
 
     const req = old
       ? http.put('/entries/' + row.id, row)
@@ -1142,6 +1169,7 @@ function uploadVoice(payload, babyId, onProgress) {
       oldM.forEach(m => { if (!cache.measurements.includes(m)) cache.measurements.push(m) })
       oldMedia.forEach(m => { if (!cache.media.includes(m)) cache.media.push(m) })
       reindexMediaOf(row.id)
+      invalidateMediaStream()
       if (msNew) { const j = cache.milestone_records.findIndex(m => m.id === msNew.id); if (j > -1) cache.milestone_records.splice(j, 1) }
       else if (msOld) { const ms = cache.milestone_records.find(m => m.id === msOld.id); if (ms) Object.assign(ms, msOld) }
       logger.error('entry', '保存记录失败', {
@@ -1203,11 +1231,13 @@ export function updateEntry(id, patch) {
     merged.badge = s.badge || ''
   }
   cache.entries[i] = merged
+  invalidateMediaStream()
   return http.put('/entries/' + id, merged).then(r => {
     cache.entries[i] = Object.assign({}, merged, r || {})
     return { id }
   }).catch(e => {
     cache.entries[i] = old
+    invalidateMediaStream()
     throw e
   })
 }
@@ -1220,11 +1250,13 @@ export function deleteEntry(id) {
   const row = Object.assign({}, e, { deleted_at: now(), deleted_by: accountName(), deleted_by_id: myUserId() })
   cache.entries.splice(i, 1)
   cache.trash.unshift(row)
+  invalidateMediaStream()
   return http.del('/entries/' + id).then(() => ({ id })).catch(err => {
     /* 失败回滚：记录回到时光轴原位 */
     const j = cache.trash.findIndex(t => t.id === id)
     if (j > -1) cache.trash.splice(j, 1)
     cache.entries.splice(Math.min(i, cache.entries.length), 0, e)
+    invalidateMediaStream()
     throw err
   })
 }
@@ -1264,10 +1296,12 @@ export function restoreEntry(id) {
   const t = cache.trash[i]
   cache.trash.splice(i, 1)
   cache.entries.unshift(Object.assign({}, t, { deleted_at: null }))
+  invalidateMediaStream()
   return http.post('/entries/' + id + '/restore').catch(err => {
     cache.trash.splice(Math.min(i, cache.trash.length), 0, t)
     const j = cache.entries.findIndex(e => e.id === id)
     if (j > -1) cache.entries.splice(j, 1)
+    invalidateMediaStream()
     throw err
   }).then(() => ({ id }))
 }
@@ -1649,37 +1683,44 @@ export function entryMedia(e) {
 export function getAllMedia(filter = {}) {
   const baby = getBaby()
   const babyId = filter.babyId || (baby ? baby.id : '')
-  const items = []
-  cache.entries
-    .filter(e => matchBabyEntry(e, babyId))
-    .slice()
-    .sort((a, b) => (a.occurred_at < b.occurred_at ? 1 : -1))
-    .forEach(e => { items.push(...entryMedia(e)) })
-  /* 相册/日记流只展示已完成媒体：后台上传中的占位项无云端地址，过滤掉避免空壳格子；
-     占位态在时光轴卡片与详情页单独渲染 */
-  const ready = items.filter(m => m.url)
-  if (filter.type && filter.type !== 'all') {
-    return ready.filter(m => m.type === filter.type)
+  /* 显式指定宝宝口径：与默认缓存流不同，现场派生（当前无外部调用，保留兼容） */
+  if (filter.babyId) {
+    const items = []
+    cache.entries
+      .filter(e => matchBabyEntry(e, babyId))
+      .slice()
+      .sort((a, b) => (a.occurred_at < b.occurred_at ? 1 : -1))
+      .forEach(e => { items.push(...entryMedia(e)) })
+    const ready = items.filter(m => m.url)
+    return filter.type && filter.type !== 'all' ? ready.filter(m => m.type === filter.type) : ready
   }
-  return ready
+  if (!mediaStream) rebuildMediaStream()
+  /* 相册/日记流只展示已完成媒体：占位项无云端地址，构建流时已剔除 */
+  if (filter.type && filter.type !== 'all') {
+    return mediaStream.filter(m => m.type === filter.type)
+  }
+  return mediaStream
 }
 
 /**
  * 某篇日记周期（range_start~range_end）内关联的照片/视频媒体，时间倒序，最多 limit 张。
- * 纯前端按日记区间从全量媒体流派生；区间缺失时返回空数组。
+ * 直接在已排序的缓存媒体流上按区间扫描，命中 limit 即停，不再每篇全表重建。
  */
 export function diaryMedia(d, limit = 6) {
   const start = d.range_start || ''
   const end = d.range_end || ''
-  return getAllMedia()
-    .filter(m => {
-      const day = String(m.occurredAt || '').slice(0, 10)
-      if (!day) return false
-      if (start && day < start) return false
-      if (end && day > end) return false
-      return true
-    })
-    .slice(0, limit)
+  if (!mediaStream) rebuildMediaStream()
+  const out = []
+  for (let i = 0; i < mediaStream.length; i++) {
+    const m = mediaStream[i]
+    const day = String(m.occurredAt || '').slice(0, 10)
+    if (!day) continue
+    if (start && day < start) continue
+    if (end && day > end) continue
+    out.push(m)
+    if (out.length >= limit) break
+  }
+  return out
 }
 
 /**
@@ -1708,8 +1749,8 @@ export function getFamily() {
 }
 
 /**
- * 记录人展示口径：【与宝宝关系 + 昵称】（如「妈妈 · 小熊妈妈」），不展示登录账号。
- * creator 只是历史名字串（服务端按令牌解析：关系 → 昵称，见 rows.actor_label），
+ * 记录人展示口径：优先【与宝宝关系】，其次【昵称】，最后【登录账号】（单一标签，不拼接）。
+ * creator 只是历史名字串（服务端按令牌解析：关系 → 昵称 → 账号，见 rows.actor_label），
  * creator_id 才是可靠依据：先按 ID 查 family.members（member_row.id 即 user_id），
  * 查不到再退回名字串匹配。
  * @param {string|{creator?:string, creator_id?:string, deleted_by?:string, deleted_by_id?:string}} src
@@ -1726,24 +1767,26 @@ export function creatorLabel(src) {
   const byName = byId ? null : members.find(x => x && (x.name === name || x.relation === name))
   const m = byId || byName
   const u = cache.user || {}
+  const username = trim(u.username)
   /* 本人判定：ID 命中，或（老数据无 ID 时）creator 就是自己的展示名/账号名/昵称 */
-  const isMe = (cid && cid === u.id) || !!(name && (name === accountName() || name === trim(u.username) || name === trim(u.name)))
+  const isMe = (cid && cid === u.id) || !!(name && (name === accountName() || name === username || name === trim(u.name)))
   const parent = cache.settings.parent || {}
 
-  let rel = trim(m && m.relation)
-  let nm = trim(m && m.name)
-  /* 成员行没填家长信息时（关系/昵称皆空），本人视角还能读自己的 settings.parent */
-  if (isMe && !rel && !nm) {
-    rel = trim(parent.relation)
-    /* 家长昵称未填时，退回注册昵称（与服务端 display_name 同口径，等于账号名视为未设置） */
-    nm = trim(parent.name) || (u.name && u.name !== u.username ? trim(u.name) : '')
-  }
-  /* 防账号名透出：昵称与登录账号同名时丢弃（老数据/旧服务端可能存了账号名） */
-  if (nm && nm === trim(u.username)) nm = ''
+  /* 1) 与宝宝关系（成员行优先；本人成员行没填家长信息时还能读自己的 settings.parent） */
+  const rel = trim(m && m.relation) || (isMe ? trim(parent.relation) : '')
+  if (rel) return rel
+  /* 2) 昵称：家长昵称 → 注册昵称 → 成员行名字（等于登录账号视为未设置） */
+  const cands = isMe ? [trim(parent.name), trim(m && m.name), trim(u.name)] : [trim(m && m.name)]
+  const nm = cands.find(x => x && x !== '家人' && x !== username)
+  if (nm) return nm
+  /* 3) 登录账号：本人取本机账号名；他人取服务端 creator 串（已按同一口径解析，兜底即账号名） */
+  if (isMe && username) return username
+  return name || '家人'
+}
 
-  /* 关系在前、昵称在后；两者其一为空则只展示另一个，都解析不到才落「家人」 */
-  if (rel && nm && nm !== rel) return rel + ' · ' + nm
-  return rel || nm || '家人'
+/** 当前用户展示名：与宝宝关系 → 昵称 → 登录账号（与记录人 creatorLabel 同口径） */
+export function myLabel() {
+  return creatorLabel({ creator: accountName(), creator_id: myUserId() }) || accountName()
 }
 
 /* ---------- 服务端家人动态通知（落库 + 读后即删） ----------
@@ -1951,7 +1994,7 @@ const AUDIT_COLORS = {
 /**
  * 家庭操作留痕列表：GET /family/audit（真实数据，非原型常量）
  * 上滑分页：offset 从 0 起按页递增，返回不足 limit 条即已到末页。
- * who 展示口径：与宝宝关系在前、昵称在后（服务端已保证 actor_name 不含登录账号）。
+ * who 展示口径：优先与宝宝关系，其次昵称，最后登录账号（服务端 actor_name 已按此链路兜底）。
  * @returns {Promise<Array<{id,act,tag,color,who,text,time}>>}
  */
 export function getAudit(offset = 0, limit = 10) {
@@ -1965,7 +2008,7 @@ export function getAudit(offset = 0, limit = 10) {
       act,
       tag: AUDIT_TAGS[act] || '操作',
       color: AUDIT_COLORS[act] || '#9A8580',
-      who: rel && nm && nm !== rel ? rel + ' · ' + nm : (rel || nm || '家人'),
+      who: rel || nm || '家人',
       text: a.text || '',
       time: at ? (dayKey(at).slice(5).replace('-', '/') + ' ' + timeOf(at)) : ''
     }

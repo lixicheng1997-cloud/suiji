@@ -266,7 +266,7 @@ export default {
   },
 
   methods: {
-    /* 记录人展示：与宝宝关系 + 昵称（与主页列表同口径，不展示登录账号）；按 creator_id 解析成员 */
+    /* 记录人展示：优先与宝宝关系 → 昵称 → 登录账号（与主页列表同口径）；按 creator_id 解析成员 */
     whoOf(e) {
       return api.creatorLabel(e)
     },

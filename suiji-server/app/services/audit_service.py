@@ -57,8 +57,8 @@ def list_recent(db: Session, family_id: str, limit: int = 200, days: int = KEEP_
         .limit(max(1, min(limit, 500)))
         .all()
     )
-    # 显示口径（操作记录页，绝不透出登录账号）：
-    # - actor_name 读取时按 actor_id 实时解析统一显示名（家长昵称 → 注册昵称 → 关系 → 家人）；
+    # 显示口径（操作记录页）：
+    # - actor_name 读取时按 actor_id 实时解析统一显示名（昵称 → 注册昵称 → 关系 → 登录账号）；
     # - actor_relation 取家长信息 parent.relation（与宝宝关系，未设置为空串）；
     # - text 里历史落库的用户名（注册默认名=登录账号）按同一口径替换为显示名。
     actor_ids = {r.actor_id for r in rows if r.actor_id}
