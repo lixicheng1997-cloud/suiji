@@ -16,7 +16,8 @@
       @click="go(t)"
     >
       <view class="stb-ic" :class="{ on: t.key === active || t.key === pending }">
-        <sj-icon :name="t.png" :size="68" />
+        <!-- 「我的」形象占画布更满、观感更大，放大 128rpx 并随容器底部对齐 -->
+        <sj-icon :name="t.png" :size="t.key === 'me' ? 80 : 80" />
       </view>
       <text class="stb-tx" :class="{ on: t.key === active || t.key === pending }">{{ t.label }}</text>
     </view>
@@ -89,7 +90,9 @@ export default {
   /* #endif */
   height: 144rpx;
   display: flex;
-  background: rgba(255, 255, 255, 0.94);
+  /* 奶油→主题浅色渐变底：色值全走 --sj-* 令牌，bear/duck 切换实时换肤；
+   * 深色端点放到 120%，浅色只染胶囊下半段，不喧宾夺主 */
+  background: linear-gradient(160deg, var(--sj-cream) 30%, var(--sj-primary-soft) 120%);
   border: 2rpx solid var(--sj-line);
   border-radius: 52rpx;
   box-shadow: 0 -12rpx 48rpx rgba(180, 110, 60, 0.10);
@@ -101,24 +104,39 @@ export default {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4rpx;
+  gap: 0;
   border-radius: 40rpx;
 }
 .stb-ic {
-  width: 68rpx;
-  height: 68rpx;
+  width: 80rpx;
+  height: 80rpx;
+  /* 底部对齐：更大的「我的」图标（128rpx）底边与其他图标底边齐平，顶部自然冒出 */
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
   transition: transform 0.3s cubic-bezier(.34,1.56,.64,1);
 }
 .stb-hover .stb-ic { transform: translateY(-3px); }
 /* 乐观高亮期间压暗非目标页签文字，强化「已接收点击」的反馈 */
 .stb-pending .stb-tx { color: var(--sj-sub); }
-/* 选中态：静态放大，无回弹/上下浮动动画 */
-.stb-ic.on { transform: scale(1.18); }
+/* 激活态：图标向上跃出胶囊上边缘（弹性缓动自带回弹过冲），
+ * 轻投影让跃出部分与页面内容分离；hover 仅微抬不跃出 */
+.stb-ic.on {
+  transform: translateY(-40rpx) scale(1.4);
+  /* 双层暖色投影：近层收形、远层晕染，加重跃出图标的暖意 */
+  filter: drop-shadow(0 8rpx 8rpx rgba(200, 115, 45, 0.30))
+          drop-shadow(0 14rpx 20rpx rgba(232, 74, 111, 0.20));
+}
 .stb-tx {
   font-size: 22rpx;
   font-weight: 700;
   color: var(--sj-faint);
-  transition: color 0.25s;
+  transition: color 0.25s, transform 0.3s cubic-bezier(.34,1.56,.64,1);
 }
-.stb-tx.on { color: var(--sj-primary-deep); }
+.stb-tx.on {
+  color: var(--sj-primary-deep);
+  /* 激活态文字上移量 = 图标弹出位移(40) − 缩放引起的下缘扩张(0.35×112/2≈19.6)，
+     使选中的图文视觉间距与未选中态完全一致 */
+  transform: translateY(-20rpx);
+}
 </style>
