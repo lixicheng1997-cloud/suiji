@@ -82,8 +82,8 @@
       v-model:show="pwdShow"
       mode="center"
       title="修改密码"
-      left-text="取消"
-      right-text=""
+      left-text=""
+      right-text="取消"
     >
       <view class="pwd-form">
         <view class="pwd-field">
@@ -99,6 +99,23 @@
           <sj-input class="pwf-in" v-model="pwd.confirm" type="password" placeholder="再次输入新密码" />
         </view>
         <sj-button class="pwd-btn" block size="lg" :loading="pwdBusy" :text="pwdBusy ? '提交中…' : '确认修改'" @click="submitPwd" />
+      </view>
+    </sj-popup>
+
+    <!-- 关于弹窗（sj-popup 居中 modal：名称 + 一句话定位 + 版本/作者行） -->
+    <sj-popup
+      v-model:show="aboutShow"
+      mode="center"
+      title="关于"
+      bar-icon="67-ctl-popup"
+      left-text=""
+      right-text="关闭"
+    >
+      <view class="about-box">
+        <text class="about-name">岁记</text>
+        <text class="about-tag">岁记 - 家庭共享的宝宝成长记录应用</text>
+        <view class="about-row"><text class="about-k">版本</text><text class="about-v">3.0</text></view>
+        <view class="about-row"><text class="about-k">作者</text><text class="about-v">xichengli</text></view>
       </view>
     </sj-popup>
 
@@ -136,6 +153,8 @@ export default {
       serverShow: false,
       serverList: [],
       serverUrl: '',
+      /* 关于弹窗（sj-popup 居中 modal） */
+      aboutShow: false,
       /* 修改密码面板（sj-popup）：三行输入 + 提交防重复 */
       pwdShow: false,
       pwd: { old: '', next: '', confirm: '' },
@@ -184,7 +203,6 @@ export default {
         {
           label: '数据与安全',
           rows: [
-            { png: '26-fn-export', label: '导出成长档案', val: '曲线 · 里程碑合集', chev: true, go: '/pages/export/export' },
             { png: '27-fn-trash', label: '回收站', val: `${trashCount} 条`, tag: true, chev: true, go: '/pages/trash/trash' }
           ]
         },
@@ -231,13 +249,7 @@ export default {
       if (r.act === 'logout') return this.doLogout()
       if (r.act === 'password') return this.doPassword()
       if (r.act === 'family') return uni.switchTab({ url: '/pages/family/family' })
-      if (r.act === 'about') {
-        return ui.showModal({
-          title: '岁记 v3.0',
-          content: '宝宝成长记录\n数据加密保存在云端，登录即可在手机、平板上查看',
-          showCancel: false
-        })
-      }
+      if (r.act === 'about') { this.aboutShow = true; return }
       if (r.go) {
         uni.navigateTo({
           url: r.go,
@@ -501,6 +513,33 @@ export default {
   font-weight: 900;
   color: var(--sj-primary-deep);
 }
+
+/* ---------- 关于弹窗（sj-popup 居中 modal：名称 + 定位 + 版本/作者行） ---------- */
+.about-box { width: 600rpx; padding: 24rpx 40rpx 40rpx; }
+.about-name {
+  display: block;
+  text-align: center;
+  font-size: 48rpx;
+  font-weight: 900;
+  color: var(--sj-primary-deep);
+  margin-top: 16rpx;
+}
+.about-tag {
+  display: block;
+  text-align: center;
+  font-size: 24rpx;
+  color: var(--sj-sub);
+  margin: 12rpx 0 32rpx;
+}
+.about-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 4rpx;
+  border-top: 2rpx dashed var(--sj-line);
+}
+.about-k { font-size: 26rpx; color: var(--sj-sub); }
+.about-v { font-size: 26rpx; font-weight: 800; color: var(--sj-primary-deep); }
 
 /* ---------- 修改密码弹窗（sj-popup 居中 modal，字段行外观对齐 v2 pg-field） ---------- */
 .pwd-form { width: 600rpx; padding: 32rpx 40rpx 40rpx; }

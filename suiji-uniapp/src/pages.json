@@ -256,15 +256,6 @@
       }
     },
     {
-      "path": "pages/export/export",
-      "style": {
-        "navigationStyle": "custom",
-        "backgroundColor": "#FFF6F0",
-        "backgroundColorTop": "#FFF6F0",
-        "backgroundColorBottom": "#FFF6F0"
-      }
-    },
-    {
       "path": "pages/backup/backup",
       "style": {
         "navigationStyle": "custom",

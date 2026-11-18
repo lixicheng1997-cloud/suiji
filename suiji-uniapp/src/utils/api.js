@@ -2057,55 +2057,6 @@ export function getBackupInfo() {
   }
 }
 
-/* ---------- 成长档案导出（HTML 本机生成逻辑保持不变，数据源=缓存） ---------- */
-export function exportArchive() {
-  const baby = getBaby()
-  const latest = getLatest()
-  const measures = getMeasures()
-  const vaccines = getVaccines()
-  const milestones = getMilestones().filter(m => m.done)
-  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  const tr = arr => '<tr>' + arr.map(c => '<td>' + esc(c) + '</td>').join('') + '</tr>'
-  const table = (heads, rows) =>
-    '<table><thead><tr>' + heads.map(h => '<th>' + esc(h) + '</th>').join('') + '</tr></thead><tbody>' +
-    (rows.length ? rows.map(r => tr(r)).join('') : '<tr><td colspan="' + heads.length + '">暂无记录</td></tr>') +
-    '</tbody></table>'
-  const html = '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">' +
-    '<title>岁记成长档案' + (baby ? ' · ' + esc(baby.name) : '') + '</title>' +
-    '<style>body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:#4A3B38;max-width:720px;margin:0 auto;padding:24px;background:#FFF6F0}' +
-    'h1{font-size:22px;color:#E86FA0}h2{font-size:16px;margin-top:28px;border-left:4px solid #FF6B8B;padding-left:8px}' +
-    'p{font-size:14px;line-height:1.7}table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px}' +
-    'th,td{border:1px solid #F0DCCF;padding:6px 10px;text-align:left;background:#fff}th{background:#FFE9EF}' +
-    '.meta{color:#9A8580;font-size:12px}</style></head><body>' +
-    '<h1>岁记 · 成长档案</h1>' +
-    (baby
-      ? '<p>' + esc(baby.name) + '（' + (baby.gender === 'girl' ? '女' : '男') + '）· ' + esc(baby.age) +
-        '<br><span class="meta">出生日期 ' + esc(baby.birth_date) + (Number(baby.gestational_weeks) < 37 ? ' · 早产（胎龄 ' + esc(baby.gestational_weeks) + ' 周，曲线按矫正月龄）' : '') + '</span></p>'
-      : '<p>尚未创建宝宝档案</p>') +
-    '<h2>当前指标（WHO 参考百分位）</h2>' +
-    table(['指标', '最新值', '百分位'], [
-      ['体重', latest.weight.value + ' kg', latest.weight.p],
-      ['身高', latest.height.value + ' cm', latest.height.p],
-      ['头围', latest.head.value + ' cm', latest.head.p]
-    ]) +
-    '<h2>测量记录</h2>' +
-    table(['日期', '月龄', '身高 cm', '体重 kg', '头围 cm', '来源'],
-      measures.map(m => [m.date, m.age, m.h || '—', m.w || '—', m.c || '—', m.by])) +
-    '<h2>已达成里程碑</h2>' +
-    table(['里程碑', '达成月龄', '领域'], milestones.map(m => [m.name, m.month, m.domain])) +
-    '<h2>疫苗接种时间表</h2>' +
-    table(['疫苗', '剂次', '月龄', '计划日期', '状态', '接种日期'],
-      vaccines.map(v => [v.n, v.dose, v.age, v.plan_text, v.status_text, v.done_date || '—'])) +
-    '<p class="meta">由岁记 App 生成 · ' + esc(now()) + ' · 本档案为记录数据汇编，不含医学解读</p>' +
-    '</body></html>'
-  const fname = 'suiji-archive_' + now().replace(/[-: ]/g, '').slice(0, 14) + '.html'
-  /* 落盘失败必须原样抛出：吞掉后页面照样显示「已生成 · 已保存」，用户以为有档案 */
-  return saveTextFile(fname, html).then(w => {
-    reportExport()
-    return { filename: fname, path: w || '', size: html.length }
-  })
-}
-
 /* ---------- 首次引导（建档变异步：服务端排期里程碑/疫苗） ---------- */
 export function onboardBaby(data) {
   if (cache.babies.length) return Promise.resolve(getBaby())
