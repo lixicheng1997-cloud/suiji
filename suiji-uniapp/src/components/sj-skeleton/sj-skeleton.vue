@@ -53,38 +53,8 @@ export default {
 }
 </style>
 
-<style lang="scss">
-/* ============ 非 scoped：以 .sj-sk 命名空间覆盖 u-skeleton 内部节点 ============
- * 库骨架块背景走 --up-skeleton-* 变量（默认冷灰），此处统一覆盖为 v2 暖米系。 */
-.sj-sk {
-  .u-skeleton__wrapper__content__rows,
-  .u-skeleton__wrapper__content__title {
-    /* v2 .pg-skel i：暖米高光扫过 + 1px→2rpx line 描边 + 圆角 --r-md 40rpx */
-    background: linear-gradient(100deg, #FBF2E6 30%, #FFF8F0 50%, #FBF2E6 70%) !important;
-    background-size: 200% 100% !important;
-    border: 2rpx solid var(--sj-line);
-    border-radius: 40rpx !important;
-  }
-  /* 条间距 = v2 .pg-skel gap 10px→20rpx（库默认 12px 偏大） */
-  .u-skeleton__wrapper__content__rows {
-    margin-bottom: 20rpx !important;
-  }
-  /* 头像占位：同暖米系，保持圆形 */
-  .u-skeleton__wrapper__avatar {
-    background: linear-gradient(100deg, #FBF2E6 30%, #FFF8F0 50%, #FBF2E6 70%) !important;
-    background-size: 200% 100% !important;
-    border: 2rpx solid var(--sj-line);
-    border-radius: 100px !important;
-  }
-  /* shimmer：对齐 v2 @keyframes shimmer（to{background-position:-200% 0}）1.4s linear */
-  .animate {
-    animation: sjSkelShimmer 1.4s linear infinite !important;
-  }
-}
-
-@keyframes sjSkelShimmer {
-  to {
-    background-position: -200% 0;
-  }
-}
-</style>
+<!-- 内部节点覆盖（暖米骨架色 / 圆角 / 条距 / shimmer）已移至 App.vue 全局样式：
+     组件 SFC 的非 scoped 块在 H5/App 端会被追加 [data-v]、小程序端受组件样式隔离，
+     均压不住 uview-plus 内部节点（同 sj-subsection 的处理），故不在本文件重复。
+     骨架颜色同时经 App.vue 的 --up-skeleton-bg-color / --up-skeleton-shimmer-color
+     映射为暖米系 + var(--sj-cream)，随 bear/duck 主题换肤。 -->

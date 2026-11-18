@@ -1,5 +1,5 @@
 <script>
-import { init, startEventsPolling, stopEventsPolling } from '@/utils/api.js'
+import { init, bootstrap, startEventsPolling, stopEventsPolling } from '@/utils/api.js'
 import { installFamilyGuard } from '@/utils/first-run.js'
 import { paintNavigationBar } from '@/infra/platform.js'
 import { initNetWatch } from '@/infra/net.js'
@@ -26,6 +26,20 @@ export default {
 
     // 系统通知：拉起通知权限、注册点击直达、按本地账本恢复图标角标
     try { notify.init() } catch (e) { /* ignore */ }
+
+    // 断网→恢复后静默重拉 bootstrap：全 App 仅此一处 force（1.2s 防抖），
+    // 勿在页面 onShow 重复触发，避免恢复瞬间重拉风暴；直连页不自动重拉列表（防滚动跳变）
+    this._prevConnected = true
+    this._netBootTimer = null
+    uni.$on('sj-net-change', (info) => {
+      const was = this._prevConnected
+      this._prevConnected = !!(info && info.connected)
+      if (was || !this._prevConnected) return
+      clearTimeout(this._netBootTimer)
+      this._netBootTimer = setTimeout(() => {
+        bootstrap({ force: true, silent: true }).catch(() => { /* 仍失败：横幅/错误态已反馈 */ })
+      }, 1200)
+    })
   },
   onShow() {
     // 回前台按未读通知数刷新应用图标角标
@@ -61,6 +75,10 @@ page, :root {
   --up-light-color: var(--sj-faint);
   --up-border-color: var(--sj-line);
   --up-bg-color: var(--sj-cream);
+  /* 骨架块颜色：库默认回退近黑灰 #2f3135（为暗色界面设计），统一改 v2 暖米系；
+   * shimmer 高光走 --sj-cream，随页面根节点 themeVars 换肤 */
+  --up-skeleton-bg-color: #FBF2E6;
+  --up-skeleton-shimmer-color: var(--sj-cream);
 
   /* 岁记 v2 设计令牌（bear 默认；duck 由页面根节点 :style="themeVars" 覆盖，见 theme/useTheme.js） */
   --sj-primary: #F7A15C; --sj-primary-deep: #E07E33; --sj-primary-soft: #FFEBD8;
@@ -135,6 +153,39 @@ page {
   font-size: 26rpx !important;
   line-height: 34rpx !important;
   font-weight: 800 !important;
+}
+
+/* ============ sj-skeleton（骨架屏）内部节点覆盖 ============
+ * 同 sj-subsection 的教训：组件 SFC 的「非 scoped 块」在 H5/App 端也会被追加 [data-v]，
+ * 小程序端自定义组件样式隔离，均压不住 uview-plus 内部节点，必须放全局样式。
+ * 外观对齐 v2 .pg-skel：暖米底 + 高光扫过（颜色另经上方 --up-skeleton-* 映射兜底）。 */
+.sj-sk .u-skeleton__wrapper__content__rows,
+.sj-sk .u-skeleton__wrapper__content__title {
+  background: linear-gradient(100deg, #FBF2E6 30%, var(--sj-cream) 50%, #FBF2E6 70%) !important;
+  background-size: 200% 100% !important;
+  border: 2rpx solid var(--sj-line);
+  border-radius: var(--sj-r-md) !important;
+}
+/* 条间距 = v2 .pg-skel gap 10px→20rpx：库行距走内联 margin-top(12px)，需 !important 压过 */
+.sj-sk .u-skeleton__wrapper__content__rows {
+  margin-top: 20rpx !important;
+  margin-bottom: 0 !important;
+}
+/* 头像占位：同暖米系，保持圆形 */
+.sj-sk .u-skeleton__wrapper__avatar {
+  background: linear-gradient(100deg, #FBF2E6 30%, var(--sj-cream) 50%, #FBF2E6 70%) !important;
+  background-size: 200% 100% !important;
+  border: 2rpx solid var(--sj-line);
+  border-radius: 100px !important;
+}
+/* shimmer：对齐 v2 @keyframes shimmer（to{background-position:-200% 0}）1.4s linear，压过库 1.8s 冷灰节奏 */
+.sj-sk .animate {
+  animation: sjSkelShimmer 1.4s linear infinite !important;
+}
+@keyframes sjSkelShimmer {
+  to {
+    background-position: -200% 0;
+  }
 }
 
 /* 按压反馈：小程序端用 hover-class（对应原型 :active / ripple） */

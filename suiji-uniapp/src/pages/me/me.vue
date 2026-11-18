@@ -256,7 +256,6 @@ export default {
         })
         return
       }
-      this.$refs.ntf.show({ type: 'warn', message: r.label + '：功能开发中，敬请期待' })
     },
 
     /* 服务器地址：列表来自前端公共配置 config/app.js，用 sj-popup 底部面板选择 */

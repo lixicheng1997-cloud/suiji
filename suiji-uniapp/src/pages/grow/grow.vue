@@ -36,6 +36,19 @@
       </view>
     </view>
 
+    <!-- 首屏加载：留白占位防闪空态（骨架屏观感不佳已撤下） -->
+    <view v-if="bootPending" />
+    <!-- bootstrap 失败且无缓存测量：错误占位 + 点击重试（区别于"真没记录"） -->
+    <view v-else-if="bootFailedEmpty">
+      <sj-empty
+        text="加载失败"
+        sub="数据拉取不成功，检查网络后重试"
+        actionText="点击重试"
+        :busy="retrying"
+        @action="retryBoot"
+      />
+    </view>
+    <template v-else>
     <!-- 生长曲线卡（v2 grow-card：绘本白卡 + 主题色曲线，SVG data-uri 渲染） -->
     <view class="grow-card">
       <view class="gc-head">
@@ -64,6 +77,7 @@
       <text v-if="trendText" class="tc-text">{{ trendText }}</text>
       <text class="tc-note">趋势描述仅供参考，不构成医学结论 · 标准来源：WHO 儿童生长标准（2006）</text>
     </view>
+    </template>
 
     <!-- 成长对比与纪念（P31/P32/P33 + AI 日记，v2 entry-grid 双列卡） -->
     <view class="entry-grid">
@@ -108,8 +122,8 @@
     </block>
 
     <!-- 测量记录 -->
-    <view class="section-title"><text>测量记录</text></view>
-    <view class="info-card">
+    <view class="section-title" v-if="showData"><text>测量记录</text></view>
+    <view class="info-card" v-if="showData">
       <view class="field-row" v-for="r in measures" :key="r.date">
         <view class="fr-left">
           <text class="fr-date">{{ r.date }}</text>
@@ -173,7 +187,10 @@ export default {
         { png: '31-fn-compare', tint: '#E4F3FB', title: '同月龄对比', sub: '不使用人脸识别', url: '/pages/compare/compare' },
         { png: '32-fn-card', tint: '#FFF3C4', title: '纪念卡', sub: '百日 / 周岁 / 里程碑 · 一键生成', url: '/pages/card/card' },
         { png: '33-fn-video', tint: '#E2F5EA', title: '成长视频制作', sub: '30–90 秒 · 手机里制作不上传', url: '/pages/video/video', disabled: true }
-      ]
+      ],
+      /* bootstrap 状态（null=未就绪显骨架 / false=失败显错误占位），订阅 'sj-boot' 更新 */
+      boot: api.bootState(),
+      retrying: false
     }
   },
 
@@ -184,9 +201,23 @@ export default {
     }
   },
 
+  onLoad() {
+    /* 订阅 bootstrap 结果：成功即回填缓存视图，失败驱动错误占位 */
+    this._onBoot = ({ ok }) => {
+      this.boot = ok
+      if (ok) this.reload()
+    }
+    uni.$on('sj-boot', this._onBoot)
+  },
+
+  onUnload() {
+    uni.$off('sj-boot', this._onBoot)
+  },
+
   onShow() {
     /* 消费编辑器跨页回传的「已保存」提示 */
     ui.consumeToast()
+    this.boot = api.bootState()
     this.reload()
   },
 
@@ -194,6 +225,11 @@ export default {
     curMetric() {
       return this.GROW[this.growMetric]
     },
+
+    /* 纯缓存页三态：未就绪→骨架；失败且无缓存测量→错误占位；其余→正常数据区 */
+    bootPending() { return this.boot === null },
+    bootFailedEmpty() { return this.boot === false && !this.measures.length },
+    showData() { return !this.bootPending && !this.bootFailedEmpty },
 
     /* 当前主题色板（曲线/图例随 bear/duck 换肤） */
     tc() {
@@ -320,6 +356,14 @@ export default {
   methods: {
     /* 下拉刷新：tabSwipe 已重拉 bootstrap，这里按缓存重算曲线 */
     tabAfterPull() { this.reload() },
+    /* 错误占位「点击重试」：强制重拉 bootstrap，结果经 'sj-boot' 事件回灌本页 */
+    retryBoot() {
+      if (this.retrying) return
+      this.retrying = true
+      api.bootstrap({ force: true })
+        .finally(() => { this.retrying = false })
+        .catch(() => { /* 失败：'sj-boot' 已置 boot=false，http.js 兜底 toast 提示原因 */ })
+    },
     /* 每次回到本页刷新：曲线 / 当前值 / 测量 / 里程碑 / 宝宝名 */
     reload() {
       const baby = api.getBaby()

@@ -22,7 +22,19 @@
 
       <!-- 日记档案：每篇一张卡，预览直接展示最终生成内容 -->
       <view class="pg-sec"><text>日记档案</text></view>
-      <view class="d-empty" v-if="!list.length">
+      <!-- 首屏加载：留白占位防闪空态（骨架屏观感不佳已撤下） -->
+      <view v-if="loading && !list.length" />
+      <!-- 首屏加载失败：错误占位 + 点击重试（区别于"还没有日记"） -->
+      <view v-else-if="loadError && !list.length">
+        <sj-empty
+          text="加载失败"
+          sub="网络异常，检查连接后重试"
+          actionText="点击重试"
+          :busy="loading"
+          @action="refresh"
+        />
+      </view>
+      <view class="d-empty" v-else-if="!list.length">
         <text>还没有日记，点击上方按钮生成本周成长日记</text>
       </view>
       <view class="grow-card" v-for="d in list" :key="d.id">
@@ -76,12 +88,16 @@
 
 <script>
 import * as api from '@/utils/api.js'
+import * as ui from '@/utils/ui.js'
 
 export default {
   data() {
     return {
       /* 全部日记（草稿+归档），按创建时间倒序 */
       list: [],
+      /* 首屏拉取中 / 首屏失败（错误占位 + 重试） */
+      loading: true,
+      loadError: false,
       /* 已展开「查看更多」的日记 id */
       expandedIds: [],
       statusBarHeight: 20,
@@ -124,11 +140,17 @@ export default {
 
   methods: {
     async refresh() {
+      this.loading = true
+      this.loadError = false
       try {
         const rows = await api.listDiaries()
         /* 为每篇派生周期内关联的照片/视频（纯前端按区间过滤） */
         this.list = rows.map(d => Object.assign({}, d, { media: api.diaryMedia(d) }))
-      } catch (e) { /* 保留当前列表 */ }
+      } catch (e) {
+        /* 保留当前列表；本就无数据 → 页面接管错误（占位 + 重试，吞掉兜底 toast） */
+        if (!this.list.length) { this.loadError = true; ui.takeOver(e) }
+      }
+      this.loading = false
     },
     fmtDate(s) {
       return String(s || '').slice(0, 10)

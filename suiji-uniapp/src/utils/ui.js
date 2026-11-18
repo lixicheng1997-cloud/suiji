@@ -185,6 +185,18 @@ export function error(err, fallback) {
 }
 
 /**
+ * 页面接管错误：首屏加载失败改由页面错误态（sj-empty 重试占位）展示时调用，
+ * 吞掉 http.js 排队的兜底 toast，避免「错误占位 + toast」双弹。
+ * 约定：首屏失败 → takeOver + 页面错误态；加载更多失败 → ui.error toast + 尾部内联重试。
+ * @param {Error|string} err 请求失败抛出的错误对象
+ */
+export function takeOver(err) {
+  if (!err || typeof err !== 'object') return
+  err.__notified = true
+  err.__pending = false
+}
+
+/**
  * 单按钮提示弹窗（需要用户明确知晓的场景，如接口报错）
  * @param {object|string} opts { title, content, confirmText='我知道了', danger, icon } 或直接传文案
  * @returns {Promise<{confirm: boolean, content: string}>}

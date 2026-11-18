@@ -42,9 +42,9 @@ const SEM = {
   warn: '64-ctl-modal-warn',
   err: '48-ctl-clear'
 }
-/* 使用默认原生导航栏的页面（pages.json 未设 navigationStyle:custom）：
- * fixed 坐标已从导航栏下缘起算，再叠加 statusBarHeight 会导致横幅整体偏下 */
-const NATIVE_NAV_ROUTES = ['pages/grow/grow', 'pages/family/family', 'pages/me/me']
+import { notifyTop, NET_BANNER_H } from '@/infra/layout.js'
+/* 离线横幅在场时的额外下移量：横幅占位高度 + 8rpx 间隙 */
+const BANNER_EXTRA = NET_BANNER_H + 8
 
 export default {
   name: 'SjNotify',
@@ -64,32 +64,25 @@ export default {
     }
   },
   created() {
-    /* 状态栏避让：CSS 变量 --status-bar-height 在 App 端为固定 25px，
-     * 高状态栏/刘海机型横幅顶边会被系统状态栏压住；改用 JS 实际像素值定位，
-     * 呼吸间距由 16rpx 提到 24rpx（整体下移一点）。H5 端 sb=0 回落样式内 CSS 变量。
-     * 默认原生导航栏页面（成长/家庭/我的）例外：fixed 坐标已在导航栏之下，
-     * 小程序/App 端不能再叠加 statusBarHeight，否则横幅偏下约一个状态栏高度 */
-    let sb = 0
-    let route = ''
-    try {
-      const info = (uni.getWindowInfo ? uni.getWindowInfo() : uni.getSystemInfoSync()) || {}
-      sb = info.statusBarHeight || 0
-      const pages = getCurrentPages()
-      const cur = pages[pages.length - 1]
-      route = (cur && cur.route) || ''
-    } catch (e) { /* 取不到时走 CSS 变量兜底 */ }
-    if (NATIVE_NAV_ROUTES.indexOf(route) !== -1) {
-      // #ifndef H5
-      this.barStyle = { top: uni.upx2px(24) + 'px' }
-      // #endif
-      return
+    /* 状态栏/原生导航栏避让计算抽到 infra/layout.js notifyTop()，与 sj-net-banner 共用；
+     * 离线横幅在场时（'sj-net-banner' 事件）整体下移横幅占位高度，避免两条 fixed 条重叠 */
+    this._bannerOn = false
+    this.applyTop()
+    this._onNetBanner = ({ on }) => {
+      this._bannerOn = !!on
+      this.applyTop()
     }
-    if (sb > 0) this.barStyle = { top: (sb + uni.upx2px(24)) + 'px' }
+    uni.$on('sj-net-banner', this._onNetBanner)
   },
   beforeUnmount() {
     if (this.timer) clearTimeout(this.timer)
+    uni.$off('sj-net-banner', this._onNetBanner)
   },
   methods: {
+    /* 按离线横幅在场与否重算顶边位置 */
+    applyTop() {
+      this.barStyle = notifyTop(24, this._bannerOn ? BANNER_EXTRA : 0)
+    },
     /**
      * 弹出通知
      * @param {Object} opt { type: 'ok'|'warn'|'err'(默认 ok), message: String, duration: Number(默认 2500ms) }

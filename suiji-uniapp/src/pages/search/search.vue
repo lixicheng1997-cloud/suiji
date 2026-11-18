@@ -29,8 +29,18 @@
       <!-- 结果计数行（v2 pg-sec：前置 primary 短条） -->
       <view v-if="items.length" class="pg-sec"><text>结果 · 已加载 {{ items.length }} 条</text></view>
 
-      <!-- 结果区 -->
-      <view v-if="!items.length && !loadingMore" class="empty">
+      <!-- 结果区：首屏留白 → 失败占位（点击重试）→ 空态 → 列表 -->
+      <view v-if="loadingFirst && !items.length" />
+      <view v-else-if="loadError && !items.length">
+        <sj-empty
+          text="加载失败"
+          sub="网络异常，检查连接后重试"
+          actionText="点击重试"
+          :busy="loadingFirst"
+          @action="search"
+        />
+      </view>
+      <view v-else-if="!items.length" class="empty">
         <!-- 空态（v2 S1）：圆形浅底 + 放大镜图标 + 主副文案 -->
         <view class="ee-ava"><sj-icon name="24-fn-search" :size="128" /></view>
         <text class="ee-title">没有匹配的记录</text>
@@ -65,10 +75,10 @@
           <image v-else-if="r.photo" class="rec-photo" :src="r.photo" mode="aspectFill" lazy-load />
         </view>
 
-        <!-- 触底分页提示（与首页同款）：加载中→弹跳；还有更多→下箭头；全部加载完→对勾（到底啦） -->
-        <view class="scroll-end">
-          <image class="se-ic" :class="{ bounce: loadingMore }" :src="scrollEndIcon" />
-          <text>{{ loadingMore ? '正在加载更多…' : hasMore ? '上拉加载更多' : '· 已经到底啦 ·' }}</text>
+        <!-- 触底分页提示（与首页同款）：加载更多失败→内联重试；加载中→弹跳；到底→对勾 -->
+        <view class="scroll-end" @click="onScrollEndTap">
+          <image class="se-ic" :class="{ bounce: loadingMore || loadingFirst }" :src="scrollEndIcon" />
+          <text>{{ loadingMore || loadingFirst ? '正在加载更多…' : moreError ? '加载更多失败，点击重试' : hasMore ? '上拉加载更多' : '· 已经到底啦 ·' }}</text>
         </view>
       </view>
     </view>
@@ -81,6 +91,7 @@
 <script>
 import { TYPES } from '@/utils/mock.js'
 import * as api from '@/utils/api.js'
+import * as ui from '@/utils/ui.js'
 
 export default {
   data() {
@@ -95,6 +106,12 @@ export default {
       hasMore: false,
       pageSize: 10,
       loadingMore: false,
+      /* 首屏拉取中（与 loadingMore 拆分：防"没有匹配的记录"在加载瞬间闪现） */
+      loadingFirst: true,
+      /* 首屏失败（列表为空时）：错误占位 + 点击重试，区别于"没结果" */
+      loadError: false,
+      /* 加载更多失败：尾部内联"点击重试" */
+      moreError: false,
       statusBarHeight: 20
     }
   },
@@ -146,24 +163,40 @@ export default {
     search() {
       this.cursor = ''
       this.hasMore = false
-      this.loadingMore = true
+      this.loadingFirst = true
+      this.loadError = false
       api.fetchSearch({ q: this.normQ(), type: this.type, limit: this.pageSize }).then(p => {
         this.items = p.items
         this.cursor = p.next_cursor
         this.hasMore = p.has_more
-        this.loadingMore = false
-      }).catch(() => { this.loadingMore = false /* 失败保留当前列表 */ })
+        this.moreError = false
+        this.loadingFirst = false
+      }).catch((e) => {
+        this.loadingFirst = false
+        /* 失败保留当前列表；本就无结果 → 页面接管错误（占位 + 重试，吞掉兜底 toast） */
+        if (!this.items.length) { this.loadError = true; ui.takeOver(e) }
+      })
     },
     /* 触底加载下一页：按游标请求 /entries/search */
     loadMore() {
-      if (this.loadingMore || !this.hasMore) return
+      if (this.loadingMore || this.loadingFirst || !this.hasMore) return
       this.loadingMore = true
+      this.moreError = false
       api.fetchSearch({ q: this.normQ(), type: this.type, cursor: this.cursor, limit: this.pageSize }).then(p => {
         this.items = this.items.concat(p.items)
         this.cursor = p.next_cursor
         this.hasMore = p.has_more
         this.loadingMore = false
-      }).catch(() => { this.loadingMore = false })
+      }).catch((e) => {
+        this.loadingMore = false
+        /* 分页失败：toast 提示 + 尾部内联重试条，已加载列表保留 */
+        this.moreError = true
+        ui.error(e, '加载更多失败')
+      })
+    },
+    /* 尾部提示条点击：仅在加载更多失败时触发重试 */
+    onScrollEndTap() {
+      if (this.moreError) this.loadMore()
     },
     /* 记录人展示：优先与宝宝关系 → 昵称 → 登录账号；按 creator_id 解析成员 */
     whoOf(e) {

@@ -315,7 +315,7 @@ export default {
     },
     onMore() {
       ui.showActionSheet({
-        itemList: ['导出此记录', '举报'],
+        itemList: ['导出此记录'],
         success: res => {
           if (res.tapIndex === 0) {
             const e = this.entry
@@ -328,17 +328,12 @@ export default {
             ].join('\n')
             uni.setClipboardData({ data })
             this.$refs.ntf.show({ type: 'ok', message: '已复制到剪贴板' })
-          } else {
-            this.$refs.ntf.show({ type: 'warn', message: '举报需接入后端（开发中）' })
           }
         }
       }).catch(() => {})
     },
     onEdit() {
       uni.navigateTo({ url: '/pages/editor/editor?type=' + this.entry.type + '&id=' + this.entry.id })
-    },
-    onShare() {
-      this.$refs.ntf.show({ type: 'warn', message: '分享到家庭动态需接入后端（开发中）' })
     },
     onDelete() {
       ui.showModal({

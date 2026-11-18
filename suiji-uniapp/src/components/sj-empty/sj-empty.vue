@@ -6,6 +6,17 @@
     </view>
     <text class="ee-title">{{ text }}</text>
     <text v-if="sub" class="ee-sub">{{ sub }}</text>
+    <!-- 重试/操作按钮（不传 actionText = 纯展示空态，与旧用法完全一致） -->
+    <view
+      v-if="actionText"
+      class="ee-btn"
+      :class="{ 'ee-btn--busy': busy }"
+      hover-class="hover-press"
+      :hover-stay-time="80"
+      @click="onAction"
+    >
+      <text class="ee-btn-text">{{ actionText }}</text>
+    </view>
   </view>
 </template>
 
@@ -26,6 +37,7 @@
  * scripts/cut-ctl-icons.py 生成到 /static/icons/ctl/{theme}/128/）。
  * 用法：<sj-empty text="这里空空如也" />（默认空态图）
  *       <sj-empty icon="24-fn-search" text="没有找到相关记录" sub="换个关键词试试" />
+ *       <sj-empty text="加载失败" sub="检查网络后重试" actionText="点击重试" :busy="retrying" @action="reload" />
  */
 export default {
   name: 'SjEmpty',
@@ -35,13 +47,23 @@ export default {
     /* 主文案 */
     text: { type: String, default: '' },
     /* 副文案（可空） */
-    sub: { type: String, default: '' }
+    sub: { type: String, default: '' },
+    /* 操作按钮文案（不传 = 不渲染按钮，保持纯展示空态） */
+    actionText: { type: String, default: '' },
+    /* 重试在途：按钮置灰并忽略点击 */
+    busy: { type: Boolean, default: false }
   },
   computed: {
     /* 自定义图标取主题目录 v2 png；缺省回落 ctl-v2 空态切图（128rpx 规格） */
     iconSrc() {
       if (this.icon) return `/static/icons/${this.__theme}/${this.icon}.png`
       return `/static/icons/ctl/${this.__theme}/128/69-ctl-empty.png`
+    }
+  },
+  methods: {
+    onAction() {
+      if (this.busy) return
+      this.$emit('action')
     }
   }
 }
@@ -80,13 +102,35 @@ export default {
   color: var(--sj-ink);
   margin-top: 28rpx;
 }
-/* 副文案（v2 p：12.5px→25rpx sub，上间距 12rpx、下间距 36rpx） */
+/* 副文案（v2 p：12.5px→25rpx sub，上间距 12rpx；有按钮时下间距收紧，间距由按钮承担） */
 .ee-sub {
   font-size: 25rpx;
   font-weight: 600;
   color: var(--sj-sub);
   margin-top: 12rpx;
   margin-bottom: 36rpx;
+}
+/* 操作按钮：primary-soft 浅橙底 + primary 描边 + 胶囊圆角（对齐 suiji-components 令牌） */
+.ee-btn {
+  margin-top: 20rpx;
+  margin-bottom: 36rpx;
+  padding: 16rpx 52rpx;
+  border-radius: var(--sj-r-pill);
+  background: var(--sj-primary-soft);
+  border: 2rpx solid var(--sj-primary);
+  transition: transform 0.15s var(--sj-spring), opacity 0.2s;
+}
+.ee-btn:active {
+  transform: scale(0.96);
+}
+/* 重试在途：置灰不可点 */
+.ee-btn--busy {
+  opacity: 0.45;
+}
+.ee-btn-text {
+  font-size: 27rpx;
+  font-weight: 700;
+  color: var(--sj-primary-deep);
 }
 </style>
 

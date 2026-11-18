@@ -7,8 +7,21 @@
       <text class="fam-tag">{{ members.length }} 人 · 共同记录 {{ sharedCount }} 条</text>
     </view>
 
+    <!-- 首屏加载：留白占位防闪空态（骨架屏观感不佳已撤下） -->
+    <view v-if="bootPending" />
+    <!-- bootstrap 失败且无任何缓存：错误占位 + 点击重试（区别于"真没数据"） -->
+    <view v-else-if="bootFailedEmpty">
+      <sj-empty
+        text="加载失败"
+        sub="数据拉取不成功，检查网络后重试"
+        actionText="点击重试"
+        :busy="retrying"
+        @action="retryBoot"
+      />
+    </view>
+
     <!-- 成员宫格（4 列卡片 + 邀请卡）；超过一行改为堆叠头像（v2 .cu-avgrp） -->
-    <view class="member-grid" v-if="!membersStacked">
+    <view class="member-grid" v-if="showData && !membersStacked">
       <view class="member-card" v-for="m in members" :key="m.n">
         <view class="mem-avatar" :style="{ background: m.c }">
           <image class="mem-img" v-if="m.av" :src="m.av" mode="aspectFill" />
@@ -23,7 +36,7 @@
         <text class="role role-invite">邀请码加入</text>
       </view>
     </view>
-    <view class="member-stack" v-else>
+    <view class="member-stack" v-else-if="showData">
       <view class="mem-avatar stack-av" v-for="m in members" :key="m.n" :style="{ background: m.c }">
         <image class="mem-img" v-if="m.av" :src="m.av" mode="aspectFill" />
         <text v-else>{{ m.n[0] }}</text>
@@ -34,7 +47,7 @@
     </view>
 
     <!-- 共享相册（照片 + 视频；点「查看全部」进入流式相册页） -->
-    <view class="fam-card">
+    <view class="fam-card" v-if="showData">
       <view class="fc-head">
         <text class="fc-title">共享相册</text>
         <view class="fc-more" hover-class="hover-press" :hover-stay-time="80" @click="goAlbum">
@@ -60,7 +73,7 @@
     </view>
 
     <!-- 家人动态卡（合规：不含健康数值） -->
-    <view class="fam-card">
+    <view class="fam-card" v-if="showData">
       <text class="fc-title">家庭动态</text>
       <view class="feed-item" v-for="(f, i) in feeds" :key="i">
         <view class="f-dot" :style="{ background: f.c }" />
@@ -118,7 +131,10 @@ export default {
       /* 家人动态：由真实记录派生，禁止出现健康数值 */
       feeds: [],
       /* 当前登录账号是否家庭创建者（仅创建者显示「邀请家人」入口） */
-      isCreator: false
+      isCreator: false,
+      /* bootstrap 状态（null=未就绪显骨架 / false=失败显错误占位），订阅 'sj-boot' 更新 */
+      boot: api.bootState(),
+      retrying: false
     }
   },
 
@@ -126,14 +142,43 @@ export default {
     /* 成员（含邀请卡位）超过一行 4 列 → 卡片宫格改为单行堆叠头像 */
     membersStacked() {
       return this.members.length + (this.isCreator ? 1 : 0) > 4
+    },
+    /* 纯缓存页三态：未就绪→骨架；失败且无缓存→错误占位；其余→正常数据区 */
+    bootPending() { return this.boot === null },
+    bootFailedEmpty() {
+      return this.boot === false && !this.members.length && !this.albumList.length && !this.feeds.length
+    },
+    showData() { return !this.bootPending && !this.bootFailedEmpty }
+  },
+
+  onLoad() {
+    /* 订阅 bootstrap 结果：成功即回填缓存视图，失败驱动错误占位 */
+    this._onBoot = ({ ok }) => {
+      this.boot = ok
+      if (ok) this.refreshView()
     }
+    uni.$on('sj-boot', this._onBoot)
+  },
+
+  onUnload() {
+    uni.$off('sj-boot', this._onBoot)
   },
 
   onShow() {
+    this.boot = api.bootState()
     this.refreshView()
   },
 
   methods: {
+    /* 错误占位「点击重试」：强制重拉 bootstrap，结果经 'sj-boot' 事件回灌本页 */
+    retryBoot() {
+      if (this.retrying) return
+      this.retrying = true
+      api.bootstrap({ force: true })
+        .finally(() => { this.retrying = false })
+        .catch(() => { /* 失败：'sj-boot' 已置 boot=false，http.js 兜底 toast 提示原因 */ })
+    },
+
     /* 本页渲染链路（缓存 → data）。
        注意：uni-app Vue3 的页面生命周期 onShow 不挂在实例上，不能 this.onShow() 手动调，
        否则抛 TypeError 被调用方 catch 误报成接口错误（如加入家庭成功却弹「加入失败」）。 */

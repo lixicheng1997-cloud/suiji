@@ -146,20 +146,27 @@
           </view>
         </view>
 
-        <!-- 首屏加载占位：弹跳 IP 图标 + 文案（已有数据的回页刷新不遮挡） -->
-        <view v-if="firstLoading" class="timeline-loading">
-          <image class="tl-ld-ic bounce" :src="firstLoadingIcon" />
-          <text class="tl-ld-tx">正在加载记录…</text>
+        <!-- 首屏加载：留白占位防闪空态（骨架屏观感不佳已撤下） -->
+        <view v-if="firstLoading" />
+        <!-- 首屏加载失败：错误占位 + 点击重试（区别于"真的没记录"） -->
+        <view v-else-if="loadError">
+          <sj-empty
+            text="加载失败"
+            sub="网络异常，检查连接后重试"
+            actionText="点击重试"
+            :busy="firstLoading"
+            @action="refresh"
+          />
         </view>
         <!-- 空态 -->
         <view v-else-if="!groups.length" class="empty">
           <sj-mascot :size="200" />
           <text class="empty-text">还没有记录{{ '\n' }}点右下角 + 记一笔吧</text>
         </view>
-        <!-- 触底分页提示：还有更多→下箭头（加载中弹跳）；全部加载完→对勾（到底啦） -->
-        <view v-else class="scroll-end">
+        <!-- 触底分页提示：加载更多失败→内联重试；还有更多→下箭头（加载中弹跳）；到底→对勾 -->
+        <view v-else class="scroll-end" @click="onScrollEndTap">
           <image class="se-ic" :class="{ bounce: loadingMore }" :src="scrollEndIcon" />
-          <text>{{ loadingMore ? '正在加载更多…' : hasMore ? '上拉加载更多' : '· 已经到底啦 ·' }}</text>
+          <text>{{ loadingMore ? '正在加载更多…' : moreError ? '加载更多失败，点击重试' : hasMore ? '上拉加载更多' : '· 已经到底啦 ·' }}</text>
         </view>
       </view>
     </view>
@@ -305,6 +312,10 @@ export default {
       loadingMore: false,
       /* 首屏整页加载态：页面打开即在拉第一页，初始 true 避免首帧闪空态；加载完成后置 false */
       firstLoading: true,
+      /* 首屏加载失败（列表为空时）：错误占位 + 点击重试，区别于"真的没记录" */
+      loadError: false,
+      /* 触底加载更多失败：尾部内联"点击重试"，不整页清空 */
+      moreError: false,
       /* 消息中心未读通知数（待办不计入，驱动顶栏铃铛角标） */
       unread: 0,
       sheetOpen: false,
@@ -423,10 +434,6 @@ export default {
       }
       return out
     },
-    /* 首屏加载占位图标：ctl 库 46-loading（与底部加载中同款 IP 弹跳图标） */
-    firstLoadingIcon() {
-      return '/static/icons/ctl/' + this.__theme + '/192/46-ctl-loading.png'
-    },
     /* 底部提示卡通图标（ctl 控制图标库，按状态取语义）：
        加载中→46-loading；还有更多→60-more；到底啦→66-ok（完成对勾） */
     scrollEndIcon() {
@@ -496,6 +503,7 @@ export default {
       this.unread = api.getUnreadTotal()
       /* 天气：按服务端 IP 粗判城市，失败静默留空（副行天气段隐藏），不阻断列表刷新 */
       api.getWeather().then(w => { this.weather = w || { text: '', temp: null, city: '' } })
+      this.loadError = false
       try {
         /* 专用分页接口拉第一页（服务端游标分页，不读全量缓存） */
         const p = await api.fetchTimeline({ limit: this.pageSize })
@@ -503,7 +511,11 @@ export default {
         this.cursor = p.next_cursor
         this.hasMore = p.has_more
         this.dayTotals = p.day_totals || {}
-      } catch (e) { /* 保留当前列表 */ }
+        this.moreError = false
+      } catch (e) {
+        /* 保留当前列表；列表本就为空 → 页面接管错误（错误占位 + 重试，吞掉兜底 toast） */
+        if (!this.items.length) { this.loadError = true; ui.takeOver(e) }
+      }
       this.firstLoading = false
       this.syncing = false
       this.syncSleepTimer()
@@ -516,13 +528,23 @@ export default {
     loadMore() {
       if (this.loadingMore || !this.hasMore) return
       this.loadingMore = true
+      this.moreError = false
       api.fetchTimeline({ cursor: this.cursor, limit: this.pageSize }).then(p => {
         this.items = this.items.concat(p.items)
         this.cursor = p.next_cursor
         this.hasMore = p.has_more
         this.dayTotals = Object.assign({}, this.dayTotals, p.day_totals)
         this.loadingMore = false
-      }).catch(() => { this.loadingMore = false })
+      }).catch((e) => {
+        this.loadingMore = false
+        /* 分页失败：toast 提示 + 尾部内联重试条，已加载列表保留 */
+        this.moreError = true
+        ui.error(e, '加载更多失败')
+      })
+    },
+    /* 尾部提示条点击：仅在加载更多失败时触发重试 */
+    onScrollEndTap() {
+      if (this.moreError) this.loadMore()
     },
     /* 记录人展示：优先与宝宝关系 → 昵称 → 登录账号；按 creator_id 解析成员 */
     whoOf(e) {
@@ -1181,15 +1203,6 @@ export default {
 .badge.backfill { color: var(--sj-faint); border: 2rpx dashed var(--sj-faint); }
 .badge.ongoing { background: #E9EEFB; color: var(--sj-c-sleep); }
 .badge.p50 { background: var(--sj-tint-measure); color: var(--sj-c-measure); }
-
-/* 首屏加载占位：居中弹跳图标 + 文案，高度与空态区接近，避免内容上下跳变 */
-.timeline-loading {
-  display: flex; flex-direction: column; align-items: center; gap: 24rpx;
-  padding: 120rpx 40rpx;
-}
-.tl-ld-ic { width: 72rpx; height: 72rpx; flex: none; }
-.tl-ld-ic.bounce { animation: seBounce 0.8s ease-in-out infinite; }
-.tl-ld-tx { font-size: 26rpx; color: var(--sj-sub); letter-spacing: 2rpx; }
 
 /* 空态 / 收尾 */
 .empty { text-align: center; padding: 96rpx 40rpx; display: flex; flex-direction: column; align-items: center; gap: 24rpx; }

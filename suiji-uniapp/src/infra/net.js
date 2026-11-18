@@ -10,10 +10,16 @@ let snapshot = { type: 'unknown', connected: true, effectiveType: '' }
 
 function apply(info) {
   if (!info) return
-  snapshot = {
+  const next = {
     type: info.networkType || info.type || 'unknown',
     connected: info.isConnected !== false,
     effectiveType: info.effectiveType || ''
+  }
+  const changed = next.connected !== snapshot.connected || next.type !== snapshot.type
+  snapshot = next
+  // 连接状态 / 网络类型实际变化时广播，供离线横幅与 App 恢复重拉订阅
+  if (changed && typeof uni !== 'undefined' && uni.$emit) {
+    uni.$emit('sj-net-change', netInfo())
   }
 }
 

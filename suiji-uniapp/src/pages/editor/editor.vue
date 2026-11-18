@@ -435,6 +435,12 @@
         <sj-textarea v-model="note" placeholder="写点什么…" :maxlength="500" height="176rpx" />
       </block>
 
+      <!-- 保存内联进度：ui.loading 全局遮罩已禁用，上传本地媒体时在按钮上方给页内反馈 -->
+      <view v-if="saving && savePercent !== null" class="save-progress">
+        <sj-progress :percent="savePercent" :height="4" />
+        <text class="sp-tx">正在上传 {{ savePercent }}%</text>
+      </view>
+
       <!-- 底部通栏主按钮（v2 pg-btn） -->
       <sj-button
         class="pg-btn"
@@ -456,6 +462,7 @@
 import { TYPES } from '@/utils/mock.js'
 import * as api from '@/utils/api.js'
 import * as ui from '@/utils/ui.js'
+import { netInfo } from '@/infra/net.js'
 
 /* 当前时间 HH:mm；plusMin 可选，为睡眠结束等场景提供偏移（跨日自动归到 23:59 前循环） */
 function nowHHmm(plusMin) {
@@ -493,6 +500,8 @@ export default {
       voice: null,
       /* 保存中：照片上传期间禁止重复提交 */
       saving: false,
+      /* 保存上传内联进度（null=不显示；0–100 由 api.saveEntry onProgress 回写） */
+      savePercent: null,
       /* 已成功提交：进入返回倒计时后拦截再次点击（与按钮 spinner 解耦，loading 可先复位） */
       submitted: false,
       statusBarHeight: 20,
@@ -1050,6 +1059,11 @@ export default {
     },
     async onSave() {
       if (this.saving || this.submitted) return
+      /* 离线预检：断网时直接拦截，省一次上行超时等待（横幅已在提示断网） */
+      if (netInfo().connected === false) {
+        this.$refs.ntf.show({ type: 'warn', message: '当前未联网，请检查网络后再保存' })
+        return
+      }
       if (this.type === 'voice' && !(this.voice && this.voice.duration)) {
         this.$refs.ntf.show({ type: 'warn', message: '先录一段宝宝的声音再保存' })
         return
@@ -1063,7 +1077,7 @@ export default {
          视频在选片后已自动压缩并上传，保存只做落库，不再上行媒体 */
       if (this.type === 'video' && this.videos.length) {
         if (this.videoFailedCount > 0) {
-          this.$refs.ntf.show({ type: 'err', message: '有视频上传失败，请删除后重选' })
+          this.$refs.ntf.show({ type: 'err', message: '有视频上传失败，点视频上的「重试」再传，或删除后重选' })
           return
         }
         if (this.videoPendingCount > 0) {
@@ -1128,6 +1142,8 @@ export default {
         : (localVideos.length ? '正在上传 ' + localVideos.length + ' 段视频…'
           : (localVoice.length ? '正在上传 ' + localVoice.length + ' 段语音…' : '正在保存记录…'))
       const keepOpen = localPhotos.length || localVideos.length || localVoice.length
+      /* 有本地媒体上行：页内按钮上方显示内联上传进度（全局遮罩已禁用） */
+      this.savePercent = keepOpen ? 0 : null
       const ld = ui.loading(busy, { sub: keepOpen ? '保持应用打开，勿切后台' : '', timeout: 300000 })
       const entry = {
         type: this.type,
@@ -1153,7 +1169,7 @@ export default {
       }
       if (this.type === 'milestone' && this.switches.dateUncertain) entry.backfill = true
       try {
-        const res = await api.saveEntry(entry, { onProgress: p => ld.update({ percent: p }) })
+        const res = await api.saveEntry(entry, { onProgress: p => { this.savePercent = p; ld.update({ percent: p }) } })
         /* 成功提示：视频已在落库前同步上传完成，媒体就位。
            不入页内横幅（页面随即销毁看不到），改入跨页队列，由返回页 onShow 弹出。 */
         const msg = '已保存'
@@ -1163,10 +1179,16 @@ export default {
         ui.queueToast(msg, 2200, 'ok')
         this.goBack()
       } catch (e) {
-        /* 失败保留表单（无归属权限时服务端返回 403） */
-        ui.error(e, '保存失败')
+        /* 失败保留表单（无归属权限时服务端返回 403）；已成功上传的文件在免传表内，重试不重传。
+           页内横幅接管错误（吞掉兜底 toast），补安抚文案 */
+        ui.takeOver(e)
+        this.$refs.ntf.show({
+          type: 'err',
+          message: ((e && e.friendly) ? e.friendly : '保存失败') + '，已填写的内容不会丢失'
+        })
       } finally {
         ld.close()
+        this.savePercent = null
         this.saving = false
       }
     }
@@ -1410,5 +1432,19 @@ export default {
 .pg-btn {
   display: flex;
   margin-top: 40rpx;
+}
+
+/* 保存内联上传进度：细条 + 百分比文案，紧贴按钮上方（全局遮罩已禁用时的页内反馈） */
+.save-progress {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-top: 40rpx;
+}
+.save-progress .sp-tx {
+  flex: none;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: var(--sj-sub);
 }
 </style>

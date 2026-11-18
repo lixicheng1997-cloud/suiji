@@ -26,7 +26,19 @@
 
     <!-- 列表 -->
     <view class="nt-list">
-      <view v-if="!list.length" class="nt-empty">
+      <!-- 首屏加载：留白占位防闪空态（骨架屏观感不佳已撤下） -->
+      <view v-if="boot === null" />
+      <!-- bootstrap 失败且列表为空：错误占位 + 点击重试（区别于"暂无通知"） -->
+      <view v-else-if="boot === false && !list.length">
+        <sj-empty
+          text="加载失败"
+          sub="数据拉取不成功，检查网络后重试"
+          actionText="点击重试"
+          :busy="retrying"
+          @action="retryBoot"
+        />
+      </view>
+      <view v-else-if="!list.length" class="nt-empty">
         <text>暂无{{ tab === 'todo' ? '待办' : '通知' }}</text>
       </view>
 
@@ -100,7 +112,10 @@ export default {
       todos: [],
       /* 触底分页（与首页一致，每页 10 条）：shown=已展示条数，对当前 tab 列表本地切片 */
       pageSize: 10,
-      shown: 10
+      shown: 10,
+      /* bootstrap 状态（null=未就绪显骨架 / false=失败显错误占位），订阅 'sj-boot' 更新 */
+      boot: api.bootState(),
+      retrying: false
     }
   },
 
@@ -131,9 +146,20 @@ export default {
     try {
       this.statusBarHeight = uni.getSystemInfoSync().statusBarHeight || 20
     } catch (e) { /* 保持默认 */ }
+    /* 订阅 bootstrap 结果：成功即回填缓存列表，失败驱动错误占位 */
+    this._onBoot = ({ ok }) => {
+      this.boot = ok
+      if (ok) this.refresh()
+    }
+    uni.$on('sj-boot', this._onBoot)
+  },
+
+  onUnload() {
+    uni.$off('sj-boot', this._onBoot)
   },
 
   onShow() {
+    this.boot = api.bootState()
     this.refresh()
   },
 
@@ -146,6 +172,15 @@ export default {
     refresh() {
       this.notices = api.getNotices()
       this.todos = api.getTodos()
+    },
+
+    /* 错误占位「点击重试」：强制重拉 bootstrap，结果经 'sj-boot' 事件回灌本页 */
+    retryBoot() {
+      if (this.retrying) return
+      this.retrying = true
+      api.bootstrap({ force: true })
+        .finally(() => { this.retrying = false })
+        .catch(() => { /* 失败：'sj-boot' 已置 boot=false，http.js 兜底 toast 提示原因 */ })
     },
 
     switchTab(t) {

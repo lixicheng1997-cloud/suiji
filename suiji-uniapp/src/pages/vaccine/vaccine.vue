@@ -17,6 +17,19 @@
 
     <!-- 时间表内容区 -->
     <view class="content">
+      <!-- 首屏加载：留白占位防闪空态（骨架屏观感不佳已撤下） -->
+      <view v-if="bootPending" />
+      <!-- bootstrap 失败且无缓存：错误占位 + 点击重试（避免误显示"共 0 剂"） -->
+      <view v-else-if="bootFailedEmpty">
+        <sj-empty
+          text="加载失败"
+          sub="数据拉取不成功，检查网络后重试"
+          actionText="点击重试"
+          :busy="retrying"
+          @action="retryBoot"
+        />
+      </view>
+      <template v-else>
       <!-- 统计摘要（v2 白卡：display 字族大数字 primary-deep） -->
       <view class="v-summary">
         <text class="vs-num">{{ doneCount }} <text class="vs-label">已接种</text></text>
@@ -90,6 +103,7 @@
 
       <!-- 合规文案（一字不动） -->
       <view class="scroll-end"><text>· 时间表以国家免疫规划为准，仅作记录与提醒，不构成医学建议 ·</text></view>
+      </template>
     </view>
 
     <!-- 日期选择：直开 sj-datetime-picker 滚轮面板（无中间 sj-modal），滚轮「确定」即保存 -->
@@ -141,7 +155,10 @@ export default {
       asShow: false,
       asVaccine: null,
       asItems: [],
-      statusBarHeight: 20
+      statusBarHeight: 20,
+      /* bootstrap 状态（null=未就绪显骨架 / false=失败显错误占位），订阅 'sj-boot' 更新 */
+      boot: api.bootState(),
+      retrying: false
     }
   },
 
@@ -166,20 +183,43 @@ export default {
     /* 行操作面板标题：当前剂次「名称 · 剂次」 */
     asTitle() {
       return this.asVaccine ? this.asVaccine.n + ' · ' + this.asVaccine.dose : ''
-    }
+    },
+    /* 纯缓存页三态：未就绪→骨架；失败且无缓存→错误占位；其余→正常数据区 */
+    bootPending() { return this.boot === null },
+    bootFailedEmpty() { return this.boot === false && !this.vaccines.length }
   },
 
   onLoad() {
     try {
       this.statusBarHeight = uni.getSystemInfoSync().statusBarHeight || 20
     } catch (e) { /* 保持默认 */ }
+    /* 订阅 bootstrap 结果：成功即回填缓存列表，失败驱动错误占位 */
+    this._onBoot = ({ ok }) => {
+      this.boot = ok
+      if (ok) this.refresh()
+    }
+    uni.$on('sj-boot', this._onBoot)
+  },
+
+  onUnload() {
+    uni.$off('sj-boot', this._onBoot)
   },
 
   onShow() {
+    this.boot = api.bootState()
     this.refresh()
   },
 
   methods: {
+    /* 错误占位「点击重试」：强制重拉 bootstrap，结果经 'sj-boot' 事件回灌本页 */
+    retryBoot() {
+      if (this.retrying) return
+      this.retrying = true
+      api.bootstrap({ force: true })
+        .finally(() => { this.retrying = false })
+        .catch(() => { /* 失败：'sj-boot' 已置 boot=false，http.js 兜底 toast 提示原因 */ })
+    },
+
     /* 状态胶囊 → sj-tag 变体（ok/soft/err 自带设计稿配色；其余走 pill 自定义浅底） */
     vTagProps(v) {
       if (v.status === 'done') return { variant: 'ok', text: v.status_text }

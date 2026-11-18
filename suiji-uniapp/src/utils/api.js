@@ -320,6 +320,13 @@ export function resetAccountSession() {
 
 /* ---------- 引导加载 ---------- */
 let bootPromise = null
+// bootstrap 结果：null=还没跑过，true=最近一次成功，false=最近一次失败。
+// 缓存页（notify/family/vaccine/grow）据此区分"真没数据"与"拉取失败"。
+let bootOk = null
+
+/** bootstrap 状态快照：null=未跑过 / true=成功 / false=失败 */
+export function bootState() { return bootOk }
+
 /**
  * 拉全量快照灌入缓存；并发调用共享同一请求（App 启动 + splash 门控只发一次）。
  * @param {{silent?: boolean, force?: boolean}} [opts] silent=true 时失败不弹提示（调用方自行提示）；
@@ -329,8 +336,12 @@ export function bootstrap(opts) {
   const o = opts || {}
   const run = () => http.get('/bootstrap', o).then(s => {
     fillCache(s); syncEventsWatermark(s); syncNotify(); pullServerNotices()
+    bootOk = true
+    uni.$emit('sj-boot', { ok: true })
     return s
   }).catch(e => {
+    bootOk = false
+    uni.$emit('sj-boot', { ok: false })
     throw e
   })
   if (o.force) return run()

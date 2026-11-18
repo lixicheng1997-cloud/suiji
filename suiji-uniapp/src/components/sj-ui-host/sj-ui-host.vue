@@ -62,6 +62,9 @@
 
     <!-- ================= 全屏加载（ui.loading() 驱动，见 utils/ui.js） ================= -->
     <sj-loading :show="ld.show" :text="ld.text" :sub="ld.sub" :percent="ld.percent" />
+
+    <!-- ================= 全局离线横幅（infra/net.js 广播驱动，持久全局态不受栈顶守卫影响） ================= -->
+    <sj-net-banner />
   </view>
 </template>
 
