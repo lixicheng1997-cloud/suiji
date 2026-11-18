@@ -125,9 +125,11 @@ GET `/bootstrap` → 全量快照（一次请求填充客户端缓存）：
 
 ```json
 { "user":{...}, "family":{"id","name","role","events_version","members":[member...]},
-  "active_baby_id":"", "babies":[baby...], "entries":[entry...未软删],
+  "active_baby_id":"", "babies":[baby...未软删], "entries":[entry...未软删],
   "measurements":[...], "media":[...], "milestone_records":[...], "vaccines":[...],
-  "journals":[...], "settings":{...}, "trash":[entry...已软删（含 deleted_at/deleted_by）] }
+  "journals":[...], "settings":{...},
+  "trash":[entry...已软删（含 deleted_at/deleted_by）],
+  "baby_trash":[baby...已软删（含 deleted_at）] }
 ```
 
 ## 4. 家庭 `/family`
@@ -176,10 +178,14 @@ GET `/bootstrap` → 全量快照（一次请求填充客户端缓存）：
 
 | 方法 路径 | 说明 |
 | --- | --- |
-| GET `/babies` | 列表（含 is_active） |
+| GET `/babies` | 列表（含 is_active；不含已软删） |
+| GET `/babies/trash` | 回收站：已软删档案列表（按删除时间倒序；bootstrap 的 `baby_trash` 同口径） |
 | POST `/babies` | 创建；**服务端同时为该宝宝初始化 milestone_records（内置清单）与 vaccines（按 birth_date 排期）**；首个宝宝自动 active。家庭成员均可建档（家庭隔离，跨家庭 403） |
 | PUT `/babies/{id}` | 更新（birth_date 变化时重排疫苗 plan_date，保留接种状态）；家庭成员均可改档 |
 | POST `/babies/{id}/activate` | 切换当前档案；家庭成员可操作 |
+| DELETE `/babies/{id}` | **软删**：进回收站保留 30 天；仅家庭创建者；若为 active 自动切到同家庭另一未删档案；记录不级联删（恢复后重新可见） |
+| POST `/babies/{id}/restore` | 从回收站恢复；仅家庭创建者；若当前家庭无 active 档案，本档案自动接管 |
+| DELETE `/babies/{id}/purge` | **彻底删除**：级联物理清除该档案下的记录/疫苗/里程碑/日记 + 媒体字节；仅家庭创建者；不可恢复 |
 
 ## 6. 记录 `/entries`
 

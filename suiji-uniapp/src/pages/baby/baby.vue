@@ -98,6 +98,20 @@
         :text="isNew ? '创建档案' : '保存'"
         @click="onSave"
       />
+
+      <!-- 编辑模式 + 家庭创建者：删除档案（软删进回收站 30 天，与记录同口径） -->
+      <view v-if="!isNew && isCreator" class="danger-zone">
+        <sj-button
+          class="danger-btn"
+          block
+          size="md"
+          type="danger"
+          :plain="true"
+          text="删除档案（进回收站保留 30 天）"
+          @click="onDelete"
+        />
+        <text class="dz-tip">档案下的记录不会立即删除，恢复档案后记录重新可见；彻底删除需在回收站操作</text>
+      </view>
     </view>
 
     <!-- 出生日期滚轮面板：挂在页面根（与 vaccine 页同款），fixed 弹层不被 .pg-field 的
@@ -155,6 +169,8 @@ export default {
       isNew: false,
       /* 指定档案模式（?id=xxx）：查看/编辑该宝宝，不要求其为当前宝宝 */
       editId: '',
+      /* 家庭创建者：编辑模式下可见「删除档案」danger 钮（与后端 require_creator 同口径） */
+      isCreator: false,
       /* 保存中：头像上传 + 建档/更新 + 疫苗排期串成一条链路，期间禁止重复提交 */
       busy: false,
       statusBarHeight: 20,
@@ -195,6 +211,8 @@ export default {
     } catch (e) { /* 保持默认 */ }
     this.isNew = !!(query && query.new)
     this.editId = (query && query.id) || ''
+    const role = api.getFamilyRole()
+    this.isCreator = role === 'creator' || role === 'owner'
     /* 新建模式保留空表单，编辑模式回填目标宝宝（?id= 指定，缺省为当前宝宝） */
     if (!this.isNew) this.loadProfile()
   },
@@ -340,6 +358,41 @@ export default {
         ld.close()
         this.busy = false
       }
+    },
+
+    /* 删除档案（软删进回收站 30 天，与记录同口径）：
+       二次确认 → deleteBaby → 若家庭已无档案按规则 3 强制进建档页，否则回列表页 */
+    onDelete() {
+      const cur = api.getBaby()
+      const id = this.editId || (cur ? cur.id : '')
+      if (!id) return
+      const target = api.getBabyById(id)
+      const name = (target && target.name) || '该宝宝'
+      ui.showModal({
+        title: '删除「' + name + '」档案？',
+        content: '档案将移入回收站，保留 30 天，期间可在回收站恢复；档案下的记录不会立即删除，恢复档案后记录重新可见。超期未恢复将自动彻底删除，含其下全部记录。',
+        confirmText: '移入回收站',
+        danger: true
+      }).then(res => {
+        if (!res || !res.confirm) return
+        const ld = ui.loading('正在删除档案…')
+        api.deleteBaby(id).then(() => {
+          ld.close()
+          this.$refs.ntf.show({ type: 'ok', message: '「' + name + '」已移入回收站' })
+          /* 删除后家庭是否还有档案：无则按规则 3 强制进建档页 */
+          const remaining = api.getBabies()
+          setTimeout(() => {
+            if (!remaining.length) {
+              uni.redirectTo({ url: '/pages/baby/baby?new=1' })
+            } else {
+              uni.navigateBack()
+            }
+          }, 800)
+        }).catch(e => {
+          ld.close()
+          ui.error(e, '删除失败，请重试')
+        })
+      }).catch(() => {})
     }
   }
 }
@@ -569,4 +622,20 @@ export default {
 .src-txt { display: flex; flex-direction: column; gap: 4rpx; }
 .src-label { font-size: 28rpx; font-weight: 800; color: var(--sj-ink); }
 .src-sub { font-size: 22rpx; font-weight: 600; color: var(--sj-sub); }
+
+/* 删除档案 danger 区（编辑模式 + 创建者可见，与记录回收站同口径） */
+.danger-zone {
+  margin-top: 36rpx;
+  padding-top: 28rpx;
+  border-top: 2rpx dashed var(--sj-line);
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+}
+.dz-tip {
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: var(--sj-sub);
+  text-align: center;
+}
 </style>

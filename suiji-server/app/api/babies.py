@@ -5,12 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..core.db import get_db
-from ..core.deps import get_auth, require_member
+from ..core.deps import get_auth, require_creator, require_member
 from ..domain.dates import today_utc, utc_now_iso
 from ..models import Baby
 from ..repositories import scoped_get
 from ..schemas import BabyIn
-from ..services.baby_service import ensure_schedule, replan_vaccines
+from ..services.baby_service import ensure_schedule, replan_vaccines, soft_delete, restore, purge_baby
 from ..services.ids import gen_id
 from ..services.rows import baby_row
 
@@ -57,7 +57,18 @@ def _check_baby(body: dict) -> None:
 
 @router.get("")
 def list_babies(db: Session = Depends(get_db), auth=Depends(get_auth)):
-    rows = db.query(Baby).filter(Baby.family_id == auth.family_id).order_by(Baby.created_at).all()
+    rows = (db.query(Baby)
+            .filter(Baby.family_id == auth.family_id, Baby.deleted_at.is_(None))
+            .order_by(Baby.created_at).all())
+    return [baby_row(b) for b in rows]
+
+
+@router.get("/trash")
+def list_trash(db: Session = Depends(get_db), auth=Depends(get_auth)):
+    """回收站：已软删的宝宝档案列表（按删除时间倒序；前端与 entry 回收站合并展示）。"""
+    rows = (db.query(Baby)
+            .filter(Baby.family_id == auth.family_id, Baby.deleted_at.isnot(None))
+            .order_by(Baby.deleted_at.desc()).all())
     return [baby_row(b) for b in rows]
 
 
@@ -123,3 +134,31 @@ def activate(baby_id: str, db: Session = Depends(get_db), auth=Depends(require_m
     db.commit()
     db.refresh(baby)
     return baby_row(baby)
+
+
+# ---------- 回收站：软删 / 恢复 / 彻底删除（仅家庭创建者，与清空数据同权限口径） ----------
+
+@router.delete("/{baby_id}")
+def delete_baby(baby_id: str, db: Session = Depends(get_db), auth=Depends(require_creator)):
+    """软删档案：进回收站保留 30 天，可恢复；超期由 cleanup_service 物理清除。"""
+    baby = scoped_get(db, Baby, baby_id, auth.family_id)
+    if baby.deleted_at:
+        return baby_row(baby)  # 幂等：重复删除返回当前状态
+    return soft_delete(db, auth, baby)
+
+
+@router.post("/{baby_id}/restore")
+def restore_baby(baby_id: str, db: Session = Depends(get_db), auth=Depends(require_creator)):
+    """从回收站恢复档案：记录自动重新可见（entry 表未动）。"""
+    baby = scoped_get(db, Baby, baby_id, auth.family_id)
+    if not baby.deleted_at:
+        return baby_row(baby)  # 幂等：未删状态恢复即原样返回
+    return restore(db, baby)
+
+
+@router.delete("/{baby_id}/purge")
+def purge_baby_endpoint(baby_id: str, db: Session = Depends(get_db), auth=Depends(require_creator)):
+    """彻底删除：级联物理清除该档案下的记录/疫苗/里程碑/日记 + 媒体字节，不可恢复。"""
+    baby = scoped_get(db, Baby, baby_id, auth.family_id)
+    purge_baby(db, baby)
+    return {"ok": True}

@@ -115,6 +115,7 @@ import { CARD_TYPES } from '@/utils/mock.js'
 import { palette, cardSkin, withAlpha, THEME_LABELS } from '@/theme/theme.js'
 import * as ui from '@/utils/ui.js'
 import { resolveSmall } from '@/api/http.js'
+import { mpSrc } from '@/infra/platform.js'
 
 export default {
   data() {
@@ -197,10 +198,10 @@ export default {
     },
     /* 预览装饰直接用 IP 素材；canvas 端为程序化等价绘制（小程序 canvas 画 SVG 不可靠） */
     glyphSrc() {
-      return this.__theme === 'duck' ? '/static/anim/bg-foot-duck.svg' : '/static/anim/sym-paw.svg'
+      return mpSrc(this.__theme === 'duck' ? '/static/anim/bg-foot-duck.svg' : '/static/anim/sym-paw.svg')
     },
     sparkSrc() {
-      return this.__theme === 'duck' ? '/static/anim/bg-feather.svg' : '/static/anim/sym-star.svg'
+      return mpSrc(this.__theme === 'duck' ? '/static/anim/bg-feather.svg' : '/static/anim/sym-star.svg')
     }
   },
 

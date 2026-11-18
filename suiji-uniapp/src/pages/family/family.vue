@@ -251,7 +251,7 @@ export default {
           if (!cur || !cur.id) return this.doJoin(code)
           return ui.confirm({
             title: '加入其他家庭',
-            content: '加入后将与当前家庭「' + (cur.name || '当前家庭') + '」解绑，该家庭的宝宝与记录将不再可见；你的个人资料不受影响。',
+            content: '加入后将与当前家庭「' + (cur.name || '当前家庭') + '」解绑，该家庭的宝宝与记录将不再可见；你在此家庭留下的历史记录将保留，重新邀请即可回到原家庭。',
             confirmText: '解绑并加入',
             cancelText: '取消',
             danger: true

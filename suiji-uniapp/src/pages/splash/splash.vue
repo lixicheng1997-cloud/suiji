@@ -21,14 +21,14 @@
 
       <!-- ⑤ 粒子绽放（静态 svg 文件；位移量用 px，内联 style 的 rpx 不会被编译转换） -->
       <view class="fx">
-        <i style="--tx:-50px;--ty:-37px;--rot:-18deg;--sc:1;--dl:0s;width:24px;height:24px"><image class="sym" src="/static/anim/sym-heart.svg" /></i>
-        <i style="--tx:52px;--ty:-39px;--rot:14deg;--sc:1;--dl:.05s;width:22px;height:22px"><image class="sym" src="/static/anim/sym-star.svg" /></i>
-        <i style="--tx:-64px;--ty:-4px;--rot:0deg;--sc:.8;--dl:.1s;width:20px;height:20px"><image class="sym" src="/static/anim/sym-paw.svg" /></i>
-        <i style="--tx:63px;--ty:-2px;--rot:20deg;--sc:.9;--dl:.15s;width:22px;height:22px"><image class="sym" src="/static/anim/sym-paw.svg" /></i>
-        <i style="--tx:-39px;--ty:26px;--rot:10deg;--sc:.7;--dl:.2s;width:20px;height:20px"><image class="sym" src="/static/anim/sym-star.svg" /></i>
-        <i style="--tx:0px;--ty:-64px;--rot:0deg;--sc:1;--dl:.08s;width:20px;height:20px"><image class="sym" src="/static/anim/sym-heart.svg" /></i>
-        <i style="--tx:-59px;--ty:22px;--rot:-8deg;--sc:.65;--dl:.24s;width:16px;height:16px"><image class="sym" src="/static/anim/sym-heart.svg" /></i>
-        <i style="--tx:59px;--ty:24px;--rot:8deg;--sc:.7;--dl:.26s;width:16px;height:16px"><image class="sym" src="/static/anim/sym-star.svg" /></i>
+        <i style="--tx:-50px;--ty:-37px;--rot:-18deg;--sc:1;--dl:0s;width:24px;height:24px"><image class="sym" :src="mpSrc('/static/anim/sym-heart.svg')" /></i>
+        <i style="--tx:52px;--ty:-39px;--rot:14deg;--sc:1;--dl:.05s;width:22px;height:22px"><image class="sym" :src="mpSrc('/static/anim/sym-star.svg')" /></i>
+        <i style="--tx:-64px;--ty:-4px;--rot:0deg;--sc:.8;--dl:.1s;width:20px;height:20px"><image class="sym" :src="mpSrc('/static/anim/sym-paw.svg')" /></i>
+        <i style="--tx:63px;--ty:-2px;--rot:20deg;--sc:.9;--dl:.15s;width:22px;height:22px"><image class="sym" :src="mpSrc('/static/anim/sym-paw.svg')" /></i>
+        <i style="--tx:-39px;--ty:26px;--rot:10deg;--sc:.7;--dl:.2s;width:20px;height:20px"><image class="sym" :src="mpSrc('/static/anim/sym-star.svg')" /></i>
+        <i style="--tx:0px;--ty:-64px;--rot:0deg;--sc:1;--dl:.08s;width:20px;height:20px"><image class="sym" :src="mpSrc('/static/anim/sym-heart.svg')" /></i>
+        <i style="--tx:-59px;--ty:22px;--rot:-8deg;--sc:.65;--dl:.24s;width:16px;height:16px"><image class="sym" :src="mpSrc('/static/anim/sym-heart.svg')" /></i>
+        <i style="--tx:59px;--ty:24px;--rot:8deg;--sc:.7;--dl:.26s;width:16px;height:16px"><image class="sym" :src="mpSrc('/static/anim/sym-star.svg')" /></i>
       </view>
 
       <!-- ④ 品牌落版 -->
@@ -54,6 +54,7 @@ import * as api from '@/utils/api.js'
 import * as ui from '@/utils/ui.js'
 import * as guide from '@/utils/first-run.js'
 import { palette } from '@/theme/theme.js'
+import { mpSrc } from '@/infra/platform.js'
 
 /* 启动加载动画：应用启动默认页 / 「我的 → 启动加载动画（演示）」入口
  * v2 IP 启动动效（蜂蜜苏醒 / 池塘破水），按主题渲染熊/鸭，分镜压缩至 ≈2.2s；轻点任意处跳过。
@@ -79,7 +80,7 @@ export default {
     /* 吉祥物头像（呼吸/眨眼动画内置于 SVG 文件） */
     faceSrc() {
       const t = this.themeName === 'duck' ? 'duck' : 'bear'
-      return `/static/anim/${t}-face.svg`
+      return mpSrc(`/static/anim/${t}-face.svg`)
     },
     /* 滴落：主题主色烘焙进 data URI */
     dropSrc() {
@@ -116,6 +117,8 @@ export default {
   },
 
   methods: {
+    /* 微信端 SVG→3× PNG 后缀切换（模板粒子图直接调用，需注册进 methods） */
+    mpSrc,
     /* 相位时间轴（1× 速度，毫秒） */
     playAnim() {
       const sched = [

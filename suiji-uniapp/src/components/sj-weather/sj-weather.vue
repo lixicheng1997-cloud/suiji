@@ -3,6 +3,8 @@
 </template>
 
 <script>
+import { mpSrc } from '@/infra/platform.js'
+
 /**
  * 岁记 · 天气卡通动效（easycom 自动注册 <sj-weather>）
  * 按服务端返回的中文天气描述，渲染对应内置 CSS 动画的 SVG（/static/anim/weather-*.svg）。
@@ -33,7 +35,7 @@ export default {
       return 'partly'
     },
     src() {
-      return this.type ? `/static/anim/weather-${this.type}.svg` : ''
+      return this.type ? mpSrc(`/static/anim/weather-${this.type}.svg`) : ''
     },
     sizeStyle() {
       const s = typeof this.size === 'number' ? this.size + 'rpx' : this.size

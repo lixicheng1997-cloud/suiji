@@ -11,8 +11,9 @@
     1) 动画一律加在 <view> 图层上，<image> 只做静态图形（项目其他动效也从不直接动 image 节点）；
     2) keyframes 内只写 px / 纯数值（安卓 webview 对 keyframes 里的 rpx、var() 解析不稳），位移走 transform；
     3) 位置与尺寸用 rpx/%，写在行内 style（App 端由编译器换算 rpx）。
-  微信端注意：小程序 <image> 不渲染 SVG（design-contract-uniapp.md §5），上微信前需把
-  static/anim/bg-*.svg 以 3× 同名 PNG 补齐，本层图形只需切换 src 后缀。
+  微信端注意：小程序 <image> 不渲染 SVG（design-contract-uniapp.md §5），
+  static/anim 下已以 3× 同名 PNG 补齐（scripts/gen-mp-png.mjs 生成），
+  图形 src 一律经 mpSrc() 收口：微信端自动切 .png，其余端保持 .svg。
 -->
 <template>
   <view class="sj-bg" :class="'sjb-' + themeName">
@@ -23,19 +24,19 @@
     <!-- ============ bear：小熊主题 ============ -->
     <template v-if="themeName === 'bear'">
       <view v-for="(p, i) in bearTrail" :key="'bp' + i" class="sjb-slot sjb-stamp" :style="layerStyle(p)">
-        <image class="sjb-gly" :style="glyStyle(p)" src="/static/anim/bg-paw-bear.svg" mode="aspectFit" />
+        <image class="sjb-gly" :style="glyStyle(p)" :src="mpSrc('/static/anim/bg-paw-bear.svg')" mode="aspectFit" />
       </view>
       <view v-for="(h, i) in bearHoney" :key="'bh' + i" class="sjb-slot sjb-drip" :style="layerStyle(h)">
-        <image class="sjb-gly" src="/static/anim/bg-honey.svg" mode="aspectFit" />
+        <image class="sjb-gly" :src="mpSrc('/static/anim/bg-honey.svg')" mode="aspectFit" />
       </view>
       <view v-for="(l, i) in bearLeaves" :key="'bl' + i" class="sjb-slot sjb-fall" :style="layerStyle(l)">
-        <image class="sjb-gly" src="/static/anim/bg-leaf.svg" mode="aspectFit" />
+        <image class="sjb-gly" :src="mpSrc('/static/anim/bg-leaf.svg')" mode="aspectFit" />
       </view>
       <view v-for="(s, i) in bearStars" :key="'bs' + i" class="sjb-slot sjb-twinkle" :style="layerStyle(s)">
-        <image class="sjb-gly" src="/static/anim/sym-star.svg" mode="aspectFit" />
+        <image class="sjb-gly" :src="mpSrc('/static/anim/sym-star.svg')" mode="aspectFit" />
       </view>
       <view class="sjb-slot sjb-riser" :style="layerStyle(bearHeart)">
-        <image class="sjb-gly" src="/static/anim/sym-heart.svg" mode="aspectFit" />
+        <image class="sjb-gly" :src="mpSrc('/static/anim/sym-heart.svg')" mode="aspectFit" />
       </view>
     </template>
 
@@ -46,13 +47,13 @@
         <view class="sjb-ring" :style="beatStyle(r, 1.9)" />
       </view>
       <view v-for="(f, i) in duckTrail" :key="'df' + i" class="sjb-slot sjb-stamp" :style="layerStyle(f)">
-        <image class="sjb-gly" :style="glyStyle(f)" src="/static/anim/bg-foot-duck.svg" mode="aspectFit" />
+        <image class="sjb-gly" :style="glyStyle(f)" :src="mpSrc('/static/anim/bg-foot-duck.svg')" mode="aspectFit" />
       </view>
       <view v-for="(b, i) in duckBubbles" :key="'db' + i" class="sjb-slot" :style="slotStyle(b)">
         <view class="sjb-bubble" :style="beatStyle(b)" />
       </view>
       <view v-for="(w, i) in duckFeathers" :key="'dw' + i" class="sjb-slot sjb-drift" :style="layerStyle(w)">
-        <image class="sjb-gly" src="/static/anim/bg-feather.svg" mode="aspectFit" />
+        <image class="sjb-gly" :src="mpSrc('/static/anim/bg-feather.svg')" mode="aspectFit" />
       </view>
     </template>
   </view>
@@ -64,6 +65,8 @@
  * 图形走 /static/anim 下的 SVG 文件（App 端不支持内联 <svg>），动画全部用 CSS keyframes。
  * 每主题约 25 个动画图层，只动 transform 与 opacity，交给 webview 合成层。
  */
+import { mpSrc } from '@/infra/platform.js'
+
 const CYCLE = 12 // 掌印小径一轮的秒数：延迟按序号递增，形成连续行走
 
 export default {
@@ -115,6 +118,8 @@ export default {
     }
   },
   methods: {
+    /* 微信端 SVG→3× PNG 后缀切换（其余端原样返回） */
+    mpSrc,
     /* 纯几何：容器定位与占位尺寸 */
     slotStyle(i) {
       const s = { width: i.size + 'rpx', height: i.size + 'rpx' }

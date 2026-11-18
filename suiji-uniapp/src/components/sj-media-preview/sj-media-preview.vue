@@ -37,8 +37,13 @@
       <cover-view class="smp-count">
         <cover-view class="smp-count-tx">{{ idx + 1 }} / {{ items.length }}</cover-view>
       </cover-view>
-      <cover-view class="smp-close" @click="close">
-        <cover-view class="smp-close-tx">×</cover-view>
+      <cover-view class="smp-actions">
+        <cover-view v-if="showDownload" class="smp-dl" @click="download">
+          <cover-view class="smp-dl-tx">↓</cover-view>
+        </cover-view>
+        <cover-view class="smp-close" @click="close">
+          <cover-view class="smp-close-tx">×</cover-view>
+        </cover-view>
       </cover-view>
     </cover-view>
 
@@ -70,13 +75,16 @@
  * - H5 / 小程序：按钮走 cover-view 模板。
  */
 import { nativeOverlaySupported, createNativeButton } from '@/infra/platform.js'
+import { toast } from '@/utils/ui.js'
 
 export default {
   name: 'SjMediaPreview',
   props: {
     show: { type: Boolean, default: false },
     items: { type: Array, default: () => [] },
-    current: { type: Number, default: 0 }
+    current: { type: Number, default: 0 },
+    /* 是否在关闭按钮左侧显示下载按钮（照片/视频存到本地相册或浏览器下载） */
+    showDownload: { type: Boolean, default: false }
   },
   data() {
     return {
@@ -111,8 +119,10 @@ export default {
     idx() { this.refreshNativeOverlay() }
   },
   created() {
-    /* 原生按钮句柄集合，不纳入响应式：{ close, count, prev, next } */
+    /* 原生按钮句柄集合，不纳入响应式：{ close, dl, count, prev, next } */
     this._native = null
+    /* 下载在途标记，防重复点击（无需驱动视图，不进响应式） */
+    this._dlBusy = false
   },
   mounted() {
     try {
@@ -132,6 +142,91 @@ export default {
     prev() { if (this.idx > 0) this.idx-- },
     next() { if (this.idx < this.items.length - 1) this.idx++ },
     close() { this.$emit('update:show', false) },
+
+    /* 下载当前媒体（照片/视频）：
+     * - App / 小程序：uni.downloadFile 拉字节到临时文件 → save*ToPhotosAlbum 存相册；
+     *   小程序相册写入需 scope.writePhotosAlbum，被拒后引导授权重试一次。
+     * - H5：下载端点 307 跳对象存储直链（跨域），优先 fetch→blob→a[download] 落地；
+     *   对象存储未放行 CORS 时回退新窗口打开，由浏览器接管保存。 */
+    download() {
+      const it = this.currentItem
+      if (!it || !it.url) { toast('内容不存在或已被删除', 2200, 'err'); return }
+      if (this._dlBusy) return
+      this._dlBusy = true
+      const isVideo = it.type === 'video'
+      const dateStr = String(it.occurredAt || '').slice(0, 10).replace(/-/g, '')
+      const filename = '岁记_' + (dateStr || '相册') + (isVideo ? '_视频.mp4' : '_照片.jpg')
+
+      // #ifdef H5
+      this._downloadH5(it.url, filename)
+      return
+      // #endif
+
+      // #ifndef H5
+      toast('正在下载…', 1600, 'ok')
+      uni.downloadFile({
+        url: it.url,
+        success: (res) => {
+          if (res.statusCode !== 200 || !res.tempFilePath) { this._dlDone(); toast('下载失败，请重试', 2200, 'err'); return }
+          this._saveToAlbum(res.tempFilePath, isVideo, false)
+        },
+        fail: () => { this._dlDone(); toast('下载失败，请检查网络', 2200, 'err') }
+      })
+      // #endif
+    },
+
+    /* 临时文件写入系统相册；authErr 时（小程序）拉起授权后重试一次 */
+    _saveToAlbum(filePath, isVideo, retried) {
+      const apiName = isVideo ? 'saveVideoToPhotosAlbum' : 'saveImageToPhotosAlbum'
+      uni[apiName]({
+        filePath,
+        success: () => { this._dlDone(); toast('已保存到相册', 2000, 'ok') },
+        fail: (e) => {
+          const msg = (e && (e.errMsg || e.message)) || ''
+          const authErr = /auth|deny|scope|permission/i.test(msg)
+          // #ifdef MP-WEIXIN
+          if (authErr && !retried) {
+            uni.authorize({
+              scope: 'scope.writePhotosAlbum',
+              success: () => this._saveToAlbum(filePath, isVideo, true),
+              fail: () => { this._dlDone(); toast('需要相册权限，请在「设置」中开启', 2400, 'warn') }
+            })
+            return
+          }
+          // #endif
+          this._dlDone()
+          toast(authErr ? '没有相册权限，请在系统设置中开启' : '保存失败，请重试', 2400, authErr ? 'warn' : 'err')
+        }
+      })
+    },
+
+    /* H5 下载：fetch 取字节转 Blob 触发浏览器下载；跨域被 CORS 拦下则新窗口打开兜底 */
+    _downloadH5(url, filename) {
+      // #ifdef H5
+      toast('正在下载…', 1600, 'ok')
+      fetch(url)
+        .then(r => { if (!r.ok) throw new Error('http ' + r.status); return r.blob() })
+        .then(blob => {
+          const objUrl = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = objUrl
+          a.download = filename
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          setTimeout(() => { try { URL.revokeObjectURL(objUrl) } catch (e) { /* 已失效 */ } }, 3000)
+          this._dlDone()
+          toast('已开始下载', 2000, 'ok')
+        })
+        .catch(() => {
+          try { window.open(url, '_blank') } catch (e) { /* 弹窗被拦截 */ }
+          this._dlDone()
+          toast('已在新窗口打开，请长按/右键保存', 2600, 'warn')
+        })
+      // #endif
+    },
+
+    _dlDone() { this._dlBusy = false },
 
     countText() { return (this.idx + 1) + ' / ' + this.items.length },
 
@@ -155,6 +250,18 @@ export default {
         text: '×', color: '#FFFFFF', fontSize: r(44), bold: true,
         onClick: () => this.close()
       })
+
+      // 下载钮（关闭钮左侧，仅 showDownload 时绘制）
+      if (this.showDownload) {
+        btns.dl = createNativeButton({
+          id: 'smp-dl',
+          rect: { top: closeTop + 'px', left: (closeLeft - r(28) - closeSize) + 'px', width: closeSize + 'px', height: closeSize + 'px' },
+          bg: 'rgba(255,255,255,0.2)',
+          radius: closeSize / 2,
+          text: '↓', color: '#FFFFFF', fontSize: r(28), bold: true,
+          onClick: () => this.download()
+        })
+      }
 
       // 计数（顶部居中，纯展示）
       const countW = r(160)
@@ -312,6 +419,26 @@ export default {
 .smp-close-tx {
   color: #fff;
   font-size: 44rpx;
+  line-height: 1;
+  text-align: center;
+}
+.smp-actions {
+  display: flex;
+  align-items: center;
+  gap: 28rpx;
+}
+.smp-dl {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.smp-dl-tx {
+  color: #fff;
+  font-size: 26rpx;
   line-height: 1;
   text-align: center;
 }

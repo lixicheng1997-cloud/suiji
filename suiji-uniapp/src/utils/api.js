@@ -35,7 +35,8 @@ const cache = {
   vaccines: [],
   journals: [],            // ai_journal 行
   settings: {},            // account/parent/switches/consent/remind/backupFlags/family/ai/trash...
-  trash: []                // 已软删 entry 行（含 deleted_at/deleted_by）
+  trash: [],               // 已软删 entry 行（含 deleted_at/deleted_by）
+  baby_trash: []           // 已软删 baby 行（含 deleted_at）；与 trash 分表，回收站页合并展示
 }
 
 /**
@@ -105,6 +106,7 @@ function resetCache() {
   cache.journals = []
   cache.settings = {}
   cache.trash = []
+  cache.baby_trash = []
   mediaIdx.clear()
   invalidateMediaStream()
 }
@@ -122,6 +124,7 @@ function fillCache(s) {
   cache.journals = Array.isArray(s.journals) ? s.journals : []
   cache.settings = s.settings && typeof s.settings === 'object' ? s.settings : {}
   cache.trash = Array.isArray(s.trash) ? s.trash : []
+  cache.baby_trash = Array.isArray(s.baby_trash) ? s.baby_trash : []
   reindexMedia()
   rebuildMediaStream()
 }
@@ -141,6 +144,7 @@ export function resetFamilyCache() {
   cache.vaccines = []
   cache.journals = []
   cache.trash = []
+  cache.baby_trash = []
   mediaIdx.clear()
   invalidateMediaStream()
 }
@@ -588,6 +592,85 @@ export function updateBaby(id, patch) {
     cache.babies[i] = old
     throw e
   })
+}
+
+/* ---------- 宝宝档案回收站（与记录回收站同口径：软删 30 天可恢复） ---------- */
+
+/**
+ * 软删档案：进回收站保留 30 天；若为 active，服务端自动切到同家庭另一未删档案。
+ * 记录不级联删（恢复档案后记录自动重新可见）。仅家庭创建者可调用。
+ */
+export function deleteBaby(id) {
+  const i = cache.babies.findIndex(b => b.id === id)
+  if (i < 0) return Promise.reject(new Error('宝宝档案不存在'))
+  const row = cache.babies[i]
+  cache.babies.splice(i, 1)
+  cache.baby_trash.unshift(Object.assign({}, row, { deleted_at: now(), deleted_by: cache.user && cache.user.name || '' }))
+  if (cache.active_baby_id === id) {
+    const nxt = cache.babies.find(b => b.is_active)
+    cache.active_baby_id = nxt ? nxt.id : ''
+    invalidateMediaStream()
+  }
+  return http.del('/babies/' + id).catch(err => {
+    /* 失败回滚：档案回到原位 */
+    const j = cache.baby_trash.findIndex(t => t.id === id)
+    if (j > -1) cache.baby_trash.splice(j, 1)
+    cache.babies.splice(Math.min(i, cache.babies.length), 0, row)
+    if (!cache.active_baby_id && row.is_active) cache.active_baby_id = row.id
+    invalidateMediaStream()
+    throw err
+  }).then(r => {
+    /* 服务端可能切换了 active，用响应同步本地 */
+    if (r && r.is_active !== undefined) {
+      const cur = cache.babies.find(b => b.id === id)
+      if (cur) cur.is_active = r.is_active
+    }
+    return { id }
+  })
+}
+
+/** 从回收站恢复档案：记录自动重新可见；若当前无 active 档案，本档案自动接管。 */
+export function restoreBaby(id) {
+  const i = cache.baby_trash.findIndex(t => t.id === id)
+  if (i < 0) return Promise.reject(new Error('回收站中没有该档案'))
+  const t = cache.baby_trash[i]
+  cache.baby_trash.splice(i, 1)
+  cache.babies.push(Object.assign({}, t, { deleted_at: null }))
+  return http.post('/babies/' + id + '/restore').catch(err => {
+    cache.baby_trash.splice(Math.min(i, cache.baby_trash.length), 0, t)
+    const j = cache.babies.findIndex(b => b.id === id)
+    if (j > -1) cache.babies.splice(j, 1)
+    throw err
+  }).then(r => {
+    /* 服务端可能自动接管 active，同步本地 */
+    if (r && r.is_active) {
+      cache.babies.forEach(b => { b.is_active = b.id === id ? 1 : 0 })
+      cache.active_baby_id = id
+      invalidateMediaStream()
+    }
+    return { id }
+  })
+}
+
+/** 彻底删除：级联物理清除该档案下的记录/疫苗/里程碑/日记 + 媒体字节，不可恢复。 */
+export function purgeBaby(id) {
+  const i = cache.baby_trash.findIndex(t => t.id === id)
+  const t = i > -1 ? cache.baby_trash[i] : null
+  if (t) cache.baby_trash.splice(i, 1)
+  return http.del('/babies/' + id + '/purge').catch(err => {
+    if (t) cache.baby_trash.splice(Math.min(i, cache.baby_trash.length), 0, t)
+    throw err
+  }).then(() => ({ id }))
+}
+
+/** 回收站档案列表（展示口径：含 age / 剩余天数） */
+export function getBabyTrash() {
+  return cache.baby_trash
+    .filter(t => trashDaysLeft(t.deleted_at) > 0)
+    .map(t => Object.assign({}, t, {
+      age: ageText(t.birth_date, now(), t.gestational_weeks),
+      days_left: trashDaysLeft(t.deleted_at)
+    }))
 }
 
 /* ---------- 时光轴（分组派生逻辑与旧版一致，数据源=缓存） ---------- */

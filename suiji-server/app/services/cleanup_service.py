@@ -13,9 +13,9 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..domain.dates import day_key, days_between, today_utc
-from ..models import AiJournal, AuditLog, Entry, Notification
+from ..models import AiJournal, AuditLog, Baby, Entry, Notification
 
-from . import account_service, entry_service
+from . import account_service, baby_service, entry_service
 
 logger = logging.getLogger("suiji.cleanup")
 
@@ -33,14 +33,20 @@ def _expired(s: str, keep_days: int) -> bool:
 
 
 def purge_expired(db: Session) -> dict:
-    """清掉全部家庭中过期的回收站记录、未归档日记草稿、操作留痕与到期注销账号，返回各计数。"""
-    counts = {"trash": 0, "drafts": 0, "audit": 0, "accounts": 0}
+    """清掉全部家庭中过期的回收站记录/宝宝档案、未归档日记草稿、操作留痕与到期注销账号，返回各计数。"""
+    counts = {"trash": 0, "babies": 0, "drafts": 0, "audit": 0, "accounts": 0}
 
     # 回收站：软删超 30 天 → 连同 measurement/growth_point/media 与文件字节物理清除
     for e in db.query(Entry).filter(Entry.deleted_at.isnot(None)).all():
         if _expired(e.deleted_at or "", TRASH_KEEP_DAYS):
             entry_service.purge_entry(db, e)
             counts["trash"] += 1
+
+    # 宝宝档案回收站：软删超 30 天 → 级联物理清除该档案下记录/疫苗/里程碑/日记 + 文件字节
+    for b in db.query(Baby).filter(Baby.deleted_at.isnot(None)).all():
+        if _expired(b.deleted_at or "", TRASH_KEEP_DAYS):
+            baby_service.purge_baby(db, b)
+            counts["babies"] += 1
 
     # AI 日记草稿：未归档超 30 天（按 updated_at 计，暂存会续期；归档的永久保留）
     for j in db.query(AiJournal).filter(AiJournal.status == "draft").all():

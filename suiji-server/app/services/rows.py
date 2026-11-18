@@ -37,6 +37,7 @@ def baby_row(b: Baby) -> dict:
         "avatar": b.avatar or "", "allergy": b.allergy or "",
         "is_active": int(b.is_active or 0),
         "created_at": b.created_at, "updated_at": b.updated_at,
+        "deleted_at": b.deleted_at if b.deleted_at else None,
     }
 
 

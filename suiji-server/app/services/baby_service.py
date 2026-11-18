@@ -5,9 +5,12 @@ from functools import lru_cache
 from sqlalchemy.orm import Session
 
 from ..core.config import settings
+from ..core.deps import AuthContext
 from ..domain.dates import add_months_str, utc_now_iso
-from ..models import Baby, MilestoneRecord, Vaccine
+from ..models import AiJournal, Baby, Entry, EntryMedia, FileObject, MilestoneRecord, Vaccine
+from . import entry_service, file_service
 from .ids import gen_id
+from .rows import baby_row
 
 
 @lru_cache(maxsize=2)
@@ -85,3 +88,76 @@ def replan_vaccines(db: Session, baby: Baby, old_birth_date: str = "") -> None:
             done=False, done_date="", org="", lot="", remind=True, remind_lead=7,
             created_at=now, updated_at=now,
         ))
+
+
+# ---------- 软删 / 恢复 / 彻底删除（与 entry 同口径，回收站保留 30 天） ----------
+
+def soft_delete(db: Session, auth: AuthContext, baby: Baby) -> dict:
+    """软删档案：deleted_at 写当前时刻；若为 active，切到同家庭另一未删档案。
+
+    删除档案不级联删记录（记录仍在 entry 表，只是 baby_id 指向已软删档案），
+    恢复档案后记录自动重新可见。彻底删除时才级联物理清除。
+    """
+    baby.deleted_at = utc_now_iso()
+    baby.updated_at = baby.deleted_at
+    if baby.is_active:
+        baby.is_active = 0
+        nxt = (db.query(Baby)
+               .filter(Baby.family_id == auth.family_id, Baby.id != baby.id,
+                       Baby.deleted_at.is_(None))
+               .order_by(Baby.created_at)
+               .first())
+        if nxt:
+            nxt.is_active = 1
+    db.commit()
+    db.refresh(baby)
+    return baby_row(baby)
+
+
+def restore(db: Session, baby: Baby) -> dict:
+    """恢复档案：清 deleted_at；若当前家庭无 active 档案，本档案自动接管。"""
+    baby.deleted_at = None
+    baby.updated_at = utc_now_iso()
+    if not baby.is_active:
+        has_active = (db.query(Baby)
+                      .filter(Baby.family_id == baby.family_id, Baby.deleted_at.is_(None),
+                              Baby.is_active == 1, Baby.id != baby.id)
+                      .first())
+        if not has_active:
+            baby.is_active = 1
+    db.commit()
+    db.refresh(baby)
+    return baby_row(baby)
+
+
+def purge_baby(db: Session, baby: Baby) -> None:
+    """彻底删除：级联物理清除该档案下的记录/疫苗/里程碑/日记 + 媒体与文件字节。
+
+    记录走 entry_service.purge_entry（含 measurement/growth_point/media/文件引用判定）；
+    档案级文件（头像等）单独释放；其余 baby_id 行直接删除。
+    """
+    # 1. 记录（含其挂载的媒体/测量/生长点/文件字节）
+    for e in db.query(Entry).filter(Entry.baby_id == baby.id).all():
+        entry_service.purge_entry(db, e)
+    # 2. 档案级文件（business_type='baby'，头像等）：先查引用再释放字节
+    for fo in db.query(FileObject).filter(FileObject.family_id == baby.family_id,
+                                          FileObject.business_type == "baby",
+                                          FileObject.business_id == baby.id).all():
+        key = fo.storage_key or ""
+        db.delete(fo)
+        db.commit()
+        if key and not file_service.object_in_use(db, baby.family_id, key):
+            try:
+                from ..media.store import get_store
+                get_store().delete(key)
+            except Exception:
+                pass
+    # 3. 孤儿 EntryMedia（entry 已删但 baby_id 残留，理论上不应存在，做兜底）
+    db.query(EntryMedia).filter(EntryMedia.baby_id == baby.id).delete(synchronize_session=False)
+    # 4. 疫苗排期 / 里程碑 / AI 日记
+    db.query(Vaccine).filter(Vaccine.baby_id == baby.id).delete(synchronize_session=False)
+    db.query(MilestoneRecord).filter(MilestoneRecord.baby_id == baby.id).delete(synchronize_session=False)
+    db.query(AiJournal).filter(AiJournal.baby_id == baby.id).delete(synchronize_session=False)
+    # 5. 档案本身
+    db.delete(baby)
+    db.commit()

@@ -119,6 +119,7 @@
 import { createVoiceRecorder } from '@/utils/voiceRecorder.js'
 import { createVoicePlayer } from '@/utils/voicePlayback.js'
 import { palette, withAlpha } from '@/theme/theme.js'
+import { mpSrc } from '@/infra/platform.js'
 
 const SPOKES = 24
 const BASE_BAR = 12
@@ -156,10 +157,10 @@ export default {
   },
   computed: {
     faceCalm() {
-      return '/static/anim/' + (this.__theme === 'duck' ? 'duck' : 'bear') + '-face.svg'
+      return mpSrc('/static/anim/' + (this.__theme === 'duck' ? 'duck' : 'bear') + '-face.svg')
     },
     faceLoud() {
-      return '/static/anim/' + (this.__theme === 'duck' ? 'duck' : 'bear') + '-face-loud.svg'
+      return mpSrc('/static/anim/' + (this.__theme === 'duck' ? 'duck' : 'bear') + '-face-loud.svg')
     },
     ballStyle() {
       /* 振幅只作用于外层球，律动 keyframes 在内层 .jelly，两层 transform 不冲突；

@@ -34,7 +34,9 @@
                     "<uses-permission android:name=\"android.permission.READ_MEDIA_VIDEO\"/>",
                     "<uses-permission android:name=\"android.permission.RECORD_AUDIO\"/>",
                     "<uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\"/>",
-                    "<uses-permission android:name=\"android.permission.VIBRATE\"/>"
+                    "<uses-permission android:name=\"android.permission.VIBRATE\"/>",
+                    "<uses-permission android:name=\"android.permission.WRITE_CALENDAR\"/>",
+                    "<uses-permission android:name=\"android.permission.READ_CALENDAR\"/>"
                 ]
             },
             "ios" : {
@@ -43,7 +45,9 @@
                     "NSCameraUsageDescription" : "用于拍摄宝宝的成长照片并保存到记录中",
                     "NSPhotoLibraryUsageDescription" : "用于从相册选择宝宝的成长照片",
                     "NSPhotoLibraryAddUsageDescription" : "用于把拍摄的照片保存到系统相册",
-                    "NSMicrophoneUsageDescription" : "用于录制宝宝的语音日记并保存到记录中"
+                    "NSMicrophoneUsageDescription" : "用于录制宝宝的语音日记并保存到记录中",
+                    "NSCalendarsUsageDescription" : "用于把疫苗接种计划写入系统日历提醒",
+                    "NSCalendarsFullAccessUsageDescription" : "用于把疫苗接种计划写入系统日历提醒"
                 }
             },
             "sdkConfigs" : {
@@ -100,7 +104,12 @@
             "es6" : true,
             "minified" : true
         },
-        "usingComponents" : true
+        "usingComponents" : true,
+        "permission" : {
+            "scope.calendar" : {
+                "desc" : "用于把疫苗接种计划写入系统日历提醒"
+            }
+        }
     },
     "h5" : {
         "title" : "岁记 · 宝宝成长记录",

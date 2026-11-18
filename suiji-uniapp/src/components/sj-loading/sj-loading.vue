@@ -23,6 +23,8 @@
 </template>
 
 <script>
+import { mpSrc } from '@/infra/platform.js'
+
 /**
  * 岁记 · 全屏加载动画（uview-plus u-overlay 封装，easycom 自动注册 <sj-loading>）
  * 用途：长任务（同步 / 导出 / 生成纪念卡 / 上传）全屏阻断式等待。
@@ -57,7 +59,7 @@ export default {
       return (this.theme || this.__theme || 'bear') === 'duck' ? 'duck' : 'bear'
     },
     resolvedImage() {
-      return this.image || `/static/loading/${this.themeKey}-loading.svg`
+      return mpSrc(this.image || `/static/loading/${this.themeKey}-loading.svg`)
     },
     imgStyle() {
       const s = typeof this.size === 'number' ? this.size + 'rpx' : this.size

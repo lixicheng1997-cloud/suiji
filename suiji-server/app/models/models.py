@@ -71,6 +71,9 @@ class Baby(Base):
     is_active: Mapped[int] = mapped_column(Integer, default=0)   # 0/1
     created_at: Mapped[str] = mapped_column(String(32), default="")
     updated_at: Mapped[str] = mapped_column(String(32), default="")
+    # 软删时间戳（与 entry.deleted_at 同口径：ISO 字符串；None=未删）
+    # 回收站保留 30 天，超期由 cleanup_service 物理清除
+    deleted_at: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
 
 class Entry(Base):

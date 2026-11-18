@@ -346,4 +346,18 @@ export function createNativeButton(o) {
   return null
 }
 
+/* ---------- 小程序 SVG 兜底切换（第 9 项一期） ----------
+ * 微信小程序 <image> 不支持 SVG（Android 真机尤为明显），H5/App 正常。
+ * 本函数把 /static/anim|loading/*.svg 路径切换为同名 3× .png（由
+ * scripts/gen-mp-png.mjs 离线生成），其他端原样返回。
+ * 一期取静态基础帧，动效降级为静图；二期可补 sprite 帧动画。 */
+export function mpSrc(path) {
+  // #ifdef MP-WEIXIN
+  return path.replace(/\.svg$/, '.png')
+  // #endif
+  // #ifndef MP-WEIXIN
+  return path
+  // #endif
+}
+
 

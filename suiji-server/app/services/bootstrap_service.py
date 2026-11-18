@@ -71,7 +71,13 @@ def snapshot(db: Session, auth: AuthContext) -> dict:
             "members": family_members(db, fid),
         },
         "active_baby_id": active.id if active else "",
-        "babies": [baby_row(b) for b in db.query(Baby).filter(Baby.family_id == fid).order_by(Baby.created_at)],
+        # 客户端缓存只含未软删档案；已删档案走 baby_trash 单独通道（回收站页合并展示）
+        "babies": [
+            baby_row(b)
+            for b in db.query(Baby)
+            .filter(Baby.family_id == fid, Baby.deleted_at.is_(None))
+            .order_by(Baby.created_at)
+        ],
         "entries": [
             entry_row(e)
             for e in db.query(Entry)
@@ -97,5 +103,11 @@ def snapshot(db: Session, auth: AuthContext) -> dict:
             for e in db.query(Entry)
             .filter(Entry.family_id == fid, Entry.deleted_at.isnot(None))
             .order_by(Entry.deleted_at.desc())
+        ],
+        "baby_trash": [
+            baby_row(b)
+            for b in db.query(Baby)
+            .filter(Baby.family_id == fid, Baby.deleted_at.isnot(None))
+            .order_by(Baby.deleted_at.desc())
         ],
     }

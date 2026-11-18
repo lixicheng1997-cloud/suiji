@@ -3,6 +3,8 @@
 </template>
 
 <script>
+import { mpSrc } from '@/infra/platform.js'
+
 /**
  * 岁记 · IP 吉祥物（easycom 自动注册 <sj-mascot>）
  * 按主题渲染小熊/小鸭，含呼吸浮动 + 眨眼动画。
@@ -22,7 +24,7 @@ export default {
     },
     src() {
       const t = this.resolvedTheme === 'duck' ? 'duck' : 'bear'
-      return `/static/anim/${t}-face.svg`
+      return mpSrc(`/static/anim/${t}-face.svg`)
     },
     boxStyle() {
       const s = typeof this.size === 'number' ? this.size + 'rpx' : this.size

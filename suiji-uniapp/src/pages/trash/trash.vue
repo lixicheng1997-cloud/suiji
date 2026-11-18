@@ -7,38 +7,39 @@
         <image class="bk-ic" :src="'/static/icons/ctl/' + __theme + '/56/59-ctl-nav-back.png'" />
       </view>
       <text class="pg-title">回收站</text>
-      <text v-if="trash.length" class="tr-count">{{ trash.length }} 项</text>
-      <text v-if="trash.length && isCreator" class="bk-act" hover-class="hover-press" :hover-stay-time="80" @click="clearAll">清空</text>
+      <text v-if="items.length" class="tr-count">{{ items.length }} 项</text>
+      <text v-if="items.length && isCreator" class="bk-act" hover-class="hover-press" :hover-stay-time="80" @click="clearAll">清空</text>
     </view>
 
     <view class="content">
       <!-- 留存规则说明（v2 pg-hint：cream 底虚线边） -->
-      <view class="pg-hint">删除的记录保留 30 天 · 到期自动清理 · 恢复后回到时光轴原位置</view>
+      <view class="pg-hint">删除的记录与宝宝档案保留 30 天 · 到期自动清理 · 恢复后回到原位置</view>
 
       <!-- 空态（sj-empty 封装：primary-soft 圆底大图标 + 主副文案） -->
       <sj-empty
-        v-if="!trash.length"
+        v-if="!items.length"
         icon="27-fn-trash"
         text="回收站是空的"
-        sub="删除的记录会先进入这里"
+        sub="删除的记录与宝宝档案会先进入这里"
       />
 
-      <!-- 回收站列表（v2 rec-card：类别色左竖条 + tint 圆底 png 图标 + 「剩 N 天 · 删除人」副文案 + 恢复/删除文字钮） -->
+      <!-- 回收站列表（v2 rec-card：类别色左竖条 + tint 圆底 png 图标 + 「剩 N 天 · 删除人」副文案 + 恢复/删除文字钮）
+           两类条目：kind='entry' 记录 / kind='baby' 宝宝档案，统一按删除时间倒序合并 -->
       <view v-else>
         <view
           class="rec-card"
-          v-for="t in trash"
+          v-for="t in items"
           :key="t.id"
-          :style="{ '--rc': 'var(--sj-c-' + tokenKey(t.type) + ')', '--rs': 'var(--sj-tint-' + tokenKey(t.type) + ')' }"
+          :style="{ '--rc': 'var(--sj-c-' + tokenKey(t.kind === 'baby' ? 'baby' : t.type) + ')', '--rs': 'var(--sj-tint-' + tokenKey(t.kind === 'baby' ? 'baby' : t.type) + ')' }"
         >
           <view class="rec-ic">
-            <sj-icon :name="TYPES[t.type].png" :size="44" />
+            <sj-icon :name="t.kind === 'baby' ? '29-fn-babies' : TYPES[t.type].png" :size="44" />
           </view>
           <view class="rec-info">
-            <text class="ri-name">{{ typeLabel(t.type) }} · {{ t.title }}</text>
+            <text class="ri-name">{{ t.kind === 'baby' ? '宝宝档案 · ' + t.title : typeLabel(t.type) + ' · ' + t.title }}</text>
             <text class="ri-desc">剩 {{ t.daysLeft }} 天 · <text v-if="t.by">{{ t.by }} </text>删除</text>
           </view>
-          <!-- 首项媒体封面：恢复/彻底删除前先辨认内容 -->
+          <!-- 首项媒体封面：恢复/彻底删除前先辨认内容（仅记录条目） -->
           <view v-if="t.media" class="rec-media">
             <sj-video-cover
               v-if="t.media.type === 'video'"
@@ -47,10 +48,10 @@
             />
             <image v-else class="rec-media-img" :src="t.media.thumb || t.media.url" mode="aspectFill" lazy-load />
           </view>
-          <view v-if="api.canEditEntry(t)" class="tr-btn" hover-class="hover-press" :hover-stay-time="80" @click="restore(t)">
+          <view v-if="canOperate(t)" class="tr-btn" hover-class="hover-press" :hover-stay-time="80" @click="restore(t)">
             <text>恢复</text>
           </view>
-          <view v-if="api.canEditEntry(t)" class="tr-del" hover-class="hover-press" :hover-stay-time="80" @click="purge(t)">
+          <view v-if="canOperate(t)" class="tr-del" hover-class="hover-press" :hover-stay-time="80" @click="purge(t)">
             <text>删除</text>
           </view>
         </view>
@@ -75,6 +76,8 @@ export default {
       api,
       TYPES,
       trash: [],
+      /* 已软删宝宝档案（与 trash 合并展示，按 deleted_at 倒序） */
+      babyTrash: [],
       statusBarHeight: 20
     }
   },
@@ -93,6 +96,12 @@ export default {
     /* 清空回收站为家庭级动作，仅创建者可见入口 */
     isCreator() {
       return api.getFamilyRole() === 'creator'
+    },
+    /* 记录 + 宝宝档案合并展示：统一按删除时间倒序 */
+    items() {
+      const a = this.trash.map(t => Object.assign({ kind: 'entry' }, t))
+      const b = this.babyTrash.map(t => Object.assign({ kind: 'baby' }, t))
+      return a.concat(b).sort((x, y) => (y.deleted_at || '').localeCompare(x.deleted_at || ''))
     }
   },
 
@@ -105,8 +114,10 @@ export default {
       }
     },
 
-    /* 展示层：note 为 mood 的历史别名，归一后才能拼出 v2 类别色/浅底令牌 */
+    /* 展示层：note 为 mood 的历史别名，归一后才能拼出 v2 类别色/浅底令牌；
+       baby 档案无专属类别色，复用 care（暖橙）作左竖条 */
     tokenKey(type) {
+      if (type === 'baby') return 'care'
       return type === 'note' ? 'mood' : type
     },
 
@@ -117,14 +128,28 @@ export default {
 
     refresh() {
       this.trash = api.listTrash()
+      this.babyTrash = api.getBabyTrash().map(t => ({
+        id: t.id, title: t.name, daysLeft: t.days_left,
+        deleted_at: t.deleted_at, by: t.deleted_by || ''
+      }))
     },
 
-    /* 恢复到时光轴原位置 */
+    /* 操作权限：记录沿用 canEditEntry；宝宝档案仅家庭创建者（与后端 require_creator 同口径） */
+    canOperate(t) {
+      return t.kind === 'baby' ? this.isCreator : api.canEditEntry(t)
+    },
+
+    /* 恢复到时光轴原位置 / 恢复宝宝档案 */
     async restore(t) {
       try {
-        await api.restoreEntry(t.id)
+        if (t.kind === 'baby') {
+          await api.restoreBaby(t.id)
+          this.$refs.ntf.show({ type: 'ok', message: '「' + t.title + '」档案已恢复' })
+        } else {
+          await api.restoreEntry(t.id)
+          this.$refs.ntf.show({ type: 'ok', message: '已恢复到时光轴' })
+        }
         this.refresh()
-        this.$refs.ntf.show({ type: 'ok', message: '已恢复到时光轴' })
       } catch (e) {
         ui.error(e, '恢复失败')
       }
@@ -134,13 +159,16 @@ export default {
     purge(t) {
       ui.showModal({
         title: '彻底删除',
-        content: '彻底删除后不可恢复',
+        content: t.kind === 'baby'
+          ? '将永久删除「' + t.title + '」档案及其下全部记录、疫苗排期、里程碑、日记 · 不可恢复'
+          : '彻底删除后不可恢复',
         confirmText: '彻底删除',
         danger: true,
         success: async res => {
           if (!res.confirm) return
           try {
-            await api.purgeEntry(t.id)
+            if (t.kind === 'baby') await api.purgeBaby(t.id)
+            else await api.purgeEntry(t.id)
             this.refresh()
             this.$refs.ntf.show({ type: 'ok', message: '已彻底删除 · 不可恢复' })
           } catch (e) {
@@ -151,18 +179,19 @@ export default {
       })
     },
 
-    /* 一键清空：无数据不响应，有数据二次确认 */
+    /* 一键清空：无数据不响应，有数据二次确认；记录走 clearTrash，宝宝档案逐条 purgeBaby */
     clearAll() {
-      if (!this.trash.length) return
+      if (!this.items.length) return
       ui.showModal({
         title: '清空回收站',
-        content: '将彻底删除 ' + this.trash.length + ' 条记录 · 不可恢复',
+        content: '将彻底删除 ' + this.items.length + ' 项（含记录与宝宝档案） · 不可恢复',
         confirmText: '清空',
         danger: true,
         success: async res => {
           if (!res.confirm) return
           try {
             await api.clearTrash()
+            await Promise.all(this.babyTrash.map(t => api.purgeBaby(t.id).catch(() => {})))
             this.refresh()
             this.$refs.ntf.show({ type: 'ok', message: '回收站已清空' })
           } catch (e) {

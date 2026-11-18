@@ -38,9 +38,12 @@
         <text class="vs-note">共 {{ vaccines.length }} 剂 · 按出生日期排期</text>
       </view>
 
-      <!-- 逾期提示（v2 pg-hint.bad：红系虚线提示条） -->
+      <!-- 逾期提示（v2 pg-hint.bad：红系虚线提示条 + 批量入日历） -->
       <view v-if="overdueCount" class="v-alert">
-        <text>有 {{ overdueCount }} 剂已逾期，建议尽快到接种单位补种。</text>
+        <text class="va-text">有 {{ overdueCount }} 剂已逾期，建议尽快到接种单位补种。</text>
+        <view class="va-acts">
+          <view class="va-btn ghost" hover-class="hover-press" :hover-stay-time="80" @click="onOverdueCal"><text>加入日历</text></view>
+        </view>
       </view>
 
       <!-- 剂次列表（v2 pg-vrow：白底 line 边 28rpx 圆角；本周到龄行高亮，状态胶囊三态） -->
@@ -142,6 +145,7 @@
 <script>
 import * as api from '@/utils/api.js'
 import * as ui from '@/utils/ui.js'
+import { saveTextFile } from '@/infra/platform.js'
 import { now, dayKey } from '@/domain/shared/date.js'
 
 export default {
@@ -319,10 +323,90 @@ export default {
       this.asItems = v.done
         ? ['取消已完成', '修改接种日期', '填写接种机构', '填写批号']
         : ['标记为已完成', '修改预期接种时间']
+            .concat(v.plan_date ? ['加入系统日历'] : [])
             .concat(v.plan_custom ? ['恢复默认接种时间'] : [])
             .concat([v.remind ? '关闭提醒' : '开启提醒'])
       this.asShow = true
     },
+
+    /* 逾期红条「加入日历」：逾期 + 7 天内到龄的剂次一次性写入系统日历 */
+    onOverdueCal() {
+      const list = this.vaccines.filter(v => !v.done && v.plan_date && (v.status === 'overdue' || v.days_left <= 7))
+      if (!list.length) {
+        this.$refs.ntf.show({ type: 'warn', message: '没有带计划日期的待接种剂次，可先「修改预期接种时间」' })
+        return
+      }
+      this.addToCalendar(list)
+    },
+
+    /* ---------- 系统日历 ----------
+     * App/微信小程序走 uni.addPhoneCalendar（逐条系统确认）；
+     * H5 无该 API，降级生成 .ics 文件下载，用户打开即导入日历 */
+    addToCalendar(list) {
+      const vs = list.filter(v => !v.done && v.plan_date)
+      if (!vs.length) {
+        this.$refs.ntf.show({ type: 'warn', message: '该剂次还没有计划日期，可先「修改预期接种时间」' })
+        return
+      }
+      // #ifdef APP-PLUS || MP-WEIXIN
+      let ok = 0
+      vs.reduce((p, v) => p.then(() => this.addOneEvent(v).then(r => { if (r) ok++ })), Promise.resolve())
+        .then(() => {
+          this.$refs.ntf.show({
+            type: ok ? 'ok' : 'warn',
+            message: ok ? '已写入 ' + ok + ' 条系统日历提醒' : '未写入日历（已取消或无权限）'
+          })
+        })
+      // #endif
+      // #ifdef H5
+      saveTextFile('suiji-vaccine.ics', this.buildIcs(vs))
+        .then(() => this.$refs.ntf.show({ type: 'ok', message: '已下载日程文件，打开即可导入系统日历' }))
+        .catch(() => this.$refs.ntf.show({ type: 'warn', message: '日程文件生成失败，请稍后再试' }))
+      // #endif
+    },
+
+    /* 单剂写入系统日历（全天日程，标题带疫苗名）；用户取消/失败返回 false */
+    addOneEvent(v) {
+      return new Promise(resolve => {
+        const start = Math.floor(new Date(v.plan_date.replace(/-/g, '/') + ' 09:00:00').getTime() / 1000)
+        uni.addPhoneCalendar({
+          title: '宝宝疫苗 · ' + v.n + ' ' + v.dose,
+          description: '岁记提醒：' + v.tip + (v.status === 'overdue' ? '（已逾期，尽快补种）' : ''),
+          startTime: start,
+          allDay: true,
+          success: () => resolve(true),
+          fail: () => resolve(false)
+        })
+      })
+    },
+
+    // #ifdef H5
+    /* 生成全天日程 ICS（RFC 5545）：DTSTART/DTEND 用 VALUE=DATE，跨天 +1 */
+    buildIcs(vs) {
+      const d8 = s => s.replace(/-/g, '')
+      const nextD8 = s => {
+        const t = new Date(s.replace(/-/g, '/') + ' 00:00:00')
+        t.setDate(t.getDate() + 1)
+        return t.getFullYear() + String(t.getMonth() + 1).padStart(2, '0') + String(t.getDate()).padStart(2, '0')
+      }
+      const stamp = d8(new Date().toISOString().slice(0, 10)) + 'T000000Z'
+      const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//suiji//vaccine//CN', 'CALSCALE:GREGORIAN']
+      vs.forEach(v => {
+        lines.push(
+          'BEGIN:VEVENT',
+          'UID:vax' + v.id + '@suiji',
+          'DTSTAMP:' + stamp,
+          'DTSTART;VALUE=DATE:' + d8(v.plan_date),
+          'DTEND;VALUE=DATE:' + nextD8(v.plan_date),
+          'SUMMARY:宝宝疫苗 · ' + v.n + ' ' + v.dose,
+          'DESCRIPTION:岁记提醒：' + v.tip + '（' + v.age + '）',
+          'END:VEVENT'
+        )
+      })
+      lines.push('END:VCALENDAR')
+      return lines.join('\r\n')
+    },
+    // #endif
 
     /* 面板选项：先收起弹层，再按文案分发原有操作 */
     async pickAction(pick) {
@@ -331,6 +415,7 @@ export default {
       if (!v) return
       if (pick === '标记为已完成') return this.toggleDone(v)
       if (pick === '修改预期接种时间') return this.openDateSheet(v, 'plan')
+      if (pick === '加入系统日历') return this.addToCalendar([v])
       if (pick === '恢复默认接种时间') {
         try {
           await api.setVaccinePlanDate(v.id, '')
@@ -471,7 +556,7 @@ export default {
 .vs-sep { font-size: 28rpx; color: var(--sj-faint); }
 .vs-note { margin-left: auto; font-size: 20rpx; color: var(--sj-faint); }
 
-/* 逾期提示（v2 pg-hint.bad 红系语义） */
+/* 逾期提示（v2 pg-hint.bad 红系语义 + 快捷动作钮） */
 .v-alert {
   font-size: 23rpx;
   color: #B04A4A;
@@ -482,6 +567,17 @@ export default {
   padding: 16rpx 24rpx;
   margin-bottom: 20rpx;
 }
+.va-acts { display: flex; gap: 16rpx; margin-top: 14rpx; }
+.va-btn {
+  display: flex;
+  align-items: center;
+  padding: 8rpx 28rpx;
+  border-radius: 999rpx;
+  background: #C25B5B;
+}
+.va-btn text { font-size: 22rpx; font-weight: 700; color: #fff; }
+.va-btn.ghost { background: transparent; border: 2rpx solid #E3A9A9; }
+.va-btn.ghost text { color: #B04A4A; }
 
 /* 剂次行（v2 pg-vrow：白底 line 边 28rpx 圆角） */
 .v-row {

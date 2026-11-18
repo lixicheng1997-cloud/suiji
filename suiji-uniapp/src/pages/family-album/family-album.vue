@@ -54,17 +54,6 @@
               <view class="cell-play"><view class="tri" /></view>
               <text v-if="m.duration" class="cell-dur">{{ fmtDur(m.duration) }}</text>
             </template>
-
-            <!-- 下载按钮（右上角）：照片/视频存到本地相册或浏览器下载，stop 阻止冒泡到预览 -->
-            <view
-              class="cell-dl"
-              :class="{ 'cell-dl-on': dlBusy[m.id] }"
-              hover-class="hover-press"
-              :hover-stay-time="80"
-              @click.stop="downloadMedia(m)"
-            >
-              <image class="cell-dl-ic" src="/static/icons/download.svg" />
-            </view>
           </view>
         </view>
       </view>
@@ -81,13 +70,12 @@
     <sj-ui-host />
 
     <!-- 全屏媒体预览（图片 / 视频共用，左右滑动切换） -->
-    <sj-media-preview v-model:show="previewShow" :items="previewItems" :current="previewCurrent" />
+    <sj-media-preview v-model:show="previewShow" :items="previewItems" :current="previewCurrent" :show-download="true" />
   </view>
 </template>
 
 <script>
 import * as api from '@/utils/api.js'
-import { toast } from '@/utils/ui.js'
 
 /* 类型分段：all 全部 / image 照片 / video 视频 */
 const TABS = [
@@ -113,9 +101,7 @@ export default {
       /* 全屏媒体预览 */
       previewShow: false,
       previewItems: [],
-      previewCurrent: 0,
-      /* 下载在途标记：m.id -> true，按钮置灰防重复点击 */
-      dlBusy: {}
+      previewCurrent: 0
     }
   },
 
@@ -202,99 +188,10 @@ export default {
       const list = this.filtered
       if (!list.length) return
       this.previewItems = list.map(x => x.type === 'video'
-        ? { type: 'video', url: x.url, thumb: x.thumb }
-        : { type: 'image', url: x.url })
+        ? { type: 'video', url: x.url, thumb: x.thumb, occurredAt: x.occurredAt }
+        : { type: 'image', url: x.url, occurredAt: x.occurredAt })
       this.previewCurrent = Math.max(0, list.indexOf(m))
       this.previewShow = true
-    },
-
-    /* 下载照片/视频：
-     * - App / 小程序：uni.downloadFile 拉字节到临时文件 → save*ToPhotosAlbum 存相册；
-     *   小程序相册写入需 scope.writePhotosAlbum，被拒后引导授权重试一次。
-     * - H5：下载端点 307 跳对象存储直链（跨域），优先 fetch→blob→a[download] 落地；
-     *   对象存储未放行 CORS 时回退新窗口打开，由浏览器接管保存。 */
-    downloadMedia(m) {
-      if (!m || !m.url) { toast('内容不存在或已被删除', 2200, 'err'); return }
-      if (this.dlBusy[m.id]) return
-      this.dlBusy[m.id] = true
-      const isVideo = m.type === 'video'
-      const dateStr = String(m.occurredAt || '').slice(0, 10).replace(/-/g, '')
-      const filename = '岁记_' + (dateStr || '相册') + (isVideo ? '_视频.mp4' : '_照片.jpg')
-
-      // #ifdef H5
-      this._downloadH5(m.url, filename, m.id)
-      return
-      // #endif
-
-      // #ifndef H5
-      toast('正在下载…', 1600, 'ok')
-      uni.downloadFile({
-        url: m.url,
-        success: (res) => {
-          if (res.statusCode !== 200 || !res.tempFilePath) {
-            this._dlDone(m.id); toast('下载失败，请重试', 2200, 'err'); return
-          }
-          this._saveToAlbum(res.tempFilePath, isVideo, m.id, false)
-        },
-        fail: () => { this._dlDone(m.id); toast('下载失败，请检查网络', 2200, 'err') }
-      })
-      // #endif
-    },
-
-    /* 临时文件写入系统相册；authErr 时（小程序）拉起授权后重试一次 */
-    _saveToAlbum(filePath, isVideo, id, retried) {
-      const apiName = isVideo ? 'saveVideoToPhotosAlbum' : 'saveImageToPhotosAlbum'
-      uni[apiName]({
-        filePath,
-        success: () => { this._dlDone(id); toast('已保存到相册', 2000, 'ok') },
-        fail: (e) => {
-          const msg = (e && (e.errMsg || e.message)) || ''
-          const authErr = /auth|deny|scope|permission/i.test(msg)
-          // #ifdef MP-WEIXIN
-          if (authErr && !retried) {
-            uni.authorize({
-              scope: 'scope.writePhotosAlbum',
-              success: () => this._saveToAlbum(filePath, isVideo, id, true),
-              fail: () => { this._dlDone(id); toast('需要相册权限，请在「设置」中开启', 2400, 'warn') }
-            })
-            return
-          }
-          // #endif
-          this._dlDone(id)
-          toast(authErr ? '没有相册权限，请在系统设置中开启' : '保存失败，请重试', 2400, authErr ? 'warn' : 'err')
-        }
-      })
-    },
-
-    /* H5 下载：fetch 取字节转 Blob 触发浏览器下载；跨域被 CORS 拦下则新窗口打开兜底 */
-    _downloadH5(url, filename, id) {
-      // #ifdef H5
-      toast('正在下载…', 1600, 'ok')
-      fetch(url)
-        .then(r => { if (!r.ok) throw new Error('http ' + r.status); return r.blob() })
-        .then(blob => {
-          const objUrl = URL.createObjectURL(blob)
-          const a = document.createElement('a')
-          a.href = objUrl
-          a.download = filename
-          document.body.appendChild(a)
-          a.click()
-          document.body.removeChild(a)
-          setTimeout(() => { try { URL.revokeObjectURL(objUrl) } catch (e) { /* 已失效 */ } }, 3000)
-          this._dlDone(id)
-          toast('已开始下载', 2000, 'ok')
-        })
-        .catch(() => {
-          try { window.open(url, '_blank') } catch (e) { /* 弹窗被拦截 */ }
-          this._dlDone(id)
-          toast('已在新窗口打开，请长按/右键保存', 2600, 'warn')
-        })
-      // #endif
-    },
-
-    /* 清除某项的下载在途标记 */
-    _dlDone(id) {
-      if (this.dlBusy[id]) delete this.dlBusy[id]
     },
 
     /* 视频时长 → mm:ss（超 1 小时 h:mm:ss） */
@@ -467,23 +364,4 @@ export default {
   font-size: 19rpx;
   font-weight: 700;
 }
-
-/* 下载按钮：右上角圆形浅底，压在缩略图/视频遮罩之上 */
-.cell-dl {
-  position: absolute;
-  right: 10rpx;
-  top: 10rpx;
-  width: 52rpx;
-  height: 52rpx;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.9);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 3;
-  box-shadow: var(--sj-sh-sm);
-}
-.cell-dl:active { transform: scale(0.9); }
-.cell-dl-ic { width: 30rpx; height: 30rpx; }
-.cell-dl-on { opacity: 0.45; }
 </style>
