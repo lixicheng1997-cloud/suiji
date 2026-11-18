@@ -6,11 +6,19 @@
 -->
 <template>
   <view class="sj-tabbar">
-    <view class="stb" hover-class="stb-hover" :hover-stay-time="120" v-for="t in tabs" :key="t.key" @click="go(t)">
-      <view class="stb-ic" :class="{ on: t.key === active }">
+    <view
+      class="stb"
+      :class="{ 'stb-pending': t.key === pending }"
+      hover-class="stb-hover"
+      :hover-stay-time="120"
+      v-for="t in tabs"
+      :key="t.key"
+      @click="go(t)"
+    >
+      <view class="stb-ic" :class="{ on: t.key === active || t.key === pending }">
         <sj-icon :name="t.png" :size="68" />
       </view>
-      <text class="stb-tx" :class="{ on: t.key === active }">{{ t.label }}</text>
+      <text class="stb-tx" :class="{ on: t.key === active || t.key === pending }">{{ t.label }}</text>
     </view>
   </view>
 </template>
@@ -31,17 +39,38 @@ export default {
     active: { type: String, required: true }
   },
   data() {
-    return { tabs: TABS }
+    return { tabs: TABS, pending: '' }
+  },
+  watch: {
+    /* 目标页已渲染（本页 active 落位时另一页接管高亮）或切回本页：清掉乐观高亮 */
+    active() { this.clearPending() }
+  },
+  beforeUnmount() {
+    this.clearPending()
   },
   mounted() {
     /* 隐藏原生 tabBar，保留 pages.json 配置以维持 tab 页路由语义 */
     uni.hideTabBar({ animation: false, fail: () => {} })
   },
   methods: {
+    /* 微信端 switchTab 要切 webview + 目标页首帧渲染，空窗数百毫秒；
+     * 点按瞬间乐观高亮目标页签，空窗期内不再呈现「点了没反应」 */
     go(t) {
-      if (t.key !== this.active) {
-        uni.switchTab({ url: t.url })
-      }
+      if (t.key === this.active || t.key === this.pending) return
+      this.pending = t.key
+      /* 兜底清除：切走后本页 webview 隐藏、active 不会变化，靠超时归位；
+         若切 tab 失败留在本页，同样由超时恢复正确高亮 */
+      clearTimeout(this._pt)
+      this._pt = setTimeout(() => { this.pending = '' }, 1200)
+      uni.switchTab({
+        url: t.url,
+        fail: () => this.clearPending()
+      })
+    },
+    clearPending() {
+      clearTimeout(this._pt)
+      this._pt = null
+      this.pending = ''
     }
   }
 }
@@ -81,6 +110,8 @@ export default {
   transition: transform 0.3s cubic-bezier(.34,1.56,.64,1);
 }
 .stb-hover .stb-ic { transform: translateY(-3px); }
+/* 乐观高亮期间压暗非目标页签文字，强化「已接收点击」的反馈 */
+.stb-pending .stb-tx { color: var(--sj-sub); }
 /* 选中态：静态放大，无回弹/上下浮动动画 */
 .stb-ic.on { transform: scale(1.18); }
 .stb-tx {
