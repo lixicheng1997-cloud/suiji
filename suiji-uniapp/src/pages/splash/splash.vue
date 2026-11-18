@@ -11,8 +11,8 @@
       <view class="drop">
         <image class="m-img" :src="dropSrc" mode="aspectFit" />
       </view>
-      <!-- ② 涟漪 -->
-      <view class="ripple"><i></i><i></i><i></i></view>
+      <!-- ② 涟漪（小程序端 <i> 会被编译成 <view> 且元素选择器 i 匹配不到，必须用类选择器） -->
+      <view class="ripple"><view class="ri ri1"></view><view class="ri ri2"></view><view class="ri ri3"></view></view>
 
       <!-- ③ 吉祥物弹出（呼吸/眨眼动画内置于 face svg 文件） -->
       <view class="mascot">
@@ -21,14 +21,14 @@
 
       <!-- ⑤ 粒子绽放（静态 svg 文件；位移量用 px，内联 style 的 rpx 不会被编译转换） -->
       <view class="fx">
-        <i style="--tx:-50px;--ty:-37px;--rot:-18deg;--sc:1;--dl:0s;width:24px;height:24px"><image class="sym" :src="mpSrc('/static/anim/sym-heart.svg')" /></i>
-        <i style="--tx:52px;--ty:-39px;--rot:14deg;--sc:1;--dl:.05s;width:22px;height:22px"><image class="sym" :src="mpSrc('/static/anim/sym-star.svg')" /></i>
-        <i style="--tx:-64px;--ty:-4px;--rot:0deg;--sc:.8;--dl:.1s;width:20px;height:20px"><image class="sym" :src="mpSrc('/static/anim/sym-paw.svg')" /></i>
-        <i style="--tx:63px;--ty:-2px;--rot:20deg;--sc:.9;--dl:.15s;width:22px;height:22px"><image class="sym" :src="mpSrc('/static/anim/sym-paw.svg')" /></i>
-        <i style="--tx:-39px;--ty:26px;--rot:10deg;--sc:.7;--dl:.2s;width:20px;height:20px"><image class="sym" :src="mpSrc('/static/anim/sym-star.svg')" /></i>
-        <i style="--tx:0px;--ty:-64px;--rot:0deg;--sc:1;--dl:.08s;width:20px;height:20px"><image class="sym" :src="mpSrc('/static/anim/sym-heart.svg')" /></i>
-        <i style="--tx:-59px;--ty:22px;--rot:-8deg;--sc:.65;--dl:.24s;width:16px;height:16px"><image class="sym" :src="mpSrc('/static/anim/sym-heart.svg')" /></i>
-        <i style="--tx:59px;--ty:24px;--rot:8deg;--sc:.7;--dl:.26s;width:16px;height:16px"><image class="sym" :src="mpSrc('/static/anim/sym-star.svg')" /></i>
+        <view class="p" style="--tx:-50px;--ty:-37px;--rot:-18deg;--sc:1;--dl:0s;width:24px;height:24px"><image class="sym" :src="mpSrc('/static/anim/sym-heart.svg')" /></view>
+        <view class="p" style="--tx:52px;--ty:-39px;--rot:14deg;--sc:1;--dl:.05s;width:22px;height:22px"><image class="sym" :src="mpSrc('/static/anim/sym-star.svg')" /></view>
+        <view class="p" style="--tx:-64px;--ty:-4px;--rot:0deg;--sc:.8;--dl:.1s;width:20px;height:20px"><image class="sym" :src="mpSrc('/static/anim/sym-paw.svg')" /></view>
+        <view class="p" style="--tx:63px;--ty:-2px;--rot:20deg;--sc:.9;--dl:.15s;width:22px;height:22px"><image class="sym" :src="mpSrc('/static/anim/sym-paw.svg')" /></view>
+        <view class="p" style="--tx:-39px;--ty:26px;--rot:10deg;--sc:.7;--dl:.2s;width:20px;height:20px"><image class="sym" :src="mpSrc('/static/anim/sym-star.svg')" /></view>
+        <view class="p" style="--tx:0px;--ty:-64px;--rot:0deg;--sc:1;--dl:.08s;width:20px;height:20px"><image class="sym" :src="mpSrc('/static/anim/sym-heart.svg')" /></view>
+        <view class="p" style="--tx:-59px;--ty:22px;--rot:-8deg;--sc:.65;--dl:.24s;width:16px;height:16px"><image class="sym" :src="mpSrc('/static/anim/sym-heart.svg')" /></view>
+        <view class="p" style="--tx:59px;--ty:24px;--rot:8deg;--sc:.7;--dl:.26s;width:16px;height:16px"><image class="sym" :src="mpSrc('/static/anim/sym-star.svg')" /></view>
       </view>
 
       <!-- ④ 品牌落版 -->
@@ -38,10 +38,6 @@
       </view>
       <text class="tagline">记录成长的每一岁</text>
 
-      <!-- ⑥ 采集加载（仅文字提示） -->
-      <view class="loader">
-        <text class="lt">正在为你收集今天的成长…</text>
-      </view>
     </view>
 
     <sj-notify ref="ntf" />
@@ -123,7 +119,7 @@ export default {
     playAnim() {
       const sched = [
         [0, 'ph-drop'], [150, 'ph-ripple'], [240, 'ph-bear'], [600, 'ph-blink'],
-        [660, 'ph-logo'], [860, 'ph-burst'], [950, 'ph-load'], [1300, 'ph-exit']
+        [660, 'ph-logo'], [860, 'ph-burst'], [1300, 'ph-exit']
       ]
       sched.forEach(([t, c]) => {
         this.animTimers.push(setTimeout(() => { this.phases.push(c) }, t))
@@ -206,11 +202,10 @@ export default {
 
 /* ② 涟漪 */
 .ripple { position: absolute; left: 50%; top: calc(30% + 34rpx); }
-.ripple i { position: absolute; border: 6rpx solid var(--sj-primary); border-radius: 50%; opacity: 0; transform: translate(-50%,-50%) scale(.1); }
-.ripple i:nth-child(1), .ripple i:nth-child(2), .ripple i:nth-child(3) { width: 240rpx; height: 240rpx; }
-.ph-ripple .ripple i { animation: sp-rip .8s cubic-bezier(.22,.8,.3,1) forwards; }
-.ph-ripple .ripple i:nth-child(2) { animation-delay: .14s; }
-.ph-ripple .ripple i:nth-child(3) { animation-delay: .28s; }
+.ripple .ri { position: absolute; width: 240rpx; height: 240rpx; border: 6rpx solid var(--sj-primary); border-radius: 50%; opacity: 0; transform: translate(-50%,-50%) scale(.1); }
+.ph-ripple .ripple .ri { animation: sp-rip .8s cubic-bezier(.22,.8,.3,1) forwards; }
+.ph-ripple .ripple .ri2 { animation-delay: .14s; }
+.ph-ripple .ripple .ri3 { animation-delay: .28s; }
 @keyframes sp-rip { 0%{ transform: translate(-50%,-50%) scale(.12); opacity:.85;} 100%{ transform: translate(-50%,-50%) scale(1.7); opacity:0;} }
 
 /* ③ 吉祥物 */
@@ -232,30 +227,25 @@ export default {
 
 /* ⑤ 粒子 */
 .fx { position: absolute; left: 50%; top: 42%; width: 0; height: 0; }
-.fx i { position: absolute; left: 0; top: 0; opacity: 0; transform: translate(-50%,-50%) scale(.2); }
+.fx .p { position: absolute; left: 0; top: 0; opacity: 0; transform: translate(-50%,-50%) scale(.2); }
 .fx .sym { display: block; width: 100%; height: 100%; }
-.ph-burst .fx i { animation: sp-burst .95s cubic-bezier(.22,.8,.3,1) var(--dl) forwards; }
+.ph-burst .fx .p { animation: sp-burst .95s cubic-bezier(.22,.8,.3,1) var(--dl) forwards; }
 @keyframes sp-burst {
   0% { opacity:0; transform: translate(-50%,-50%) scale(.2) rotate(0); }
   18% { opacity:1; }
   100% { opacity:0; transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(var(--sc)) rotate(var(--rot)); }
 }
 
-/* ⑥ 采集加载 */
-.loader { position: absolute; left: 50%; top: 76%; transform: translate(-50%,-50%); display: flex; flex-direction: column; align-items: center; gap: 8rpx; opacity: 0; }
-.loader .lt { font-size: 23rpx; color: var(--sj-faint); letter-spacing: 4rpx; }
-.ph-load .loader { animation: sp-fadeUp .4s cubic-bezier(.22,.8,.3,1) both; }
-
 /* ⑦ 收束 → 交接 */
 .ph-exit .mascot { animation: sp-zoomOut .55s cubic-bezier(.22,.8,.3,1) forwards; }
 @keyframes sp-zoomOut { 0%{ opacity:1; transform: translate(-50%,-50%) scale(1);} 100%{ opacity:0; transform: translate(-50%,-56%) scale(1.9);} }
-.ph-exit .logo, .ph-exit .tagline, .ph-exit .loader, .ph-exit .ripple { animation: sp-fadeOut .4s ease both; }
+.ph-exit .logo, .ph-exit .tagline, .ph-exit .ripple { animation: sp-fadeOut .4s ease both; }
 @keyframes sp-fadeOut { to { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .ph-drop .drop, .ph-ripple .ripple i, .ph-bear .mascot,
+  .ph-drop .drop, .ph-ripple .ripple .ri, .ph-bear .mascot,
   .ph-logo .lg1, .ph-logo .lg2,
-  .ph-logo .tagline, .ph-burst .fx i, .ph-load .loader,
+  .ph-logo .tagline, .ph-burst .fx .p,
   .ph-exit .mascot { animation: none; }
   .ph-bear .mascot, .ph-logo .lg { opacity: 1; transform: translate(-50%,-50%) scale(1); }
 }
