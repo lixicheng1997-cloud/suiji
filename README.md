@@ -42,7 +42,6 @@ suiji/
 ├── suiji-uniapp/            # uni-app 客户端（Vue3 时光轴首页）
 ├── suiji-icons/             # 图标库与生成脚本
 ├── suiji-page-backgrounds/  # 页面背景资源
-├── suiji-sound-design/      # 音效资源
 └── suiji-website-v4/        # 官网源码
 ```
 

@@ -178,7 +178,7 @@ server {
         add_header Content-Security-Policy   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'self'" always;
     }
 
-    # H5 静态素材（图标 / 动画 / 音效 / tabbar，长缓存 7 天）
+    # H5 静态素材（图标 / 动画 / tabbar，长缓存 7 天）
     location /static/ {
         alias /usr/share/nginx/html/suiji-web/static/;
         expires 7d;
