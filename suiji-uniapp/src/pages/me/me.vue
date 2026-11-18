@@ -240,10 +240,6 @@ export default {
         this.refresh()
         return
       }
-      if (r.act === 'elder') {
-        uni.navigateTo({ url: '/pages/elder/elder' })
-        return
-      }
       if (r.act === 'aiConfig') return this.doAiConfig()
       if (r.act === 'server') return this.doServer()
       if (r.act === 'logout') return this.doLogout()

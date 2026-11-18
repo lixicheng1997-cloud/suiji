@@ -30,7 +30,7 @@
  * 观感：暖可可深遮罩 rgba(74,50,38,.55) + 白 94% 毛玻璃面板（--sj-r-lg / --sj-sh-lg）；
  * 遮罩 240ms 淡入，面板 320ms 弹性入场（退场不缩放，避免收尾抖动）；
  * 小熊 / 小鸭同 viewBox 同时长，主题切换零重排。
- * 降级：长辈模式或低端机可传 image="/static/loading/{theme}-loading-dots.svg"（连跳变体，重绘面积更小）。
+ * 降级：低端机可传 image="/static/loading/{theme}-loading-dots.svg"（连跳变体，重绘面积更小）。
  * 用法：<sj-loading :show="busy" text="正在同步云端…" />
  *       <sj-loading :show="up" text="正在上传照片…" :sub="pct + '% · 保持应用打开'" :percent="pct" />
  */

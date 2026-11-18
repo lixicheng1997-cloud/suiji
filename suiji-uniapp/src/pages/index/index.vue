@@ -401,7 +401,7 @@ export default {
       if (!text) return ''
       return w.temp === null || w.temp === undefined || w.temp === '' ? text : text + ' ' + w.temp + '℃'
     },
-    /* 顶部统计胶囊：共享 stats.js 文案只在主页做俏皮化映射，不影响 elder 页复用 */
+    /* 顶部统计胶囊：共享 stats.js 文案只在主页做俏皮化映射 */
     chipStats() {
       const map = { feeding: '今日吃奶', sleep: '近一天觉觉', milestone: '今日小记' }
       return this.todayStats.map(s => ({ ...s, label: map[s.type] || s.label }))

@@ -47,7 +47,7 @@
 { "id":"usr_xxx", "name":"妈妈", "role":"creator|member", "color":"#FF6B8B", "avatar":"/api/files/xxx/download", "relation":"妈妈" }
 // setting（每用户一个 JSON 对象，键与旧 db.getSetting 一致）
 { "account":{...}, "parent":{...}, "switches":{...}, "consent":{...}, "remind":{...},
-  "elder":{...}, "backupFlags":{...}, "family":{...}, "ai":{...}, "trash":[...] }
+  "backupFlags":{...}, "family":{...}, "ai":{...}, "trash":[...] }
 ```
 
 ## 1.5 传输加密（敏感接口端到端加密）
@@ -321,7 +321,7 @@ mp3/m4a/aac/wav/ogg/flac、pdf/txt/csv/json/zip 之一；并按 magic bytes 嗅�
 | 方法 路径 | 说明 |
 | --- | --- |
 | GET `/settings` | 整个 settings JSON |
-| PUT `/settings` | `{key, value}` 单键写入（account/parent/switches/consent/remind/elder/backupFlags/family/trash 等） |
+| PUT `/settings` | `{key, value}` 单键写入（account/parent/switches/consent/remind/backupFlags/family/trash 等） |
 
 ## 11. AI 日记 `/journals`
 

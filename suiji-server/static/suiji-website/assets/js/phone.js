@@ -366,11 +366,6 @@ const PHONE = (() => {
     toast('已切换到 ' + item.dataset.baby + ' 的档案');
   }));
 
-  /* ---------- 机内长辈模式 ---------- */
-  $('#elderEntry').addEventListener('click', () => $('#elderMode').classList.add('show'));
-  $('#elderExit').addEventListener('click', () => $('#elderMode').classList.remove('show'));
-  $('#elderCall').addEventListener('click', () => toast('正在呼叫妈妈…（演示）'));
-
   /* ---------- P09 动态表单 / 胶囊 / 开关 ---------- */
   $$('.pg-type').forEach(t => t.addEventListener('click', () => {
     $$('.pg-type').forEach(x => x.classList.remove('on'));

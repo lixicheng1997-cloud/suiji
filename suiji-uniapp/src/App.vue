@@ -169,7 +169,7 @@ page {
  * （.as-item / .as-cancel）不在列内，保持不透明以免叠玻璃发浑或压不住底下内容。 */
 .rec-card, .rec-milestone, .grow-card, .entry-card, .info-card, .now-card, .member-card, .fam-card,
 .set-group, .uk-group, .audit-row, .nt-item, .v-row, .v-summary, .vp-item,
-.pg-vrow, .elder-row, .tr-btn, .d-row, .baby-chip, .ds-chip, .dr-count, .ms-badge,
+.pg-vrow, .tr-btn, .d-row, .baby-chip, .ds-chip, .dr-count, .ms-badge,
 .rchip, .metric-tab, .nt-tabs, .bk, .back-btn, .bk-exit, .bk-skip, .bk-hud,
 .me-avatar, .mc-photo, .album-img, .cmp-slot, .cmp-thumb, .sj-cell, .sj-nb--plain, .mem-card,
 .sj-vs {

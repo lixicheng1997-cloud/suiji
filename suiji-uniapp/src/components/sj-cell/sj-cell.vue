@@ -42,7 +42,7 @@
  * 点击：hover 按压缩放 + emit click；url 传入时自动 uni.navigateTo（isTab 走 switchTab）。
  * 色值全部 var(--sj-*)，随 bear/duck 换肤。
  * 用法：<sj-cell icon="29-fn-babies" title="宝宝档案" value="安安 · 8月12天" url="/pages/baby/baby" />
- *       <sj-cell icon="30-fn-elder" title="长辈模式" showSwitch v-model:checked="elderOn" />
+ *       <sj-cell icon="21-fn-remind" title="提醒通知" showSwitch v-model:checked="notifyOn" />
  *       <sj-cell icon="27-fn-trash" title="删除全部本地数据" value="演示二次确认" danger arrow />
  */
 export default {

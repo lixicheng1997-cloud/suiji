@@ -338,12 +338,6 @@ code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85em;backgroun
 .mini-confetti i:nth-child(3){background:var(--c-sleep)}
 .mini-confetti i:nth-child(4){background:var(--c-measure)}
 .mini-confetti i:nth-child(5){background:var(--c-mood)}
-.mini-elder{padding:22px 16px;gap:12px}
-.mini-elder h4{font-family:var(--font-display);font-size:21px;font-weight:900}
-.elder-row{display:flex;align-items:center;gap:12px;background:#fff;border:2px solid var(--line);border-radius:16px;padding:12px;font-size:16px;font-weight:800}
-.elder-row img{width:38px;height:38px}
-.elder-row b{margin-left:auto;color:var(--ok);font-size:15px}
-.elder-row b.elder-warn{color:var(--bad)}
 
 /* ---------- 03 动效格 ---------- */
 .motion-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
@@ -413,7 +407,7 @@ code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85em;backgroun
    ================================================================ */
 
 /* ---------- 点按涟漪（全 App 通用） ---------- */
-.rec-card,.tile,.entry-card,.member-card,.set-row,.ts-btn,.baby-chip,.sync-chip,.mo-ripple,.cel-main,.cel-ghost,.elder-call,.ms-chip,.feed-item{position:relative;overflow:hidden}
+.rec-card,.tile,.entry-card,.member-card,.set-row,.ts-btn,.baby-chip,.sync-chip,.mo-ripple,.cel-main,.cel-ghost,.ms-chip,.feed-item{position:relative;overflow:hidden}
 .rip{position:absolute;border-radius:50%;pointer-events:none;background:radial-gradient(circle,rgba(224,126,51,.30),rgba(224,126,51,0) 72%);transform:scale(0);animation:ripAnim .6s ease-out forwards}
 @keyframes ripAnim{to{transform:scale(1);opacity:0}}
 
@@ -472,23 +466,6 @@ code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85em;backgroun
 .celebrate .confetti-bit{animation-name:fallCel}
 @keyframes fallCel{0%{transform:translateY(-10px) rotate(0);opacity:1}100%{transform:translateY(820px) rotate(680deg);opacity:0}}
 
-/* ---------- 机内长辈模式 ---------- */
-.elder-mode{position:absolute;inset:0;z-index:55;background:#FFF6EA;display:none;flex-direction:column;gap:14px;padding:58px 20px 26px;overflow-y:auto}
-.elder-mode.show{display:flex;animation:scrIn .4s var(--smooth)}
-.elder-mode h3{font-family:var(--font-display);font-size:24px;font-weight:900;margin:4px 0 6px}
-.elder-exit{align-self:flex-start;display:flex;align-items:center;gap:4px;background:#fff;border:2px solid var(--line);border-radius:var(--r-pill);padding:8px 16px;font-size:15px;font-weight:800;color:var(--sub);transition:transform .2s var(--spring)}
-.elder-exit:hover{transform:scale(1.04)}
-.elder-mode .elder-row{font-size:19px;padding:16px;border-width:2.5px}
-.elder-mode .elder-row img{width:46px;height:46px}
-.elder-mode .elder-row b{font-size:18px}
-.elder-mode .elder-row:nth-child(2){animation:rise .5s var(--smooth) .05s backwards}
-.elder-mode .elder-row:nth-child(3){animation:rise .5s var(--smooth) .12s backwards}
-.elder-mode .elder-row:nth-child(4){animation:rise .5s var(--smooth) .19s backwards}
-.elder-mode .elder-row:nth-child(5){animation:rise .5s var(--smooth) .26s backwards}
-.elder-call{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;background:var(--ok);color:#fff;font-size:18px;font-weight:900;border-radius:20px;padding:16px;box-shadow:0 8px 20px rgba(95,192,140,.4);transition:transform .2s var(--spring)}
-.elder-call:hover{transform:scale(1.03)}
-.elder-call:active{transform:scale(.96)}
-.elder-call .ic{width:22px;height:22px}
 .toast{z-index:70}
 
 /* ---------- 爱心粒子 ---------- */

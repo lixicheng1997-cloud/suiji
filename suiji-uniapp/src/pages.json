@@ -290,12 +290,6 @@
         "backgroundColorTop": "#FFF6F0",
         "backgroundColorBottom": "#FFF6F0"
       }
-    },
-    {
-      "path": "pages/elder/elder",
-      "style": {
-        "navigationStyle": "custom"
-      }
     }
   ],
   "globalStyle": {
