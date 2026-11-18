@@ -97,6 +97,15 @@
                   <text v-if="e.creator || e.creator_id">· {{ whoOf(e) }}</text>
                 </block>
               </view>
+              <!-- 心情情绪胶囊行：情绪名文字（moods 由 api toViewItem 派生，兼容旧数据） -->
+              <view v-if="e.type === 'mood' && e.moods.length" class="rec-moods">
+                <text
+                  v-for="mn in e.moods"
+                  :key="mn"
+                  class="rm-chip"
+                  :style="{ background: moodOf(mn).tint, color: moodOf(mn).accent }"
+                >{{ mn }}</text>
+              </view>
               <!-- 语音：紧凑播放条替代原装饰波形（点击只播放，不冒泡进详情） -->
               <view v-if="e.voice" class="rec-voice">
                 <sj-voice-play
@@ -273,7 +282,7 @@
 </template>
 
 <script>
-import { TYPES, BADGES } from '@/utils/mock.js'
+import { TYPES, BADGES, MOODS } from '@/utils/mock.js'
 import * as api from '@/utils/api.js'
 import * as ui from '@/utils/ui.js'
 import tabSwipe, { pullRefresh } from '@/utils/tabSwipe.js'
@@ -549,6 +558,10 @@ export default {
     /* 记录人展示：优先与宝宝关系 → 昵称 → 登录账号；按 creator_id 解析成员 */
     whoOf(e) {
       return api.creatorLabel(e)
+    },
+    /* 情绪名 → MOODS 元数据（胶囊底色/文字色/小脸图） */
+    moodOf(name) {
+      return MOODS.find(m => m.name === name) || MOODS[0]
     },
     /* rec-card 左描边色 + 入场错峰延迟（错峰上限 10 张，触底加载的新卡片不排长队） */
     cardStyle(e) {
@@ -1051,6 +1064,20 @@ export default {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+/* 心情情绪胶囊行（时光轴 mood 卡：小脸图 + 情绪名，各自 tint 底 + accent 文字） */
+.rec-moods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 10rpx;
+}
+.rm-chip {
+  font-size: 21rpx;
+  font-weight: 700;
+  line-height: 1;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
 }
 .rec-photo {
   width: 96rpx;

@@ -18,7 +18,7 @@ import { summarize } from '@/domain/summary.js'
 import { todayStats as calcTodayStats } from '@/domain/stats.js'
 import { chartData, chartDataDays, percentileOf, percentileBadge } from '@/domain/growth.js'
 import { vaccineStatus, vaccineTip, daysToPlan, planDateFor, VACCINE_STATUS_TEXT } from '@/domain/vaccine.js'
-import { PARENT_INFO, REMIND_DEFAULT, VACCINE_PROGRAM } from '@/utils/mock.js'
+import { PARENT_INFO, REMIND_DEFAULT, VACCINE_PROGRAM, MOODS } from '@/utils/mock.js'
 import { error as uiError, toast as uiToast } from '@/utils/ui.js'
 import { SERVERS, MESSAGE_POLL_INTERVAL } from '@/config/app.js'
 
@@ -674,6 +674,23 @@ export function getBabyTrash() {
 }
 
 /* ---------- 时光轴（分组派生逻辑与旧版一致，数据源=缓存） ---------- */
+/* 心情记录的情绪名列表（toViewItem 派生，时光轴/详情/搜索共用）：
+   兼容三代数据——新 payload.moods 数组 → 旧 payload.mood 单值 → title「心情 · X」按 +/、 拆多选 */
+const moodListOf = e => {
+  const names = MOODS.map(m => m.name)
+  const p = e.payload || {}
+  let picks = []
+  if (Array.isArray(p.moods) && p.moods.length) {
+    picks = p.moods.filter(x => names.indexOf(x) > -1)
+  } else if (p.mood && names.indexOf(p.mood) > -1) {
+    picks = [p.mood]
+  } else {
+    const mm = /·\s*(.+)$/.exec(String(e.title || ''))
+    if (mm) picks = mm[1].trim().split(/[+、]/).map(s => s.trim()).filter(s => names.indexOf(s) > -1)
+  }
+  return picks
+}
+
 const toViewItem = e => ({
   id: e.id, time: timeOf(e.occurred_at), day: dayLabel(dayKey(e.occurred_at)),
   /* 原始日期键（YYYY-MM-DD）：日期行全天条数按它从服务端 day_totals 取值 */
@@ -682,6 +699,8 @@ const toViewItem = e => ({
   /* 记录人账号 ID：展示口径的可靠依据（creator 只是历史名字串） */
   creator_id: e.creator_id || '',
   badge: e.badge || (e.is_backfilled ? 'backfill' : ''), note: e.note || '',
+  /* 心情记录的情绪名列表（非 mood 类型为 []，页面据此渲染情绪胶囊行） */
+  moods: e.type === 'mood' ? moodListOf(e) : [],
   /* 列表用缩略图（400px 宽 JPEG，~100KB）；详情页条带用 800px 变体，点开放大才用原图 */
   photo: http.resolveThumb(e.photo || ''),
   /* 原始 photo URL 保留，详情页/大图预览用原图 */

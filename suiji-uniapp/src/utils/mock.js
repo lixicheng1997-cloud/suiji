@@ -25,6 +25,19 @@ export const TYPES = {
   note:      { label: '心情',   iconKey: 'heart',       png: '09-text-mood',  color: '#E86FA0', tint: '#FDE9F2' }
 }
 
+/* ---------- 心情情绪选项（编辑器方框 + 时光轴/详情胶囊行共用元数据） ----------
+   tint：胶囊底色；accent：胶囊文字/描边色（均十六进制字面量，小程序端不认 CSS 变量取色） */
+export const MOODS = [
+  { name: '开心', tint: '#FFF3C4', accent: '#F7B32C' },
+  { name: '惊喜', tint: '#FFE9E0', accent: '#FF8F6B' },
+  { name: '平静', tint: '#E9EEFB', accent: '#8FA8DC' },
+  { name: '黏人', tint: '#FDE9F2', accent: '#F58FB0' },
+  { name: '委屈', tint: '#F0EAFB', accent: '#A994D8' },
+  { name: '担忧', tint: '#E4F3FB', accent: '#6FBDE0' },
+  { name: '生气', tint: '#FFE7E2', accent: '#FF7B6B' },
+  { name: '疲惫', tint: '#EAF3EA', accent: '#9BB89A' }
+]
+
 /* ---------- 徽标文案 ---------- */
 export const BADGES = {
   milestone: '里程碑',

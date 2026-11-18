@@ -19,6 +19,15 @@
         <sj-icon :name="TYPES[entry.type].png" :size="116" />
         <text class="gc-title">{{ entry.title }}</text>
         <text class="gc-sub">{{ entry.time }} · {{ TYPES[entry.type].label }} · {{ whoOf(entry) }}记录</text>
+        <!-- 心情情绪胶囊行（mood 专属）：情绪名文字 -->
+        <view v-if="entry.type === 'mood' && entry.moods && entry.moods.length" class="gc-moods">
+          <text
+            v-for="mn in entry.moods"
+            :key="mn"
+            class="gm-chip"
+            :style="{ background: moodOf(mn).tint, color: moodOf(mn).accent }"
+          >{{ mn }}</text>
+        </view>
         <!-- 徽标（补记 / 里程碑 / 进行中 / 百分位）：ms-badge 金色胶囊 -->
         <text v-if="entry.badge" class="ms-badge">{{ BADGES[entry.badge] }}</text>
       </view>
@@ -139,7 +148,7 @@
 </template>
 
 <script>
-import { TYPES, BADGES } from '@/utils/mock.js'
+import { TYPES, BADGES, MOODS } from '@/utils/mock.js'
 import * as api from '@/utils/api.js'
 import * as ui from '@/utils/ui.js'
 import { resolveSmall, resolveCover } from '@/api/http.js'
@@ -269,6 +278,10 @@ export default {
     /* 记录人展示：优先与宝宝关系 → 昵称 → 登录账号（与主页列表同口径）；按 creator_id 解析成员 */
     whoOf(e) {
       return api.creatorLabel(e)
+    },
+    /* 情绪名 → MOODS 元数据（胶囊底色/文字色/小脸图） */
+    moodOf(name) {
+      return MOODS.find(m => m.name === name) || MOODS[0]
     },
     goBack() {
       if (getCurrentPages().length > 1) uni.navigateBack()
@@ -432,6 +445,21 @@ export default {
   margin-top: 12rpx;
 }
 .gc-sub { font-size: 24rpx; color: var(--sj-sub); margin-top: 8rpx; }
+/* 心情情绪胶囊行（详情头区 mood 专属：小脸图 + 情绪名，各自 tint 底 + accent 文字） */
+.gc-moods {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12rpx;
+  margin-top: 16rpx;
+}
+.gm-chip {
+  font-size: 22rpx;
+  font-weight: 800;
+  line-height: 1;
+  padding: 10rpx 20rpx;
+  border-radius: 999rpx;
+}
 /* 徽标：金色胶囊（与首页 ms-badge 同款观感） */
 .ms-badge {
   font-size: 21rpx;

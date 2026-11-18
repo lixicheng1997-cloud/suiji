@@ -397,27 +397,30 @@
         <sj-textarea v-model="note" placeholder="写点什么…" :maxlength="500" height="176rpx" />
       </block>
 
-      <!-- ========== 心情（P09 mood：备注式 textarea + 4 情绪 chips + 爱心评分） ========== -->
+      <!-- ========== 心情（mood：8 个情绪方框多选 + 爱心评分 + 备注） ========== -->
       <block v-else-if="type === 'mood'">
-        <!-- 备注（sj-textarea：白底描边容器由组件自绘，上限 500 字，超出会被输入框挡在本地） -->
-        <sj-textarea v-model="note" placeholder="写点什么…" :maxlength="500" height="176rpx" />
-        <view class="pg-chips">
-          <sj-tag
-            v-for="c in chipGroups.moodPick"
-            :key="c"
-            variant="chip"
-            pressable
-            :active="single.moodPick === c"
-            :text="c"
-            @click="pickSingle('moodPick', c)"
-          />
+        <view class="mood-grid">
+          <view
+            v-for="m in MOODS"
+            :key="m.name"
+            class="mood-card"
+            :class="{ active: multi.moods.indexOf(m.name) > -1 }"
+            hover-class="hover-press"
+            :hover-stay-time="80"
+            @click="toggleMulti('moods', m.name)"
+          >
+            <text class="mc-name">{{ m.name }}</text>
+          </view>
         </view>
 
         <view class="pg-field">
           <text class="pf-label">今日心情</text>
-          <!-- 爱心评分（sj-rate：0–5 心，v-model 绑新字段 moodRate，默认 0 即未评分） -->
+          <!-- 爱心评分（sj-rate：0–5 心，v-model 绑 moodRate，默认 0 即未评分） -->
           <sj-rate v-model="moodRate" :size="22" />
         </view>
+
+        <!-- 备注（sj-textarea：白底描边容器由组件自绘，上限 500 字，超出会被输入框挡在本地） -->
+        <sj-textarea v-model="note" placeholder="写点什么…" :maxlength="500" height="176rpx" />
       </block>
 
       <!-- ========== 语音 ========== -->
@@ -459,7 +462,7 @@
 </template>
 
 <script>
-import { TYPES } from '@/utils/mock.js'
+import { TYPES, MOODS } from '@/utils/mock.js'
 import * as api from '@/utils/api.js'
 import * as ui from '@/utils/ui.js'
 import { netInfo } from '@/infra/net.js'
@@ -482,6 +485,7 @@ export default {
   data() {
     return {
       TYPES,
+      MOODS,
       /* 类型胶囊行顺序（对齐 v2 P09 设计稿） */
       typeKeys: ['feeding', 'sleep', 'milestone', 'measure', 'poop', 'temp', 'med', 'photo', 'video', 'mood', 'voice'],
       type: 'feeding',
@@ -554,13 +558,13 @@ export default {
         poopTexture: '金黄糊状',
         tempSite: '腋下',
         measureSource: '儿保医院',
-        medBasis: '医生处方',
-        moodPick: '开心'
+        medBasis: '医生处方'
       },
-      /* 多选组：数组存选中项 */
+      /* 多选组：数组存选中项（moods=心情表情卡多选） */
       multi: {
         foods: [],
-        poopAbnormal: []
+        poopAbnormal: [],
+        moods: []
       },
       /* 辅食食材自定义：输入面板开关与输入值 */
       foodCustomOpen: false,
@@ -589,8 +593,7 @@ export default {
         poopAbnormal: ['血丝', '黏液', '颜色异常', '量异常'],
         tempSite: ['腋下', '耳温', '额温'],
         measureSource: ['儿保医院', '家庭自测'],
-        medBasis: ['医生处方', '药品说明书', '其他'],
-        moodPick: ['开心', '惊喜', '平静', '担忧']
+        medBasis: ['医生处方', '药品说明书', '其他']
       }
     }
   },
@@ -832,7 +835,7 @@ export default {
     onPickDose(e) {
       this.dose = e.value[0]
     },
-    /* 多选组（异常标记 / 辅食食材）：点击 toggle */
+    /* 多选组（异常标记 / 辅食食材 / 心情表情）：点击 toggle */
     toggleMulti(key, val) {
       /* 辅食食材的“+ 自定义”不是选项，点击展开自定义输入行 */
       if (key === 'foods' && val === '+ 自定义') {
@@ -986,9 +989,20 @@ export default {
           setTime('med', t.med || hm)
           break
         case 'mood': {
-          /* 历史 title 格式「心情 · X」：X 在预置情绪内才选中；rate 限幅 0–5 */
-          const mm = /·\s*(.+)$/.exec(String(p.title || ''))
-          if (mm) pick('moodPick', mm[1].trim(), this.chipGroups.moodPick)
+          /* 兼容三代数据：新 payload.moods 数组 → 旧 payload.mood 单值 → title「心情 · X」正则解析（按 +/、 拆多选）；rate 限幅 0–5 */
+          const names = MOODS.map(m => m.name)
+          let picks = []
+          if (Array.isArray(p.moods) && p.moods.length) {
+            picks = p.moods.filter(x => names.indexOf(x) > -1)
+          } else if (p.mood && names.indexOf(p.mood) > -1) {
+            picks = [p.mood]
+          } else {
+            const mm = /·\s*(.+)$/.exec(String(p.title || ''))
+            if (mm) {
+              picks = mm[1].trim().split(/[+、]/).map(s => s.trim()).filter(s => names.indexOf(s) > -1)
+            }
+          }
+          this.multi.moods = picks
           const r = parseInt(p.rate, 10)
           if (!isNaN(r)) this.moodRate = Math.min(5, Math.max(0, r))
           break
@@ -1039,8 +1053,12 @@ export default {
             ongoing: this.switches.medOngoing
           }
         case 'mood':
-          /* 独立 rate 字段并入（不改 title 旧格式，历史记录不受影响；0 即未评分） */
-          return { title: '心情 · ' + this.single.moodPick, rate: this.moodRate }
+          /* 多选情绪数组 + rate；title 兼容旧格式「心情 · X」（多选拼 +），0 颗心即未评分 */
+          return {
+            moods: this.multi.moods.slice(),
+            rate: this.moodRate,
+            title: this.multi.moods.length ? '心情 · ' + this.multi.moods.join('+') : '心情 · 记录'
+          }
         case 'voice': {
           /* 未录（或录完又取消）时给空壳，saveEntry 会跳过上传 */
           const v = this.voice || {}
@@ -1309,6 +1327,37 @@ export default {
 /* chips 单选 / 多选（v2 pg-chips） */
 .pg-chips { display: flex; flex-wrap: wrap; gap: 16rpx; margin-bottom: 24rpx; }
 .pg-chips.center { justify-content: center; }
+
+/* 心情情绪方框（mood-grid：2 行 4 列文字方框，选中态 mood 主题色描边 + 浅粉底） */
+.mood-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16rpx;
+  margin-bottom: 24rpx;
+}
+.mood-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 88rpx;
+  border-radius: 20rpx;
+  border: 2rpx solid var(--sj-glass-line);
+  background: var(--sj-glass);
+  box-shadow: var(--sj-sh-sm);
+  transition: border-color 0.2s var(--sj-smooth), background 0.2s var(--sj-smooth), box-shadow 0.2s var(--sj-smooth);
+}
+.mood-card.active {
+  border-color: var(--sj-c-mood);
+  background: var(--sj-tint-mood);
+  box-shadow: 0 6rpx 20rpx rgba(232, 111, 160, 0.25);
+}
+.mc-name {
+  font-size: 25rpx;
+  font-weight: 900;
+  color: var(--sj-ink);
+  opacity: 0.78;
+}
+.mood-card.active .mc-name { color: var(--sj-c-mood); opacity: 1; }
 
 /* 字段行（v2 pg-field：毛玻璃面 + 半透高光描边 + 28rpx 圆角；玻璃配方见 App.vue --sj-glass*） */
 .pg-field {
