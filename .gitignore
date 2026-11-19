@@ -19,6 +19,8 @@ node_modules/
 # ---------- 构建产物 ----------
 dist/
 build/
+# H5 网页版构建镜像（robocopy 自 suiji-uniapp/dist，仅部署用）
+suiji-server/static/suiji-web/
 .output/
 .temp/
 .cache/

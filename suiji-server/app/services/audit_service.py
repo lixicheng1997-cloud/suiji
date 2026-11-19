@@ -45,13 +45,16 @@ def list_recent(db: Session, family_id: str, limit: int = 200, days: int = KEEP_
     """近 `days` 天内的家庭留痕，倒序返回（默认 180 天，与保留期一致）。
 
     offset/limit 供客户端上滑分页：offset 从 0 起按页递增。
+    admin_* 动作（管理员查看媒体留痕、停用、解绑等）不对家庭成员展示——
+    管理行为只在管理后台审计页可见，避免把运维痕迹暴露进 App 操作记录页。
     """
     if not family_id:
         return []
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
     rows = (
         db.query(AuditLog)
-        .filter(AuditLog.family_id == family_id, AuditLog.created_at >= cutoff)
+        .filter(AuditLog.family_id == family_id, AuditLog.created_at >= cutoff,
+                AuditLog.action.notlike("admin\\_%", escape="\\"))
         .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
         .offset(max(0, offset))
         .limit(max(1, min(limit, 500)))
