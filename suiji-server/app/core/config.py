@@ -109,6 +109,16 @@ class Settings:
         self.rl_refresh_window = int(os.getenv("RL_REFRESH_WINDOW", "300") or 300)
         self.rl_join = int(os.getenv("RL_JOIN", "10") or 10)
         self.rl_join_window = int(os.getenv("RL_JOIN_WINDOW", "300") or 300)
+        # 阿里云号码认证服务（一键登录 GetMobile / 本机号码校验 VerifyPhone）
+        # AK 未配置或 ALIYUN_PHONE_ENABLED=0 时端点返回 503，前端按钮隐藏
+        self.aliyun_phone_ak_id = os.getenv("ALIYUN_PHONE_AK_ID", "").strip()
+        self.aliyun_phone_ak_secret = os.getenv("ALIYUN_PHONE_AK_SECRET", "").strip()
+        self.aliyun_phone_enabled = os.getenv("ALIYUN_PHONE_ENABLED", "0").strip().lower() in (
+            "1", "true", "yes", "on")
+        self.rl_phone_login = int(os.getenv("RL_PHONE_LOGIN", "10") or 10)
+        self.rl_phone_login_window = int(os.getenv("RL_PHONE_LOGIN_WINDOW", "300") or 300)
+        self.rl_phone_bind = int(os.getenv("RL_PHONE_BIND", "10") or 10)
+        self.rl_phone_bind_window = int(os.getenv("RL_PHONE_BIND_WINDOW", "300") or 300)
         self.rl_upload = int(os.getenv("RL_UPLOAD", "60") or 60)
         self.rl_upload_window = int(os.getenv("RL_UPLOAD_WINDOW", "300") or 300)
         # 直传的控制面（presign 签发 + register 登记）：每文件 2 次调用，与字节量无关。

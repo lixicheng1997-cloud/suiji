@@ -158,6 +158,10 @@ server {
     # PUT/PostObject 直传才能走通（被拦时仅回退 multipart，功能不坏但多一跳）。
     # Permissions-Policy 对 self 放开 camera/microphone：H5 端拍照、录语音依赖
     # getUserMedia/mediaDevices，写成 () 会在网页里整功能禁用。
+    #
+    # 阿里云号码认证（H5 网页版 SDK）：script-src 放行 SDK 的 CDN 域，
+    # connect-src 放行 SDK 与运营商认证网关的通信域。域名以阿里云控制台开通
+    # 号码认证后给出的接入文档为准，多个用空格分隔，经 NGINX_PHONE_ORIGIN 注入。
     location = / {
         root /usr/share/nginx/html/suiji-web;
         try_files /index.html =502;
@@ -165,7 +169,7 @@ server {
         add_header X-Content-Type-Options    "nosniff" always;
         add_header Referrer-Policy           "no-referrer" always;
         add_header Permissions-Policy        "geolocation=(), camera=(self), microphone=(self)" always;
-        add_header Content-Security-Policy   "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: ${NGINX_MEDIA_ORIGIN}; font-src 'self' data:; media-src 'self' data: blob: ${NGINX_MEDIA_ORIGIN}; connect-src 'self' ${NGINX_MEDIA_ORIGIN}; frame-ancestors 'self'" always;
+        add_header Content-Security-Policy   "default-src 'self'; script-src 'self' 'unsafe-inline' ${NGINX_PHONE_ORIGIN}; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: ${NGINX_MEDIA_ORIGIN}; font-src 'self' data:; media-src 'self' data: blob: ${NGINX_MEDIA_ORIGIN}; connect-src 'self' ${NGINX_MEDIA_ORIGIN} ${NGINX_PHONE_ORIGIN}; frame-ancestors 'self'" always;
     }
 
     # H5 打包产物 JS/CSS（文件名带内容哈希，长缓存 7 天）

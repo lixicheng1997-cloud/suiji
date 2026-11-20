@@ -21,6 +21,33 @@ class LoginIn(BaseModel):
     password: str = Field(max_length=PASSWORD_MAX_LENGTH)
 
 
+class PhoneOneClickIn(BaseModel):
+    """一键登录：客户端原生 SDK/网页 SDK 返回的取号令牌，服务端拿它调 GetMobile 换手机号。"""
+    token: str = Field(min_length=1, max_length=512)
+
+
+class PhonePrefetchIn(BaseModel):
+    """静默预取本机号码：SDK 静默令牌换脱敏号，仅用于登录页展示，不产生登录态。"""
+    token: str = Field(min_length=1, max_length=512)
+
+
+class PhoneVerifyLoginIn(BaseModel):
+    """本机号码校验登录：用户输入手机号 + SDK 校验令牌，PASS 才放行。"""
+    phone: str = Field(min_length=1, max_length=20)
+    token: str = Field(min_length=1, max_length=512)
+
+
+class PhoneBindIn(BaseModel):
+    """绑定手机号（登录态）：VerifyPhone 校验通过才写入。"""
+    phone: str = Field(min_length=1, max_length=20)
+    token: str = Field(min_length=1, max_length=512)
+
+
+class PhoneUnbindIn(BaseModel):
+    """解绑手机号（登录态）：无短信通道，用密码做二次校验兜底。"""
+    password: str = Field(max_length=PASSWORD_MAX_LENGTH)
+
+
 class RefreshIn(BaseModel):
     refresh: str
 

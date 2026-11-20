@@ -119,6 +119,42 @@
       </view>
     </sj-popup>
 
+    <!-- 绑定手机号弹窗（sj-popup 居中 modal：输入手机号，SDK 校验本机 SIM 后提交） -->
+    <sj-popup
+      v-model:show="phoneBindShow"
+      mode="center"
+      title="绑定手机号"
+      left-text=""
+      right-text="取消"
+    >
+      <view class="pwd-form">
+        <text class="pwd-tip">校验通过即完成绑定，绑定后可用手机号快速登录</text>
+        <view class="pwd-field">
+          <text class="pwf-label">手机号</text>
+          <sj-input class="pwf-in" v-model="phoneBindNum" type="number" :maxlength="11" placeholder="11 位手机号" />
+        </view>
+        <sj-button class="pwd-btn" block size="lg" :loading="phoneBindBusy" :text="phoneBindBusy ? '校验中…' : '校验并绑定'" @click="submitPhoneBind" />
+      </view>
+    </sj-popup>
+
+    <!-- 解绑手机号弹窗（sj-popup 居中 modal：密码二次校验，无短信通道的兜底验证） -->
+    <sj-popup
+      v-model:show="phoneUnbindShow"
+      mode="center"
+      title="解绑手机号"
+      left-text=""
+      right-text="取消"
+    >
+      <view class="pwd-form">
+        <text class="pwd-tip">解绑后该手机号不再用于登录本账号</text>
+        <view class="pwd-field">
+          <text class="pwf-label">登录密码</text>
+          <sj-input class="pwf-in" v-model="phoneUnbindPwd" type="password" placeholder="输入登录密码确认" />
+        </view>
+        <sj-button class="pwd-btn" block size="lg" :loading="phoneUnbindBusy" :text="phoneUnbindBusy ? '提交中…' : '确认解绑'" @click="submitPhoneUnbind" />
+      </view>
+    </sj-popup>
+
     <sj-notify ref="ntf" />
     <sj-ui-host />
   </view>
@@ -129,6 +165,8 @@ import * as api from '@/utils/api.js'
 import * as ui from '@/utils/ui.js'
 import tabSwipe, { pullRefresh } from '@/utils/tabSwipe.js'
 import { THEME_LABELS } from '@/theme/theme.js'
+import { getVerifyToken } from '@/infra/platform.js'
+import { PHONE_LOGIN_ENABLED } from '@/config/app.js'
 
 /* 开关行下标 → 持久化键（模板以数组下标消费 switches，形状保持不变） */
 const SWITCH_KEYS = ['checkup', 'anniversary', 'notify']
@@ -159,6 +197,14 @@ export default {
       pwdShow: false,
       pwd: { old: '', next: '', confirm: '' },
       pwdBusy: false,
+      /* 绑定/解绑手机号（sj-popup）：绑定走 SDK 本机校验，解绑走密码二次校验 */
+      phoneBindShow: false,
+      phoneBindNum: '',
+      phoneBindBusy: false,
+      phoneUnbindShow: false,
+      phoneUnbindPwd: '',
+      phoneUnbindBusy: false,
+      phoneLoginEnabled: !!PHONE_LOGIN_ENABLED,
       THEME_LABELS,
       groups: []
     }
@@ -203,7 +249,19 @@ export default {
         {
           label: '数据与安全',
           rows: [
-            { png: '27-fn-trash', label: '回收站', val: `${trashCount} 条`, tag: true, chev: true, go: '/pages/trash/trash' }
+            { png: '27-fn-trash', label: '回收站', val: `${trashCount} 条`, tag: true, chev: true, go: '/pages/trash/trash' },
+            /* 手机号绑定入口：总开关开启时展示；已绑定显示脱敏号码（点按解绑），未绑定引导绑定 */
+            ...(this.phoneLoginEnabled
+              ? [{
+                  png: '35-fn-audit',
+                  label: '绑定手机号',
+                  val: api.getBoundPhone() || '绑定后可快速登录',
+                  tag: true,
+                  tagCls: api.getBoundPhone() ? '' : 'soft',
+                  chev: true,
+                  act: api.getBoundPhone() ? 'phoneUnbind' : 'phoneBind'
+                }]
+              : [])
           ]
         },
         {
@@ -244,6 +302,8 @@ export default {
       if (r.act === 'server') return this.doServer()
       if (r.act === 'logout') return this.doLogout()
       if (r.act === 'password') return this.doPassword()
+      if (r.act === 'phoneBind') return this.doPhoneBind()
+      if (r.act === 'phoneUnbind') return this.doPhoneUnbind()
       if (r.act === 'family') return uni.switchTab({ url: '/pages/family/family' })
       if (r.act === 'about') { this.aboutShow = true; return }
       if (r.go) {
@@ -324,6 +384,66 @@ export default {
         ld.close()
         this.pwdBusy = false
         ui.error(e, '密码修改失败，请重试')
+      })
+    },
+
+    /* ---------- 绑定 / 解绑手机号（阿里云号码认证） ---------- */
+
+    /* 绑定：清空表单打开弹窗；提交时先 SDK 校验「输入号 == 本机 SIM 号」再调绑定接口 */
+    doPhoneBind() {
+      this.phoneBindNum = ''
+      this.phoneBindShow = true
+    },
+
+    submitPhoneBind() {
+      if (this.phoneBindBusy) return
+      const p = this.phoneBindNum.trim()
+      if (!/^1\d{10}$/.test(p)) { this.$refs.ntf.show({ type: 'warn', message: '请输入 11 位手机号' }); return }
+      this.phoneBindBusy = true
+      const ld = ui.loading('正在校验本机号码…')
+      getVerifyToken().then(token => {
+        if (!token) {
+          ld.close()
+          this.phoneBindBusy = false
+          this.$refs.ntf.show({ type: 'warn', message: '本机暂不支持号码校验，无法绑定该手机号' })
+          return
+        }
+        api.phoneBind(p, token).then(() => {
+          ld.close()
+          this.phoneBindBusy = false
+          this.phoneBindShow = false
+          this.$refs.ntf.show({ type: 'ok', message: '手机号已绑定 · 可用本机快速登录' })
+          this.refresh()
+        }).catch(e => {
+          ld.close()
+          this.phoneBindBusy = false
+          ui.error(e, '绑定失败，请重试')
+        })
+      })
+    },
+
+    /* 解绑：密码二次校验（无短信通道的兜底验证），防他人冒用设备操作 */
+    doPhoneUnbind() {
+      this.phoneUnbindPwd = ''
+      this.phoneUnbindShow = true
+    },
+
+    submitPhoneUnbind() {
+      if (this.phoneUnbindBusy) return
+      const pwd = this.phoneUnbindPwd
+      if (!pwd) { this.$refs.ntf.show({ type: 'warn', message: '请输入登录密码确认' }); return }
+      this.phoneUnbindBusy = true
+      const ld = ui.loading('正在解绑…')
+      api.phoneUnbind(pwd).then(() => {
+        ld.close()
+        this.phoneUnbindBusy = false
+        this.phoneUnbindShow = false
+        this.$refs.ntf.show({ type: 'ok', message: '手机号已解绑' })
+        this.refresh()
+      }).catch(e => {
+        ld.close()
+        this.phoneUnbindBusy = false
+        ui.error(e, '解绑失败，请确认密码后重试')
       })
     },
 
@@ -466,6 +586,8 @@ export default {
 }
 .set-tag.ok { background: #E2F5EA; color: #2E7D4F; }
 .set-tag.warn { background: #FFF3C4; color: #B47714; }
+/* 未绑定手机号的引导标签：暖棕浅底弱化态 */
+.set-tag.soft { background: var(--sj-primary-soft); color: var(--sj-primary-deep); }
 
 /* ---------- 开关（sj-switch 封装，外观对齐 v2）：行内不收缩，沿用原 .switch 的 flex:none ---------- */
 .row-sw { flex: none; }

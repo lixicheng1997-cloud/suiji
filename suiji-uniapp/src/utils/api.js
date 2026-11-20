@@ -166,6 +166,8 @@ export function getNickname() {
   const u = cache.user || {}
   return u.name && u.name !== u.username ? u.name : ''
 }
+/** 当前账号绑定的手机号（服务端已脱敏为 138****1234；未绑定返回空串） */
+export function getBoundPhone() { return (cache.user || {}).phone || '' }
 export function serverUrl() { return http.baseUrl() }
 export function setServerUrl(url) { http.setBaseUrl(url) }
 
@@ -258,26 +260,56 @@ function applyAccount(r) {
   setAccountMarker(marker)
 }
 
+/** 登录/注册成功后的公共记账：账号标记 → 写令牌 → 灌缓存 → 旧水位作废 */
+function _takeLogin(r) {
+  applyAccount(r)
+  http.setTokens(r.access, r.refresh, r.media)
+  cache.user = r.user || null
+  cache.family = r.family || null
+  clearEventsCursor()
+  return r
+}
+
 export function login(username, password) {
-  return http.post('/auth/login', { username, password }).then(r => {
-    applyAccount(r)
-    http.setTokens(r.access, r.refresh, r.media)
-    cache.user = r.user || null
-    cache.family = r.family || null
-    clearEventsCursor()   // 换账号/换家庭：旧水位作废，首次探测重新初始化
-    return r
-  })
+  return http.post('/auth/login', { username, password }).then(_takeLogin)
 }
 
 export function register(username, password, name) {
   const body = { username, password }
   if (name) body.name = name
-  return http.post('/auth/register', body).then(r => {
-    applyAccount(r)
-    http.setTokens(r.access, r.refresh, r.media)
-    cache.user = r.user || null
-    cache.family = r.family || null
-    clearEventsCursor()
+  return http.post('/auth/register', body).then(_takeLogin)
+}
+
+/* ---------- 手机号登录（阿里云号码认证） ----------
+ * oneclick：客户端 SDK 取号令牌（App 原生插件 / H5 网页版），服务端 GetMobile 换手机号；
+ * verifyLogin：输入手机号 + SDK 校验令牌，服务端 VerifyPhone PASS 才放行。
+ * 两条链路的账号融合规则在后端统一（已绑定登录 / 未绑定自动注册）。 */
+export function phoneOneClick(token) {
+  return http.post('/auth/phone/oneclick', { token }).then(_takeLogin)
+}
+
+/** 静默预取脱敏本机号码（登录页展示用，不产生登录态）：resolve({masked})；
+ *  换号失败 reject（503），由登录页静默回退手动输入 */
+export function phonePrefetch(token) {
+  return http.post('/auth/phone/prefetch', { token })
+}
+
+export function phoneVerifyLogin(phone, token) {
+  return http.post('/auth/phone/verify-login', { phone, token }).then(_takeLogin)
+}
+
+/** 绑定手机号（登录态）：返回 r.user.phone 为脱敏手机号 */
+export function phoneBind(phone, token) {
+  return http.post('/auth/phone/bind', { phone, token }).then(r => {
+    if (r && r.user) cache.user = r.user
+    return r
+  })
+}
+
+/** 解绑手机号（登录态，密码二次校验） */
+export function phoneUnbind(password) {
+  return http.post('/auth/phone/unbind', { password }).then(r => {
+    if (r && r.user) cache.user = r.user
     return r
   })
 }

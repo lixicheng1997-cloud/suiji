@@ -25,6 +25,23 @@
             "Record" : {},
             "VideoPlayer" : {}
         },
+        "nativePlugins" : {
+            "AliCloud-NirvanaPns" : {
+                "__plugin_info__" : {
+                    "name" : "阿里云号码认证SDK",
+                    "description" : "阿里云号码认证SDK，包含一键登录和本机号码校验两个功能",
+                    "version" : "1.0.0",
+                    "platforms" : "Android,iOS",
+                    "url" : "https://ext.dcloud.net.cn/plugin?id=4297",
+                    "android_package_name" : "",
+                    "ios_bundle_id" : "",
+                    "isCloud" : false,
+                    "bought" : -1,
+                    "pid" : "4297",
+                    "parameters" : {}
+                }
+            }
+        },
         "distribute" : {
             "android" : {
                 "permissions" : [
@@ -36,7 +53,10 @@
                     "<uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\"/>",
                     "<uses-permission android:name=\"android.permission.VIBRATE\"/>",
                     "<uses-permission android:name=\"android.permission.WRITE_CALENDAR\"/>",
-                    "<uses-permission android:name=\"android.permission.READ_CALENDAR\"/>"
+                    "<uses-permission android:name=\"android.permission.READ_CALENDAR\"/>",
+                    "<uses-permission android:name=\"android.permission.READ_PHONE_STATE\"/>",
+                    "<uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\"/>",
+                    "<uses-permission android:name=\"android.permission.ACCESS_WIFI_STATE\"/>"
                 ]
             },
             "ios" : {
@@ -51,7 +71,9 @@
                 }
             },
             "sdkConfigs" : {
-                "oauth" : {}
+                "oauth" : {},
+                "speech" : {},
+                "ad" : {}
             },
             "icons" : {
                 "android" : {
@@ -86,15 +108,17 @@
                 }
             },
             "splashscreen" : {
-                "androidStyle" : "fullscreen",
+                "androidStyle" : "common",
                 "android" : {
                     "hdpi" : "unpackage/res/splash/splash-hdpi.png",
                     "xhdpi" : "unpackage/res/splash/splash-xhdpi.png",
                     "xxhdpi" : "unpackage/res/splash/splash-xxhdpi.png",
                     "xxxhdpi" : "unpackage/res/splash/splash-xxxhdpi.png"
-                }
+                },
+                "useOriginalMsgbox" : false
             }
-        }
+        },
+        "nvueLaunchMode" : ""
     },
     "quickapp" : {},
     "mp-weixin" : {

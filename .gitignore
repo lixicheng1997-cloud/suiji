@@ -78,3 +78,4 @@ suiji-server/tmp/
 .playwright-cli/
 .trae-html-share-packages/
 .codebuddy/
+nativeplugins/

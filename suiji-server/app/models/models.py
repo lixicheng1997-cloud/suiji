@@ -1,5 +1,5 @@
 """数据模型（SQLAlchemy 2.x）：行形状对齐契约 §1，时间字段统一存字符串。"""
-from sqlalchemy import JSON, Boolean, Float, Integer, String, UniqueConstraint
+from sqlalchemy import JSON, Boolean, Float, Index, Integer, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..core.db import Base
@@ -22,6 +22,16 @@ class User(Base):
     # 账号注销冷静期（TDD §十）：空串=未申请注销；非空=计划于该 UTC 时刻删除账号。
     # 30 天内登录或主动调用 /auth/deactivate/cancel 即清空该字段撤销注销。
     deletion_scheduled_at: Mapped[str] = mapped_column(String(32), default="", index=True)
+    # 手机号（阿里云号码认证登录）：密文落库（EncryptedString 与宝宝姓名同口径）。
+    # 随机 nonce 密文无法建唯一索引，唯一性由 phone_hash（确定性 HMAC）承担；
+    # 老用户与未绑定用户为空串，空串不参与唯一约束（部分唯一索引见下）。
+    phone: Mapped[str] = mapped_column(EncryptedString(32), default="")
+    phone_hash: Mapped[str] = mapped_column(String(64), default="", index=True)
+    __table_args__ = (
+        # 部分唯一索引：phone_hash 非空才唯一（SQLite/Postgres 均支持条件索引）
+        Index("uq_user_phone_hash", "phone_hash", unique=True,
+              sqlite_where=text("phone_hash != ''"), postgresql_where=text("phone_hash != ''")),
+    )
 
 
 class Family(Base):

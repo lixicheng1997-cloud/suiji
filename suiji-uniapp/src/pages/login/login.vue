@@ -11,9 +11,73 @@
       <text class="lg-slogan">记录成长的每一刻</text>
     </view>
 
+    <!-- 手机号登录：上下两个独立表单 —— ①自动获取的本机号码（大字 + 一键登录）；②手动输入手机号（本机 SIM 校验） -->
+    <!-- #ifndef MP-WEIXIN -->
+    <template v-if="phoneMode">
+      <!-- 表单一：自动获取的本机号码（reading 读取中 → ready 主态）；未取到号整卡隐藏，不打扰用户 -->
+      <view v-if="phoneState === 'reading' || phoneState === 'ready'" class="lg-card lg-loose">
+        <view v-if="phoneState === 'reading'" class="pn-reading">
+          <view class="pn-spin"></view>
+          <text class="pn-read-t">正在读取你的手机号码…</text>
+        </view>
+        <template v-else>
+          <text class="pn-num-label">本机号码</text>
+          <view class="pn-num">
+            <text class="pn-head">{{ maskedParts.head }}</text><text class="pn-mask">{{ maskedParts.mask }}</text><text class="pn-tail">{{ maskedParts.tail }}</text>
+          </view>
+          <view class="pn-carrier">
+            <text class="pn-carrier-hl">运营商安全认证</text>
+          </view>
+          <sj-button
+            class="lg-btn"
+            block
+            size="lg"
+            :loading="busy"
+            :text="busy ? '处理中…' : '一键登录'"
+            @click="oneClick"
+          />
+          <!-- 其他手机号登录（展开下方手动输入表单）｜密码登录 -->
+          <view class="lg-alt-row">
+            <view class="lg-alt" hover-class="hover-press" :hover-stay-time="80" @click="showManualForm = true">
+              <text class="lg-alt-t">切换其他手机号</text>
+            </view>
+            <text class="alt-sep"></text>
+            <view class="lg-alt" hover-class="hover-press" :hover-stay-time="80" @click="phoneMode = false">
+              <text class="lg-alt-t">密码登录</text>
+            </view>
+          </view>
+        </template>
+      </view>
+
+      <!-- 表单二：手动输入手机号（本机 SIM 校验登录）。未取到号时常驻；
+           取到号时默认收起，经表单一「切换其他手机号」展开 -->
+      <view v-if="phoneState === 'manual' || showManualForm" class="lg-card lg-loose" :class="{ 'lg-card2': phoneState === 'reading' || phoneState === 'ready' }">
+        <text class="fc-title">手机号登录</text>
+        <view class="pg-field pg-field-lg">
+          <text class="pf-label">手机号</text>
+          <sj-input class="pf-in" v-model="phone" type="number" :maxlength="11" placeholder="11 位手机号" />
+        </view>
+        <sj-button
+          class="lg-btn2"
+          block
+          size="lg"
+          :loading="busy"
+          :text="busy ? '处理中…' : '校验本机号码登录'"
+          @click="submitPhone"
+        />
+        <view class="lg-alt-row">
+          <view class="lg-alt" hover-class="hover-press" :hover-stay-time="80" @click="phoneMode = false">
+            <text class="lg-alt-t">使用账号密码登录</text>
+          </view>
+        </view>
+      </view>
+    </template>
+
+    <template v-else>
+    <!-- #endif -->
     <!-- 登录 / 注册卡片（v2 白底 surface 圆角卡） -->
     <view class="lg-card">
-      <!-- 模式分段切换（sj-subsection / u-subsection） -->
+      <!-- 分段切换（sj-subsection / u-subsection） -->
       <sj-subsection
         class="lg-seg"
         :modelValue="mode === 'login' ? 0 : 1"
@@ -46,7 +110,20 @@
         :text="busy ? '处理中…' : (mode === 'login' ? '登 录' : '注册并进入')"
         @click="submit"
       />
+
+      <!-- 手机号登录入口（默认模式即手机号登录；此处仅供从账号密码切回。
+           微信小程序不支持号码认证，整块不渲染） -->
+      <!-- #ifndef MP-WEIXIN -->
+      <template v-if="phoneLoginEnabled">
+      <view class="lg-alt" hover-class="hover-press" :hover-stay-time="80" @click="phoneMode = true">
+        <text class="lg-alt-t">返回手机号登录</text>
+      </view>
+      </template>
+      <!-- #endif -->
     </view>
+    <!-- #ifndef MP-WEIXIN -->
+    </template>
+    <!-- #endif -->
 
     <!-- 服务器地址入口：由前端公共配置 config/app.js 的 SHOW_SERVER_PICKER 控制显隐；
          关闭时整行与选择面板都不渲染，地址固定走配置默认项 -->
@@ -94,14 +171,16 @@
 import * as api from '@/utils/api.js'
 import * as ui from '@/utils/ui.js'
 import * as guide from '@/utils/first-run.js'
-import { requestMediaPermissions } from '@/infra/platform.js'
-import { SHOW_SERVER_PICKER } from '@/config/app.js'
+import { requestMediaPermissions, phoneAuthSupported, getOneClickToken, getVerifyToken, prefetchOneClickLogin } from '@/infra/platform.js'
+import { SHOW_SERVER_PICKER, PHONE_LOGIN_ENABLED } from '@/config/app.js'
 
 /* 媒体权限主动申请的落本机标记（只问一次，避免每次登录重复弹系统授权框） */
 const PERM_ASKED_KEY = 'sj_media_perm_asked'
 
 /* 云端版入口门控页：账号密码换 JWT（契约 §2），成功后 bootstrap 灌缓存，
- * 再按「家庭 → 宝宝档案 → 隐私同意」逐级判定去向（见 first-run.js goAfterLogin）。 */
+ * 再按「家庭 → 宝宝档案 → 隐私同意」逐级判定去向（见 first-run.js goAfterLogin）。
+ * 手机号登录（阿里云号码认证）：一键登录（SIM 免密）与手机号+本机校验两条链，
+ * 账号融合在后端统一（已绑定手机号 → 登录；未绑定 → 自动注册）。 */
 export default {
   data() {
     return {
@@ -111,6 +190,16 @@ export default {
       name: '',
       usernameErr: '',
       busy: false,
+      /* 手机号登录：默认即手机号模式（总开关开启时）。表单一（自动取号）phoneState：
+       * reading 静默取号中 → ready 主态（大号脱敏号码 + 一键登录）/ manual 未取到号（表单一整体隐藏）；
+       * 手动输入由表单二常驻承担；maskedPhone 为服务端预取的脱敏本机号码（ready 态展示） */
+      phoneMode: !!PHONE_LOGIN_ENABLED,
+      phoneState: 'reading',
+      maskedPhone: '',
+      /* 取到号后手动输入表单是否展开（表单一「切换其他手机号」触发） */
+      showManualForm: false,
+      phone: '',
+      phoneLoginEnabled: !!PHONE_LOGIN_ENABLED,
       /* 登录页服务器入口开关：来自前端公共配置 config/app.js（0=隐藏，1=展示） */
       showServerPicker: !!SHOW_SERVER_PICKER,
       server: '',
@@ -126,10 +215,20 @@ export default {
     username() { this.usernameErr = '' }
   },
 
+  computed: {
+    /* 脱敏号拆三段（138 | **** | 8888），中间星号用主色，对齐参考图 */
+    maskedParts() {
+      const m = this.maskedPhone || ''
+      return { head: m.slice(0, 3), mask: m.slice(3, 7), tail: m.slice(7) }
+    }
+  },
+
   onLoad() {
     try {
       this.statusBarHeight = uni.getSystemInfoSync().statusBarHeight || 20
     } catch (e) { /* 保持默认 */ }
+    /* 静默预取本机号码（能力探测 → 取号令牌 → 服务端换脱敏号），驱动手机号卡片状态机 */
+    if (this.phoneLoginEnabled) this.prefetchPhone()
     /* 首次启动（本机没选过）：按配置 is_default 落一个默认地址；
      * 入口隐藏时仍需落默认地址，只是不在页面上展示可切换的行 */
     api.pickDefaultServer().then(() => {
@@ -140,7 +239,7 @@ export default {
   },
 
   methods: {
-    /* 分段器下标 → 模式字符串 */
+    /* 分段器下标 → 模式字符串（仅账号密码卡片使用；手机号卡片为独立表单） */
     onMode(index) {
       this.mode = index === 0 ? 'login' : 'register'
       this.usernameErr = ''
@@ -227,6 +326,97 @@ export default {
           }
           ui.error(e, '操作失败，请重试')
         })
+    },
+
+    /* ---------- 手机号登录（阿里云号码认证，App/H5；小程序无此入口） ---------- */
+
+    /* 登录成功后的公共收尾：拉全量 bootstrap 灌缓存 → 逐级门控进 App（与 submit 共用口径） */
+    _afterLogin(ld) {
+      ld.update({ text: '正在准备你的成长记录…', sub: '首次进入需要一点时间' })
+      return api.bootstrap()
+        .then(() => {
+          this.busy = false
+          ld.close()
+          /* 逐级门控：无家庭 → 创建/加入引导页；无档案 → 建档页；未留痕 → 隐私页；否则进首页 */
+          guide.goAfterLogin()
+          this.askMediaPermissions()
+        })
+        .catch(e => {
+          ld.close()
+          this.busy = false
+          ui.error(e, '登录成功但数据加载失败，请重试')
+        })
+    },
+
+    /* 静默预取本机号码（状态机驱动）：能力探测 → getVerifyToken 静默令牌 →
+     * 服务端 /auth/phone/prefetch 换脱敏号 → ready；任一环节失败 → manual 回退手动输入。
+     * 预取令牌一次性消费，不影响后续一键登录（getLoginToken 另发新令牌） */
+    prefetchPhone() {
+      this.phoneState = 'reading'
+      phoneAuthSupported().then(ok => {
+        if (!ok) { this.phoneState = 'manual'; return }
+        /* 提前预取，让一键登录授权页可秒开 */
+        prefetchOneClickLogin()
+        return getVerifyToken().then(token => {
+          if (!token) { this.phoneState = 'manual'; return }
+          return api.phonePrefetch(token).then(r => {
+            this.maskedPhone = (r && r.masked) || ''
+            this.showManualForm = false
+            this.phoneState = this.maskedPhone ? 'ready' : 'manual'
+          })
+        })
+      }).catch(() => { this.phoneState = 'manual' })
+    },
+
+    /* 一键登录：拉起运营商授权页 → SDK 取号令牌 → 服务端 GetMobile 换手机号 →
+     * 已绑定手机号直接登录该账号，未绑定自动注册（融合规则在后端） */
+    oneClick() {
+      if (this.busy) return
+      this.busy = true
+      const ld = ui.loading('正在识别本机号码…')
+      getOneClickToken().then(token => {
+        if (!token) {
+          /* 无 SIM / 运营商不支持 / 用户取消：不抛错，引导走其他手机号或账号密码 */
+          ld.close()
+          this.busy = false
+          this.$refs.ntf.show({ type: 'warn', message: '本机号码读取失败，可换个手机号试试，或用账号密码登录' })
+          return
+        }
+        api.phoneOneClick(token)
+          .then(() => this._afterLogin(ld))
+          .catch(e => {
+            ld.close()
+            this.busy = false
+            ui.error(e, '一键登录失败，请使用账号密码登录')
+          })
+      })
+    },
+
+    /* 手机号 + 本机号码校验登录：输入号必须与本机 SIM 一致（VerifyPhone PASS） */
+    submitPhone() {
+      if (this.busy) return
+      const p = this.phone.trim()
+      if (!/^1\d{10}$/.test(p)) {
+        this.$refs.ntf.show({ type: 'warn', message: '请输入 11 位手机号' })
+        return
+      }
+      this.busy = true
+      const ld = ui.loading('正在校验本机号码…')
+      getVerifyToken().then(token => {
+        if (!token) {
+          ld.close()
+          this.busy = false
+          this.$refs.ntf.show({ type: 'warn', message: '手机号与本机不一致或校验不可用，请使用账号密码登录' })
+          return
+        }
+        api.phoneVerifyLogin(p, token)
+          .then(() => this._afterLogin(ld))
+          .catch(e => {
+            ld.close()
+            this.busy = false
+            ui.error(e, '登录失败，请使用账号密码登录')
+          })
+      })
     }
   }
 }
@@ -295,6 +485,24 @@ export default {
   box-sizing: border-box;
 }
 
+/* 手机号双表单布局：表单一（自动取号）与表单二（手动输入）上下叠放，间距收紧一档 */
+.lg-card2 { margin-top: 32rpx; }
+/* 宽松版卡片：加大内边距，元素间距更舒展（手机号表单专用） */
+.lg-loose { padding: 48rpx 44rpx 48rpx; }
+.lg-loose .lg-btn { margin-top: 40rpx; }
+.lg-loose .lg-btn2 { margin-top: 8rpx; }
+
+/* 独立表单卡片标题（手机号登录卡片） */
+.fc-title {
+  display: block;
+  text-align: center;
+  font-family: var(--sj-font-display);
+  font-size: 34rpx;
+  font-weight: 900;
+  color: var(--sj-ink);
+  margin-bottom: 28rpx;
+}
+
 /* 分段切换（sj-subsection，卡内下沿留白） */
 .lg-seg {
   display: block;
@@ -325,6 +533,13 @@ export default {
   border-color: var(--sj-bad);
 }
 .pf-label { color: var(--sj-sub); font-weight: 700; flex: none; width: 140rpx; }
+/* 手机号输入行加大版：更高、更圆、字号更大，不紧凑 */
+.pg-field-lg {
+  padding: 28rpx 34rpx;
+  border-radius: 34rpx;
+  margin: 36rpx 0 32rpx;
+  font-size: 32rpx;
+}
 /* 字段级错误文案（紧跟出错的行，随用户改动消失） */
 .pf-hint {
   display: block;
@@ -343,6 +558,78 @@ export default {
   display: flex;
   margin-top: 20rpx;
 }
+
+/* ---------- 手机号登录状态机 ---------- */
+/* ① 读取中：转圈 + 说明 */
+.pn-reading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40rpx 0 56rpx;
+}
+.pn-spin {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  border: 6rpx solid var(--sj-primary-soft);
+  border-top-color: var(--sj-primary-deep);
+  animation: pn-spin 1s linear infinite;
+}
+@keyframes pn-spin { to { transform: rotate(360deg); } }
+.pn-read-t { margin-top: 24rpx; font-size: 25rpx; color: var(--sj-sub); }
+/* ② 主态：本机号码大字展示 */
+.pn-num-label {
+  display: block;
+  text-align: center;
+  font-size: 23rpx;
+  color: var(--sj-sub);
+  letter-spacing: 2rpx;
+  margin-top: 8rpx;
+}
+.pn-num {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  font-family: var(--sj-font-display);
+  font-size: 68rpx;
+  font-weight: 900;
+  color: var(--sj-ink);
+  letter-spacing: 4rpx;
+  margin: 16rpx 0 8rpx;
+}
+/* 中间脱敏星号用主色，前后数字保持墨色（对齐参考图） */
+.pn-mask { color: var(--sj-primary-deep); }
+.pn-carrier {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 4rpx;
+}
+.pn-carrier-hl { font-size: 22rpx; color: var(--sj-primary-deep); }
+/* 文字链接行（账号密码登录入口） */
+.lg-alt-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 24rpx;
+  margin-top: 24rpx;
+}
+.lg-alt-row .lg-alt { margin-top: 0; padding: 8rpx 0; }
+/* 双链接行内的入口用灰色常规文字（对齐参考图，主操作仍靠上方大按钮） */
+.lg-alt-row .lg-alt .lg-alt-t { color: var(--sj-sub); font-weight: 400; }
+.alt-sep { width: 2rpx; height: 24rpx; background: var(--sj-line); flex: none; }
+/* 校验本机号码次按钮（plain 描边变体，仅补上沿间距） */
+.lg-btn2 {
+  display: flex;
+  margin-top: 24rpx;
+}
+/* 文字切换链接（手机号登录 ↔ 账号密码） */
+.lg-alt {
+  display: flex;
+  justify-content: center;
+  margin-top: 24rpx;
+  padding: 8rpx;
+}
+.lg-alt-t { font-size: 24rpx; font-weight: 700; color: var(--sj-primary-deep); }
 
 /* ---------- 服务器地址行 ---------- */
 .lg-server {
@@ -406,7 +693,10 @@ export default {
   color: var(--sj-primary-deep);
 }
 
-/* ---------- 合规脚注 ---------- */
-.lg-foot { margin-top: 40rpx; }
+/* ---------- 合规脚注：贴屏幕底部（页根为 flex 纵向，margin-top:auto 推到底） ---------- */
+.lg-foot {
+  margin-top: auto;
+  padding: 40rpx 0 calc(24rpx + env(safe-area-inset-bottom));
+}
 .lg-foot text { font-size: 21rpx; color: var(--sj-faint); letter-spacing: 2rpx; }
 </style>

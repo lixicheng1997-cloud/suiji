@@ -7,15 +7,16 @@ import * as notify from '@/infra/notify.js'
 
 export default {
   onLaunch() {
-    initNetWatch()
-    // 手势导航真机的底部白带落在 webview 之外，只能把原生导航条底色设成页面底色（见 infra/platform.js）
-    paintNavigationBar('#FFF8F0')
-    // 家庭强制门控：已登录但未关联家庭的账号，任何跳转都会被改写到 pages/family-setup
-    installFamilyGuard()
-    // 关闭原生启动画面，交由 pages/splash/splash 自定义动画接管
+    // 关闭原生启动画面，交由 pages/splash/splash 自定义动画接管。
+    // 必须最先执行：若后续任一步在真机抛错，原生启动图会一直盖住 vue 页面，表现为「卡在启动图标页」。
     // #ifdef APP-PLUS
-    plus.navigator.closeSplashscreen()
+    try { plus.navigator.closeSplashscreen() } catch (e) { /* ignore */ }
     // #endif
+    try { initNetWatch() } catch (e) { /* ignore */ }
+    // 手势导航真机的底部白带落在 webview 之外，只能把原生导航条底色设成页面底色（见 infra/platform.js）
+    try { paintNavigationBar('#FFF8F0') } catch (e) { /* ignore */ }
+    // 家庭强制门控：已登录但未关联家庭的账号，任何跳转都会被改写到 pages/family-setup
+    try { installFamilyGuard() } catch (e) { /* ignore */ }
 
     // 云端版（TDD v3.0）：已登录则拉 bootstrap 灌内存缓存；未登录由 splash 跳登录页。
     // init() 内部已捕获网络异常，不会 reject；门控路由由 pages/splash 负责。

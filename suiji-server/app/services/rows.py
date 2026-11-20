@@ -135,5 +135,12 @@ def audit_row(a: AuditLog) -> dict:
     }
 
 
+def mask_phone(phone: str) -> str:
+    """手机号脱敏展示：138****1234；未绑定返回空串。"""
+    p = (phone or "").strip()
+    return f"{p[:3]}****{p[-4:]}" if len(p) == 11 else ""
+
+
 def user_row(u: User) -> dict:
-    return {"id": u.id, "name": u.name, "username": u.username, "is_admin": int(u.is_admin or 0)}
+    return {"id": u.id, "name": u.name, "username": u.username,
+            "phone": mask_phone(u.phone or ""), "is_admin": int(u.is_admin or 0)}

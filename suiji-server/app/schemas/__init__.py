@@ -13,6 +13,11 @@ from .schemas import (
     LogoutIn,
     MemberRoleIn,
     PasswordIn,
+    PhoneBindIn,
+    PhoneOneClickIn,
+    PhonePrefetchIn,
+    PhoneUnbindIn,
+    PhoneVerifyLoginIn,
     PresignIn,
     RefreshIn,
     RegisterDirectIn,
@@ -26,7 +31,8 @@ from .schemas import (
 
 __all__ = [
     "BabyIn", "DeactivateIn", "EntryIn", "EntryMediaPatch", "FamilyCreateIn", "FilePatch", "ImportIn", "JoinIn", "JournalGenerateIn",
-    "JournalUpdateIn", "LoginIn", "LogoutIn", "MemberRoleIn", "PasswordIn", "PresignIn", "RefreshIn",
+    "JournalUpdateIn", "LoginIn", "LogoutIn", "MemberRoleIn", "PasswordIn", "PhoneBindIn", "PhoneOneClickIn", "PhonePrefetchIn",
+    "PhoneUnbindIn", "PhoneVerifyLoginIn", "PresignIn", "RefreshIn",
     "RegisterDirectIn", "RegisterIn", "SettingsIn", "SyncRowsIn",
     "UserStatusIn", "VaccinePatch", "MilestonePatch",
 ]

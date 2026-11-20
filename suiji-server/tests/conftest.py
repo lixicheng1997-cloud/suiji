@@ -17,8 +17,13 @@ os.environ["LLM_MODEL"] = ""
 os.environ["MEDIA_BACKEND"] = "local"
 # 放宽限流配额：功能测试会在同一个 client IP（testclient）上反复注册/上传，
 # 生产配额（注册 5 次/小时）会误伤。限流本身由 tests/test_rate_limit.py 单独验证。
-for _k in ("RL_REGISTER", "RL_LOGIN", "RL_REFRESH", "RL_JOIN", "RL_UPLOAD", "RL_WEATHER"):
+for _k in ("RL_REGISTER", "RL_LOGIN", "RL_REFRESH", "RL_JOIN", "RL_UPLOAD", "RL_WEATHER",
+           "RL_PHONE_LOGIN", "RL_PHONE_BIND"):
     os.environ[_k] = "100000"
+# 号码认证测试里统一开关服务（测试内部再按用例覆盖 ALIYUN_PHONE_ENABLED）
+os.environ["ALIYUN_PHONE_ENABLED"] = "1"
+os.environ["ALIYUN_PHONE_AK_ID"] = "test-ak"
+os.environ["ALIYUN_PHONE_AK_SECRET"] = "test-ak-secret"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

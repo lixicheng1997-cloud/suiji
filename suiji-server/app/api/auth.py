@@ -4,6 +4,11 @@
   access 2 小时（业务）/ refresh 30 天（一次性轮换）/ media 7 天（仅下载）
   /auth/logout   精确撤销当前 access，并一并作废传入的 refresh
   refresh 重放   判定令牌已泄露 → 抬高该用户水位线，全部已签发令牌立即失效
+
+手机号登录（阿里云号码认证服务，/auth/phone/*）：
+  一键登录（App/H5 原生 SDK 取号令牌 → GetMobile）与本机号码校验（输入号 + 令牌 →
+  VerifyPhone PASS）共用同一套账号融合规则 _resolve_phone_login：
+  手机号已绑定 → 登录该账号；未绑定 → 自动注册新账号（无密码，仅手机号通道）。
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -11,14 +16,18 @@ from sqlalchemy.orm import Session
 from ..core.config import settings
 from ..core.db import get_db
 from ..core.deps import AuthContext, get_auth, session_valid
-from ..core.rate_limit import limit as rate_limit
+from ..core.rate_limit import limit as rate_limit, rate_limiter
 from ..core.security import (ACCESS, MEDIA, REFRESH, create_token, decode_token,
                              hash_password, verify_password)
 from ..core.session_store import session_store
 from ..domain.dates import utc_now_iso
 from ..models import Family, FamilyMember, User
-from ..schemas import DeactivateIn, LoginIn, LogoutIn, PasswordIn, RefreshIn, RegisterIn
+from ..schemas import (DeactivateIn, LoginIn, LogoutIn, PasswordIn, PhoneBindIn,
+                       PhoneOneClickIn, PhonePrefetchIn, PhoneUnbindIn,
+                       PhoneVerifyLoginIn, RefreshIn, RegisterIn)
 from ..services import account_service
+from ..services.alibaba_phone import (gen_auto_username, get_mobile, phone_hash_of,
+                                      verify_phone)
 from ..services.ids import gen_id
 from ..services.rows import user_row
 
@@ -127,6 +136,147 @@ def login(body: LoginIn, db: Session = Depends(get_db),
     return _issue(db, user, family)
 
 
+# ---------- 手机号登录（阿里云号码认证） ----------
+
+def _phone_service_ready() -> None:
+    """号码认证服务可用性闸：AK 未配置或开关关闭时一律 503（前端按钮隐藏，端点兜底）。"""
+    if not (settings.aliyun_phone_enabled and settings.aliyun_phone_ak_id
+            and settings.aliyun_phone_ak_secret):
+        raise HTTPException(status_code=503, detail="号码认证未开通，请使用账号密码登录")
+
+
+def _check_phone_format(phone: str) -> str:
+    """手机号格式闸：大陆 11 位号码（1 开头），只挡格式不挡归属地。"""
+    phone = (phone or "").strip()
+    if len(phone) != 11 or not phone.isdigit() or not phone.startswith("1"):
+        raise HTTPException(status_code=422, detail="手机号格式不正确")
+    return phone
+
+
+def _phone_rate_guard(phone_hash: str, count: int, window: int) -> None:
+    """按手机号哈希限流（防枚举）：同一手机号窗口内超过配额直接 429，不区分是否命中账号。"""
+    if not rate_limiter.hit(f"rl:phonehash:{phone_hash}", count, window):
+        raise HTTPException(
+            status_code=429, detail="该手机号操作过于频繁，请稍后再试",
+            headers={"Retry-After": str(window)},
+        )
+
+
+def _resolve_phone_login(db: Session, phone: str) -> dict:
+    """手机号登录融合规则（一键登录与本机号码校验共用）：
+    - 已绑定手机号 → 登录该账号（复刻 login 的停用拦截 + need_family 判定）；
+    - 未绑定 → 自动注册新账号：username=sj+随机10位（不展示）、password_hash=""
+      （不可密码登录，可在「我的」页设置密码后获得双通道）、name=手机用户。
+    """
+    ph = phone_hash_of(phone)
+    user = db.query(User).filter(User.phone_hash == ph).first()
+    if user is None:
+        # 自动注册：username 撞库重掷（随机 10 位碰撞概率可忽略，兜底仍做幂等重试）
+        for _ in range(3):
+            candidate = gen_auto_username()
+            if not db.query(User).filter(User.username == candidate).first():
+                break
+        else:
+            raise HTTPException(status_code=503, detail="注册繁忙，请稍后再试")
+        user = User(id=gen_id("usr"), username=candidate, name="手机用户",
+                    password_hash="", family_id="", created_at=utc_now_iso(),
+                    phone=phone, phone_hash=ph)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return _issue_pending(user)
+    if int(user.status or 0) == 1:
+        raise HTTPException(status_code=403, detail="账号已被停用，请联系管理员")
+    family = db.get(Family, user.family_id) if user.family_id else None
+    if family is None:
+        return _issue_pending(user)
+    return _issue(db, user, family)
+
+
+@router.post("/phone/prefetch",
+             dependencies=[rate_limit("phone_prefetch", 10, 300)])
+def phone_prefetch(body: PhonePrefetchIn):
+    """静默预取脱敏本机号码：客户端 SDK 静默令牌 → GetMobile 换号 → 返回脱敏号。
+
+    仅供登录页顶部展示「138****8888」，不产生任何登录态；令牌一次性消费，
+    预取用掉不影响后续一键登录（getLoginToken 另发新令牌）。
+    换号失败（无 SIM / 令牌类型不符 / 服务异常）一律 503，前端静默回退手动输入。
+    """
+    _phone_service_ready()
+    phone = get_mobile(body.token)
+    return {"masked": phone[:3] + "****" + phone[7:]}
+
+
+@router.post("/phone/oneclick",
+             dependencies=[rate_limit("phone_login", settings.rl_phone_login, settings.rl_phone_login_window)])
+def phone_oneclick(body: PhoneOneClickIn, db: Session = Depends(get_db)):
+    """一键登录：客户端 SDK 取号令牌 → 服务端 GetMobile 换手机号 → 融合规则签发令牌。
+
+    阿里云令牌一次性消费，天然防重放；IP 限流 + 手机号哈希限流双键防枚举。
+    """
+    _phone_service_ready()
+    phone = get_mobile(body.token)
+    _phone_rate_guard(phone_hash_of(phone), 5, 3600)
+    return _resolve_phone_login(db, phone)
+
+
+@router.post("/phone/verify-login",
+             dependencies=[rate_limit("phone_login", settings.rl_phone_login, settings.rl_phone_login_window)])
+def phone_verify_login(body: PhoneVerifyLoginIn, db: Session = Depends(get_db)):
+    """本机号码校验登录：用户输入手机号 + SDK 校验令牌，VerifyPhone PASS 才放行。"""
+    _phone_service_ready()
+    phone = _check_phone_format(body.phone)
+    verify_phone(phone, body.token)
+    _phone_rate_guard(phone_hash_of(phone), 5, 3600)
+    return _resolve_phone_login(db, phone)
+
+
+@router.post("/phone/bind",
+             dependencies=[rate_limit("phone_bind", settings.rl_phone_bind, settings.rl_phone_bind_window)])
+def phone_bind(body: PhoneBindIn, db: Session = Depends(get_db), auth: AuthContext = Depends(get_auth)):
+    """绑定手机号（登录态）：VerifyPhone 校验持机者本人后写入。
+
+    冲突策略：手机号已归属其他账号 → 409 拒绝不自动合并（防误并家庭数据），
+    提示先在原账号解绑；本账号已绑其他手机号 → 409 要求先解绑。
+    """
+    user = db.get(User, auth.user_id)
+    if not user:
+        raise HTTPException(status_code=401, detail="登录已失效，请重新登录")
+    phone = _check_phone_format(body.phone)
+    verify_phone(phone, body.token)
+    ph = phone_hash_of(phone)
+    other = db.query(User).filter(User.phone_hash == ph, User.id != user.id).first()
+    if other is not None:
+        raise HTTPException(status_code=409, detail="该手机号已绑定其他账号，请先在原账号解绑后再绑定")
+    if user.phone_hash and user.phone_hash != ph:
+        raise HTTPException(status_code=409, detail="当前账号已绑定其他手机号，请先解绑")
+    user.phone = phone
+    user.phone_hash = ph
+    db.commit()
+    return {"ok": True, "user": user_row(user)}
+
+
+@router.post("/phone/unbind")
+def phone_unbind(body: PhoneUnbindIn, db: Session = Depends(get_db), auth: AuthContext = Depends(get_auth)):
+    """解绑手机号（登录态）：无短信通道，用密码二次校验兜底。
+
+    手机号账号（password_hash 为空）不允许解绑：解绑后将失去唯一登录通道。
+    """
+    user = db.get(User, auth.user_id)
+    if not user:
+        raise HTTPException(status_code=401, detail="登录已失效，请重新登录")
+    if not user.phone_hash:
+        raise HTTPException(status_code=400, detail="当前账号未绑定手机号")
+    if not user.password_hash:
+        raise HTTPException(status_code=400, detail="请先设置密码后再解绑手机号，否则将无法登录")
+    if not verify_password(body.password, user.password_hash):
+        raise HTTPException(status_code=400, detail="密码不正确")
+    user.phone = ""
+    user.phone_hash = ""
+    db.commit()
+    return {"ok": True, "user": user_row(user)}
+
+
 @router.post("/refresh")
 def refresh(body: RefreshIn, db: Session = Depends(get_db),
             _rl=rate_limit("refresh", settings.rl_refresh, settings.rl_refresh_window)):
@@ -203,10 +353,11 @@ def change_password(body: PasswordIn, db: Session = Depends(get_db), auth: AuthC
     user = db.get(User, auth.user_id)
     if not user:
         raise HTTPException(status_code=401, detail="登录已失效，请重新登录")
-    if not verify_password(body.old_password, user.password_hash):
+    # 手机号注册的账号（password_hash 为空）首次设置密码：免验旧密码
+    if user.password_hash and not verify_password(body.old_password, user.password_hash):
         raise HTTPException(status_code=400, detail="原密码不正确")
     _check_password_strength(body.new_password)
-    if verify_password(body.new_password, user.password_hash):
+    if user.password_hash and verify_password(body.new_password, user.password_hash):
         raise HTTPException(status_code=400, detail="新密码不能与当前密码相同")
     user.password_hash = hash_password(body.new_password)
     db.commit()

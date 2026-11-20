@@ -5,6 +5,8 @@
  * 迁库（如换框架）时只需重写本文件，领域层与仓储 API 不变。
  */
 
+import { PHONE_AUTH_PLUGIN, PHONE_AUTH_SDK_INFO, PHONE_AUTH_H5_SDK, PHONE_AUTH_H5_GLOBAL } from '@/config/app.js'
+
 const hasPlus = () => typeof plus !== 'undefined' && plus && plus.sqlite
 
 /* ---------- KV 存储 ---------- */
@@ -358,6 +360,191 @@ export function mpSrc(path) {
   // #ifndef MP-WEIXIN
   return path
   // #endif
+}
+
+/* ---------- 阿里云号码认证（一键登录 / 本机号码校验） ----------
+ * 平台差异继续收口在本文件：App 端走 uni.requireNativePlugin（原生插件），
+ * H5 端动态注入网页版 SDK；小程序端不支持（恒返回 null）。
+ * 任何失败——插件缺失 / 标准基座 / 未插 SIM / 运营商不支持 / SDK 加载失败——
+ * 一律 resolve(null)，由上层静默回退账号密码登录，UI 不阻塞不报错。
+ * 令牌均为一次性：服务端 GetMobile / VerifyPhone 用掉即废，无重放风险。
+ *
+ * 插件市场地址：https://ext.dcloud.net.cn/plugin?id=4297
+ * 插件名：AliCloud-NirvanaPns
+ * 官方文档：https://help.aliyun.com/zh/pnvs/developer-reference/uni-app-access
+ * 实际 API 契约（App 端）：
+ *   setAuthSDKInfo(info)                          — 必调，设置控制台密钥
+ *   checkEnvAvailable(authType, cb)               — 1=本机校验, 2=一键登录
+ *   accelerateLoginPage(timeout, cb)              — 一键登录前预取（建议提前 2~3 秒）
+ *   getLoginToken(timeout, config, tokenCb, uiCb, customCb) — 唤起授权页
+ *   quitLoginPage()                               — 关闭授权页
+ *   accelerateVerify(timeout, cb)                 — 本机校验前预取
+ *   getVerifyToken(timeout, cb)                   — 获取校验令牌（不需要 phone 参数）
+ *   回调 resultCode === "600000" 表示成功 */
+
+/* App 端插件懒加载 + 密钥初始化（只初始化一次） */
+let _appPluginInited = false
+function getAppPlugin() {
+  // #ifdef APP-PLUS
+  try {
+    const plugin = uni.requireNativePlugin(PHONE_AUTH_PLUGIN)
+    if (!plugin) return null
+    if (!_appPluginInited) {
+      _appPluginInited = true
+      if (PHONE_AUTH_SDK_INFO) {
+        plugin.setAuthSDKInfo(PHONE_AUTH_SDK_INFO)
+      }
+    }
+    return plugin
+  } catch (e) { return null }
+  // #endif
+  // eslint-disable-next-line no-unreachable
+  return null
+}
+
+/* H5 网页版 SDK 懒加载（只注一次；超时/失败均按不支持处理） */
+let _h5SdkLoading = null
+function loadH5Sdk() {
+  // #ifdef H5
+  if (typeof window !== 'undefined' && window.PHONE_AUTH_SDK_READY) {
+    return Promise.resolve(window[PHONE_AUTH_H5_GLOBAL])
+  }
+  if (_h5SdkLoading) return _h5SdkLoading
+  _h5SdkLoading = new Promise(resolve => {
+    const s = document.createElement('script')
+    let done = false
+    const finish = ok => {
+      if (done) return
+      done = true
+      window.PHONE_AUTH_SDK_READY = !!ok
+      _h5SdkLoading = null
+      resolve(ok ? window[PHONE_AUTH_H5_GLOBAL] : null)
+    }
+    s.src = PHONE_AUTH_H5_SDK
+    s.async = true
+    s.onload = () => finish(!!window[PHONE_AUTH_H5_GLOBAL])
+    s.onerror = () => finish(false)
+    document.head.appendChild(s)
+    setTimeout(() => finish(false), 8000)
+  })
+  return _h5SdkLoading
+  // #endif
+  // eslint-disable-next-line no-unreachable
+  return Promise.resolve(null)
+}
+
+/** 当前平台是否具备号码认证能力（按钮显隐用；能力探测失败按钮自动隐藏） */
+export async function phoneAuthSupported() {
+  // #ifdef APP-PLUS
+  const plugin = getAppPlugin()
+  if (!plugin) return false
+  return new Promise(resolve => {
+    try {
+      plugin.checkEnvAvailable(2, res => {
+        resolve(!!res && res.resultCode === '600000')
+      })
+    } catch (e) { resolve(false) }
+  })
+  // #endif
+  // #ifdef H5
+  const sdk = await loadH5Sdk()
+  return !!sdk
+  // #endif
+  // eslint-disable-next-line no-unreachable
+  return false
+}
+
+/** 一键登录预取号（accelerateLoginPage）：提前 2~3 秒调用可让授权页秒开并即时展示本机号码；
+ *  官方文档要求仅在未登录场景调用、勿频繁调用，故只在登录页 onLoad 触发一次。
+ *  App 端走插件预取；H5 网页 SDK 内部自行预取，此处 no-op。 */
+export function prefetchOneClickLogin() {
+  // #ifdef APP-PLUS
+  const plugin = getAppPlugin()
+  if (!plugin || typeof plugin.accelerateLoginPage !== 'function') return
+  try { plugin.accelerateLoginPage(5000, () => {}) } catch (e) { /* 预取失败不阻断：getLoginToken 会自行取号 */ }
+  // #endif
+}
+
+/** 一键登录取号：弹出运营商授权页，用户确认后 resolve(令牌)；失败/取消 resolve(null) */
+export function getOneClickToken() {
+  // #ifdef APP-PLUS
+  return new Promise(resolve => {
+    const plugin = getAppPlugin()
+    if (!plugin || typeof plugin.getLoginToken !== 'function') return resolve(null)
+    try {
+      plugin.getLoginToken(
+        5000,
+        {},
+        res => {
+          const r = res || {}
+          if (r.resultCode === '600000' && r.token) {
+            resolve(r.token)
+          } else {
+            resolve(null)
+          }
+        },
+        /* uiCallback：授权页生命周期事件（打开/关闭/点击等），按需埋点，此处不处理 */
+        () => {},
+        /* customUiCallback：自定义授权页 UI 配置，留空使用默认样式 */
+        () => {}
+      )
+    } catch (e) { resolve(null) }
+  })
+  // #endif
+  // #ifdef H5
+  return loadH5Sdk().then(sdk => new Promise(resolve => {
+    if (!sdk || typeof sdk.getLoginToken !== 'function') return resolve(null)
+    try {
+      sdk.getLoginToken(res => {
+        const r = res || {}
+        resolve((r.resultCode === '600000' || r.code === 0 || r.success) && r.token ? r.token : null)
+      })
+    } catch (e) { resolve(null) }
+  }))
+  // #endif
+  // eslint-disable-next-line no-unreachable
+  return Promise.resolve(null)
+}
+
+/** 关闭一键登录授权页（用户取消或超时后调用） */
+export function quitLoginPage() {
+  // #ifdef APP-PLUS
+  const plugin = getAppPlugin()
+  if (plugin && typeof plugin.quitLoginPage === 'function') {
+    try { plugin.quitLoginPage() } catch (e) { /* ignore */ }
+  }
+  // #endif
+}
+
+/** 本机号码校验取号：resolve(令牌)；失败/不匹配 resolve(null)
+ * 注意：getVerifyToken 不需要传 phone 参数，token 本身即代表本机号码，
+ * 服务端用 VerifyPhone(PhoneNumber=用户输入号, AccessToken=token) 做比对校验。 */
+export function getVerifyToken() {
+  // #ifdef APP-PLUS
+  return new Promise(resolve => {
+    const plugin = getAppPlugin()
+    if (!plugin || typeof plugin.getVerifyToken !== 'function') return resolve(null)
+    try {
+      plugin.getVerifyToken(5000, res => {
+        const r = res || {}
+        resolve(r.resultCode === '600000' && r.token ? r.token : null)
+      })
+    } catch (e) { resolve(null) }
+  })
+  // #endif
+  // #ifdef H5
+  return loadH5Sdk().then(sdk => new Promise(resolve => {
+    if (!sdk || typeof sdk.getVerifyToken !== 'function') return resolve(null)
+    try {
+      sdk.getVerifyToken(res => {
+        const r = res || {}
+        resolve((r.resultCode === '600000' || r.code === 0 || r.success) && r.token ? r.token : null)
+      })
+    } catch (e) { resolve(null) }
+  }))
+  // #endif
+  // eslint-disable-next-line no-unreachable
+  return Promise.resolve(null)
 }
 
 
